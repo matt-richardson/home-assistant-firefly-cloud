@@ -1,0 +1,272 @@
+"""Data update coordinator for Firefly Cloud integration."""
+import logging
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
+
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+
+from .api import FireflyAPIClient
+from .const import (
+    DEFAULT_SCAN_INTERVAL,
+    DEFAULT_TASK_LOOKAHEAD_DAYS,
+    DOMAIN,
+)
+from .exceptions import (
+    FireflyAuthenticationError,
+    FireflyConnectionError,
+    FireflyTokenExpiredError,
+)
+
+_LOGGER = logging.getLogger(__name__)
+
+
+class FireflyUpdateCoordinator(DataUpdateCoordinator):
+    """Class to manage fetching Firefly data."""
+
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        api: FireflyAPIClient,
+        task_lookahead_days: int = DEFAULT_TASK_LOOKAHEAD_DAYS,
+    ) -> None:
+        """Initialize the coordinator."""
+        super().__init__(
+            hass,
+            _LOGGER,
+            name=DOMAIN,
+            update_interval=DEFAULT_SCAN_INTERVAL,
+        )
+        self.api = api
+        self.task_lookahead_days = task_lookahead_days
+        self._user_info: Optional[Dict[str, Any]] = None
+
+    async def _async_update_data(self) -> Dict[str, Any]:
+        """Fetch data from Firefly API."""
+        try:
+            # Get user info if we don't have it
+            if not self._user_info:
+                self._user_info = await self.api.get_user_info()
+
+            # Calculate date ranges
+            now = datetime.now()
+            today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            today_end = today_start + timedelta(days=1)
+            week_start = today_start
+            week_end = today_start + timedelta(days=7)
+            task_end = today_start + timedelta(days=self.task_lookahead_days)
+
+            user_guid = self._user_info["guid"]
+
+            # Fetch data in parallel
+            events_today = await self.api.get_events(today_start, today_end, user_guid)
+            events_week = await self.api.get_events(week_start, week_end, user_guid)
+            tasks = await self.api.get_tasks()
+
+            # Process and organize the data
+            data = {
+                "user_info": self._user_info,
+                "events": {
+                    "today": self._process_events(events_today),
+                    "week": self._process_events(events_week),
+                },
+                "tasks": {
+                    "all": self._process_tasks(tasks),
+                    "due_today": self._filter_tasks_by_date(tasks, today_start, today_end),
+                    "upcoming": self._filter_tasks_by_date(tasks, now, task_end),
+                    "overdue": self._filter_overdue_tasks(tasks, now),
+                },
+                "last_updated": now,
+            }
+
+            _LOGGER.debug(
+                "Successfully updated Firefly data: %d events today, %d events this week, %d total tasks",
+                len(events_today),
+                len(events_week), 
+                len(tasks),
+            )
+
+            return data
+
+        except FireflyTokenExpiredError as err:
+            _LOGGER.warning("Firefly authentication token expired, reauthentication required")
+            raise UpdateFailed("Authentication token expired") from err
+        except FireflyAuthenticationError as err:
+            _LOGGER.error("Firefly authentication error: %s", err)
+            raise UpdateFailed(f"Authentication error: {err}") from err
+        except FireflyConnectionError as err:
+            _LOGGER.warning("Connection error while updating Firefly data: %s", err)
+            raise UpdateFailed(f"Connection error: {err}") from err
+        except Exception as err:
+            _LOGGER.exception("Unexpected error updating Firefly data")
+            raise UpdateFailed(f"Unexpected error: {err}") from err
+
+    def _process_events(self, events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Process and clean event data."""
+        processed_events = []
+        
+        for event in events:
+            try:
+                processed_event = {
+                    "start": datetime.fromisoformat(event["start"].replace("Z", "+00:00")),
+                    "end": datetime.fromisoformat(event["end"].replace("Z", "+00:00")),
+                    "subject": event.get("subject", "Unknown Subject"),
+                    "location": event.get("location"),
+                    "description": event.get("description"),
+                    "guild": event.get("guild"),
+                    "attendees": event.get("attendees", []),
+                }
+                processed_events.append(processed_event)
+            except (ValueError, KeyError) as err:
+                _LOGGER.warning("Error processing event data: %s", err)
+                continue
+
+        # Sort by start time
+        processed_events.sort(key=lambda x: x["start"])
+        return processed_events
+
+    def _process_tasks(self, tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Process and clean task data."""
+        processed_tasks = []
+        
+        for task in tasks:
+            try:
+                due_date_str = task.get("dueDate")
+                set_date_str = task.get("setDate")
+                
+                processed_task = {
+                    "id": task.get("guid", task.get("id", "unknown")),
+                    "title": task.get("title", "Untitled Task"),
+                    "description": task.get("description", ""),
+                    "due_date": (
+                        datetime.fromisoformat(due_date_str.replace("Z", "+00:00"))
+                        if due_date_str
+                        else None
+                    ),
+                    "set_date": (
+                        datetime.fromisoformat(set_date_str.replace("Z", "+00:00"))
+                        if set_date_str
+                        else None
+                    ),
+                    "subject": task.get("subject", {}).get("name", "Unknown Subject"),
+                    "task_type": self._determine_task_type(task),
+                    "completion_status": task.get("completionStatus", "Unknown"),
+                    "setter": task.get("setter", {}).get("name", "Unknown"),
+                    "raw_data": task,  # Keep raw data for debugging
+                }
+                processed_tasks.append(processed_task)
+            except (ValueError, KeyError, TypeError) as err:
+                _LOGGER.warning("Error processing task data: %s", err)
+                continue
+
+        return processed_tasks
+
+    def _determine_task_type(self, task: Dict[str, Any]) -> str:
+        """Determine task type from task data."""
+        title = task.get("title", "").lower()
+        description = task.get("description", "").lower()
+        
+        # Simple classification based on keywords
+        if any(keyword in title for keyword in ["test", "exam", "assessment"]):
+            return "test"
+        elif any(keyword in title for keyword in ["project", "assignment"]):
+            return "project"
+        elif any(keyword in description for keyword in ["permission", "slip", "form"]):
+            return "permission_slip"
+        else:
+            return "homework"
+
+    def _filter_tasks_by_date(
+        self, tasks: List[Dict[str, Any]], start: datetime, end: datetime
+    ) -> List[Dict[str, Any]]:
+        """Filter tasks by date range."""
+        filtered_tasks = []
+        
+        for task in tasks:
+            due_date_str = task.get("dueDate")
+            if not due_date_str:
+                continue
+                
+            try:
+                due_date = datetime.fromisoformat(due_date_str.replace("Z", "+00:00"))
+                if start <= due_date < end:
+                    filtered_tasks.append(task)
+            except ValueError:
+                continue
+                
+        return self._process_tasks(filtered_tasks)
+
+    def _filter_overdue_tasks(
+        self, tasks: List[Dict[str, Any]], now: datetime
+    ) -> List[Dict[str, Any]]:
+        """Filter overdue tasks."""
+        overdue_tasks = []
+        
+        for task in tasks:
+            due_date_str = task.get("dueDate")
+            completion_status = task.get("completionStatus", "")
+            
+            if not due_date_str or completion_status.lower() == "completed":
+                continue
+                
+            try:
+                due_date = datetime.fromisoformat(due_date_str.replace("Z", "+00:00"))
+                if due_date < now:
+                    overdue_tasks.append(task)
+            except ValueError:
+                continue
+                
+        return self._process_tasks(overdue_tasks)
+
+    def get_events_for_day(self, target_date: datetime) -> List[Dict[str, Any]]:
+        """Get events for a specific day."""
+        if not self.data or "events" not in self.data:
+            return []
+
+        day_start = target_date.replace(hour=0, minute=0, second=0, microsecond=0)
+        day_end = day_start + timedelta(days=1)
+        
+        # For today, use the cached today events
+        today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        if day_start == today:
+            return self.data["events"]["today"]
+        
+        # For other days in the week, filter from week events
+        week_events = self.data["events"]["week"]
+        return [
+            event for event in week_events
+            if day_start <= event["start"] < day_end
+        ]
+
+    def get_tasks_by_subject(self) -> Dict[str, List[Dict[str, Any]]]:
+        """Group tasks by subject."""
+        if not self.data or "tasks" not in self.data:
+            return {}
+
+        tasks_by_subject = {}
+        for task in self.data["tasks"]["upcoming"]:
+            subject = task["subject"]
+            if subject not in tasks_by_subject:
+                tasks_by_subject[subject] = []
+            tasks_by_subject[subject].append(task)
+
+        return tasks_by_subject
+
+    def get_special_requirements_today(self) -> List[str]:
+        """Get special requirements for today (sports kit, equipment, etc.)."""
+        today_events = self.get_events_for_day(datetime.now())
+        requirements = []
+        
+        for event in today_events:
+            subject = event["subject"].lower()
+            description = (event["description"] or "").lower()
+            
+            # Check for sports/PE requirements
+            if any(keyword in subject for keyword in ["pe", "sport", "games", "physical"]):
+                requirements.append("Sports kit required")
+            
+            # Check for equipment mentions in description
+            if any(keyword in description for keyword in ["equipment", "kit", "uniform"]):
+                requirements.append(f"Special equipment for {event['subject']}")
+        
+        return list(set(requirements))  # Remove duplicates
