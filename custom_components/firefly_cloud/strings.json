@@ -1,0 +1,86 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to Firefly Cloud",
+        "description": "Enter your school's Firefly code to connect to your school's Firefly system.",
+        "data": {
+          "school_code": "School Code"
+        },
+        "data_description": {
+          "school_code": "Enter your school's Firefly code (usually found in your school's Firefly URL, e.g., 'myschool' from myschool.fireflycloud.net)"
+        }
+      },
+      "auth": {
+        "title": "Authenticate with Firefly",
+        "description": "Complete authentication by logging into Firefly in your browser.\n\n**Instructions:**\n1. Click the authentication URL above to open Firefly\n2. Log in with your Firefly credentials\n3. After successful login, open browser developer tools (F12)\n4. Go to Console tab and type: `document.documentElement.outerHTML`\n5. Copy the entire response (should contain `<token>...</token>`)\n6. Paste it in the field below",
+        "data": {
+          "auth_response": "Authentication Response"
+        },
+        "data_description": {
+          "auth_response": "Paste the full HTML response containing the authentication token"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Reauthenticate with Firefly",
+        "description": "Your Firefly authentication has expired. Please log in again using the same process.\n\n**Instructions:**\n1. Click the authentication URL above to open Firefly\n2. Log in with your Firefly credentials\n3. After successful login, open browser developer tools (F12)\n4. Go to Console tab and type: `document.documentElement.outerHTML`\n5. Copy the entire response (should contain `<token>...</token>`)\n6. Paste it in the field below",
+        "data": {
+          "auth_response": "Authentication Response"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to Firefly Cloud. Please check your internet connection and try again.",
+      "school_not_found": "School not found. Please check your school code and try again.",
+      "school_disabled": "This school's Firefly Cloud integration is not enabled. Please contact your school administrator.",
+      "invalid_auth": "Authentication failed. Please ensure you copied the complete authentication response and try again.",
+      "unknown": "An unexpected error occurred. Please try again."
+    },
+    "abort": {
+      "already_configured": "This Firefly Cloud school is already configured.",
+      "reauth_successful": "Reauthentication successful! Your Firefly Cloud integration is now working again."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Firefly Cloud Options",
+        "description": "Configure options for your Firefly Cloud integration.",
+        "data": {
+          "task_lookahead_days": "Task Lookahead Days"
+        },
+        "data_description": {
+          "task_lookahead_days": "Number of days ahead to look for upcoming tasks (1-30 days)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "today_schedule": {
+        "name": "Today's Schedule"
+      },
+      "week_schedule": {
+        "name": "Week Schedule"
+      },
+      "upcoming_tasks": {
+        "name": "Upcoming Tasks"
+      },
+      "tasks_due_today": {
+        "name": "Tasks Due Today"
+      }
+    }
+  },
+  "services": {},
+  "exceptions": {
+    "auth_failed": {
+      "message": "Authentication with Firefly failed. Please check your credentials and try again."
+    },
+    "connection_error": {
+      "message": "Unable to connect to Firefly Cloud. Please check your internet connection."
+    },
+    "rate_limit": {
+      "message": "Too many requests to Firefly Cloud. Please wait a moment and try again."
+    }
+  }
+}
