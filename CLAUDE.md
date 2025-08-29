@@ -56,4 +56,6 @@ Target test structure in `tests/` with fixtures in `tests/fixtures/`.
 
 ## Development Workflow
 
-Always commit to git after a change is made.
+Always run tests before saying that a change is complete.
+Always commit to git after a change is complete
+.

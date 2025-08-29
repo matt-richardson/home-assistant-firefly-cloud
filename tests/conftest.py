@@ -4,9 +4,28 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime, timedelta
 
 import pytest
+import pytest_asyncio
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_NAME
+
+# Import Home Assistant test utilities
+try:
+    from homeassistant.testing import get_fixture_path
+except ImportError:
+    pass
+
+# Configure pytest for Home Assistant testing
+@pytest.fixture
+async def hass():
+    """Return a Home Assistant instance for testing."""
+    from homeassistant.core import HomeAssistant
+    from homeassistant.config import Config
+    
+    hass = HomeAssistant()
+    hass.config = Config(hass)
+    hass.data = {}
+    return hass
 
 from custom_components.firefly_cloud.const import (
     CONF_DEVICE_ID,
@@ -236,4 +255,10 @@ def mock_coordinator_data():
 def mock_aiohttp_session():
     """Return a mock aiohttp session."""
     session = AsyncMock()
+    
+    # Configure the context manager behavior
+    response = AsyncMock()
+    session.get.return_value.__aenter__.return_value = response
+    session.post.return_value.__aenter__.return_value = response
+    
     return session

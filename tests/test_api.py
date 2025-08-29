@@ -2,6 +2,7 @@
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
+import pytest_asyncio
 
 from custom_components.firefly_cloud.api import FireflyAPIClient
 from custom_components.firefly_cloud.exceptions import (
@@ -26,6 +27,7 @@ def api_client(mock_aiohttp_session):
     )
 
 
+@pytest.mark.asyncio
 async def test_get_school_info_success(mock_aiohttp_session, mock_school_info):
     """Test successful school info retrieval."""
     # Mock XML response
@@ -51,6 +53,7 @@ async def test_get_school_info_success(mock_aiohttp_session, mock_school_info):
     assert "device_id" in result
 
 
+@pytest.mark.asyncio
 async def test_get_school_info_not_found(mock_aiohttp_session):
     """Test school not found."""
     xml_response = """<?xml version="1.0"?>
@@ -66,12 +69,14 @@ async def test_get_school_info_not_found(mock_aiohttp_session):
         await FireflyAPIClient.get_school_info(mock_aiohttp_session, "nonexistent")
 
 
+@pytest.mark.asyncio
 async def test_get_school_info_invalid_code():
     """Test invalid school code."""
     with pytest.raises(FireflySchoolNotFoundError):
         await FireflyAPIClient.get_school_info(AsyncMock(), "")
 
 
+@pytest.mark.asyncio
 async def test_get_api_version_success(api_client, mock_aiohttp_session):
     """Test successful API version retrieval."""
     xml_response = """<?xml version="1.0"?>
@@ -93,6 +98,7 @@ async def test_get_api_version_success(api_client, mock_aiohttp_session):
     assert result["increment"] == 3
 
 
+@pytest.mark.asyncio
 async def test_verify_credentials_success(api_client, mock_aiohttp_session):
     """Test successful credential verification."""
     mock_response = AsyncMock()
@@ -106,6 +112,7 @@ async def test_verify_credentials_success(api_client, mock_aiohttp_session):
     assert result is True
 
 
+@pytest.mark.asyncio
 async def test_verify_credentials_invalid(api_client, mock_aiohttp_session):
     """Test invalid credential verification."""
     mock_response = AsyncMock()
@@ -117,6 +124,7 @@ async def test_verify_credentials_invalid(api_client, mock_aiohttp_session):
     assert result is False
 
 
+@pytest.mark.asyncio
 async def test_parse_authentication_response_success(api_client):
     """Test successful authentication response parsing."""
     xml_response = """<token>
@@ -132,6 +140,7 @@ async def test_parse_authentication_response_success(api_client):
     assert result["user"]["guid"] == "test-user-123"
 
 
+@pytest.mark.asyncio
 async def test_parse_authentication_response_empty():
     """Test empty authentication response."""
     api_client = FireflyAPIClient(
@@ -145,6 +154,7 @@ async def test_parse_authentication_response_empty():
         await api_client.parse_authentication_response("")
 
 
+@pytest.mark.asyncio
 async def test_parse_authentication_response_invalid_xml():
     """Test invalid XML in authentication response."""
     api_client = FireflyAPIClient(
@@ -158,6 +168,7 @@ async def test_parse_authentication_response_invalid_xml():
         await api_client.parse_authentication_response("invalid xml")
 
 
+@pytest.mark.asyncio
 async def test_graphql_query_success(api_client, mock_aiohttp_session):
     """Test successful GraphQL query."""
     mock_response = AsyncMock()
@@ -171,6 +182,7 @@ async def test_graphql_query_success(api_client, mock_aiohttp_session):
     assert result == {"test": "result"}
 
 
+@pytest.mark.asyncio
 async def test_graphql_query_token_expired(api_client, mock_aiohttp_session):
     """Test GraphQL query with expired token."""
     mock_response = AsyncMock()
@@ -181,6 +193,7 @@ async def test_graphql_query_token_expired(api_client, mock_aiohttp_session):
         await api_client._graphql_query("query { test }")
 
 
+@pytest.mark.asyncio
 async def test_graphql_query_rate_limit(api_client, mock_aiohttp_session):
     """Test GraphQL query with rate limit."""
     mock_response = AsyncMock()
@@ -191,6 +204,7 @@ async def test_graphql_query_rate_limit(api_client, mock_aiohttp_session):
         await api_client._graphql_query("query { test }")
 
 
+@pytest.mark.asyncio
 async def test_graphql_query_api_errors(api_client, mock_aiohttp_session):
     """Test GraphQL query with API errors."""
     mock_response = AsyncMock()
@@ -203,6 +217,7 @@ async def test_graphql_query_api_errors(api_client, mock_aiohttp_session):
         await api_client._graphql_query("query { test }")
 
 
+@pytest.mark.asyncio
 async def test_get_events_success(api_client, mock_events):
     """Test successful event retrieval."""
     api_client._user_info = {"guid": "test-user-123"}
@@ -219,6 +234,7 @@ async def test_get_events_success(api_client, mock_events):
         assert result == mock_events
 
 
+@pytest.mark.asyncio
 async def test_get_tasks_success(api_client, mock_tasks):
     """Test successful task retrieval."""
     mock_response = AsyncMock()
@@ -233,6 +249,7 @@ async def test_get_tasks_success(api_client, mock_tasks):
     assert result == mock_tasks
 
 
+@pytest.mark.asyncio
 async def test_get_tasks_token_expired(api_client):
     """Test task retrieval with expired token."""
     mock_response = AsyncMock()
@@ -243,6 +260,7 @@ async def test_get_tasks_token_expired(api_client):
         await api_client.get_tasks()
 
 
+@pytest.mark.asyncio
 async def test_get_participating_groups_success(api_client):
     """Test successful participating groups retrieval."""
     api_client._user_info = {"guid": "test-user-123"}
@@ -256,12 +274,14 @@ async def test_get_participating_groups_success(api_client):
         assert result == mock_groups
 
 
+@pytest.mark.asyncio
 async def test_get_participating_groups_no_user(api_client):
     """Test participating groups retrieval without user info."""
     with pytest.raises(FireflyAuthenticationError):
         await api_client.get_participating_groups()
 
 
+@pytest.mark.asyncio
 async def test_get_auth_url(api_client):
     """Test authentication URL generation."""
     url = api_client.get_auth_url()
@@ -271,6 +291,7 @@ async def test_get_auth_url(api_client):
     assert "test-device-123" in url
 
 
+@pytest.mark.asyncio
 async def test_get_user_info_cached(api_client):
     """Test getting cached user info."""
     user_info = {"guid": "test-user-123", "fullname": "Test User"}
@@ -281,6 +302,7 @@ async def test_get_user_info_cached(api_client):
     assert result == user_info
 
 
+@pytest.mark.asyncio
 async def test_get_user_info_no_cache(api_client):
     """Test getting user info without cache."""
     with pytest.raises(FireflyAuthenticationError):

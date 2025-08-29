@@ -20,6 +20,7 @@ from custom_components.firefly_cloud.exceptions import (
 )
 
 
+@pytest.mark.asyncio
 async def test_async_setup_entry_success(
     hass: HomeAssistant,
     mock_config_entry: ConfigEntry,
@@ -50,6 +51,7 @@ async def test_async_setup_entry_success(
         mock_coordinator.async_config_entry_first_refresh.assert_called_once()
 
 
+@pytest.mark.asyncio
 async def test_async_setup_entry_auth_failed(
     hass: HomeAssistant,
     mock_config_entry: ConfigEntry,
@@ -67,6 +69,7 @@ async def test_async_setup_entry_auth_failed(
             await async_setup_entry(hass, mock_config_entry)
 
 
+@pytest.mark.asyncio
 async def test_async_setup_entry_token_expired(
     hass: HomeAssistant,
     mock_config_entry: ConfigEntry,
@@ -84,6 +87,7 @@ async def test_async_setup_entry_token_expired(
             await async_setup_entry(hass, mock_config_entry)
 
 
+@pytest.mark.asyncio
 async def test_async_setup_entry_connection_error(
     hass: HomeAssistant,
     mock_config_entry: ConfigEntry,
@@ -101,6 +105,7 @@ async def test_async_setup_entry_connection_error(
             await async_setup_entry(hass, mock_config_entry)
 
 
+@pytest.mark.asyncio
 async def test_async_setup_entry_coordinator_fetch_failure(
     hass: HomeAssistant,
     mock_config_entry: ConfigEntry,
@@ -121,6 +126,7 @@ async def test_async_setup_entry_coordinator_fetch_failure(
             await async_setup_entry(hass, mock_config_entry)
 
 
+@pytest.mark.asyncio
 async def test_async_unload_entry_success(
     hass: HomeAssistant,
     mock_config_entry: ConfigEntry,
@@ -142,6 +148,7 @@ async def test_async_unload_entry_success(
         coordinator.async_shutdown.assert_called_once()
 
 
+@pytest.mark.asyncio
 async def test_async_unload_entry_failure(
     hass: HomeAssistant,
     mock_config_entry: ConfigEntry,
@@ -163,6 +170,7 @@ async def test_async_unload_entry_failure(
         coordinator.async_shutdown.assert_not_called()
 
 
+@pytest.mark.asyncio
 async def test_async_reload_entry(
     hass: HomeAssistant,
     mock_config_entry: ConfigEntry,
@@ -181,6 +189,7 @@ async def test_async_reload_entry(
         mock_setup.assert_called_once_with(hass, mock_config_entry)
 
 
+@pytest.mark.asyncio
 async def test_async_update_options(
     hass: HomeAssistant,
     mock_config_entry: ConfigEntry,
