@@ -61,4 +61,72 @@ For issues, feature requests, or questions, please use the GitHub Issues tab.
 
 ## Development
 
-See `CLAUDE.md` for development guidance and `firefly-cloud-technical-spec.md` for detailed technical specifications.
+### Dev Container Setup (Recommended)
+
+This project includes a complete development container setup for VS Code that provides:
+
+- **Python 3.11 Environment**: Pre-configured with all dependencies
+- **Home Assistant Test Instance**: Automatic setup with integration pre-linked
+- **Testing Framework**: pytest with async support and coverage reporting (>95% target)
+- **Code Quality Tools**: black, flake8, mypy, pylint pre-configured
+- **VS Code Extensions**: Python development, YAML, and debugging tools
+- **Port Forwarding**: Home Assistant accessible at http://localhost:8123
+
+#### Quick Start with Dev Container
+
+1. **Prerequisites**: Install Docker and VS Code with Dev Containers extension
+2. **Open Project**: Open this directory in VS Code
+3. **Start Container**: Command Palette > "Dev Containers: Reopen in Container"
+4. **Wait for Setup**: Automatic dependency installation and environment configuration
+5. **Start Developing**: Use the helper commands below
+
+#### Development Commands
+
+Use the `./dev.sh` helper script for common development tasks:
+
+```bash
+./dev.sh test          # Run all tests
+./dev.sh test-cov      # Run tests with coverage (Silver tier: >95%)
+./dev.sh test-single   # Run specific test function
+./dev.sh lint          # Run all linting tools (black, flake8, mypy, pylint)
+./dev.sh format        # Format code with black and isort
+./dev.sh validate      # Full validation suite (format + lint + test)
+./dev.sh ha-test       # Start Home Assistant test instance
+./dev.sh clean         # Clean temporary files and caches
+```
+
+#### Testing the Integration
+
+The dev container automatically sets up a Home Assistant test instance:
+- Navigate to http://localhost:8123 after running `./dev.sh ha-test`
+- Integration is pre-installed and ready for configuration
+- Add Firefly Cloud through Settings > Devices & Services
+- Debug logging is enabled for development
+
+#### File Structure in Dev Container
+
+```
+/workspace/
+├── custom_components/firefly_cloud/    # Integration source code
+├── tests/                              # Comprehensive test suite
+├── homeassistant_test/                 # Home Assistant test instance
+│   ├── configuration.yaml             # Test configuration
+│   └── custom_components/              # Integration symlinked here
+├── .devcontainer/                      # Dev container configuration
+└── dev.sh                             # Development helper script
+```
+
+### Manual Development Setup
+
+If not using the dev container, you'll need:
+
+1. **Python 3.11+** with pip
+2. **Dependencies**: `pip install homeassistant aiohttp lxml python-dateutil voluptuous`
+3. **Development Tools**: `pip install pytest pytest-asyncio pytest-cov black flake8 mypy pylint`
+4. **Testing**: Run `pytest tests/` from the project root
+
+### Additional Resources
+
+- `CLAUDE.md` - Development guidance and architecture overview
+- `firefly-cloud-technical-spec.md` - Detailed technical specifications
+- `.devcontainer/README.md` - Complete dev container documentation
