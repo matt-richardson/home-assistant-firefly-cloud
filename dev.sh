@@ -5,11 +5,11 @@
 case "$1" in
     "test")
         echo "🧪 Running tests..."
-        python -m pytest tests/ -v
+        pytest tests/ -v
         ;;
     "test-cov")
         echo "🧪 Running tests with coverage..."
-        python -m pytest tests/ --cov=custom_components.firefly_cloud --cov-report=html --cov-report=term-missing --cov-fail-under=95
+        pytest tests/ --cov=custom_components.firefly_cloud --cov-report=html --cov-report=term-missing --cov-fail-under=95
         ;;
     "test-single")
         if [ -z "$2" ]; then
@@ -18,7 +18,7 @@ case "$1" in
             exit 1
         fi
         echo "🧪 Running single test: $2"
-        python -m pytest tests/ -v -k "$2"
+        pytest tests/ -v -k "$2"
         ;;
     "lint")
         echo "🔍 Running linting..."
@@ -36,15 +36,30 @@ case "$1" in
         black custom_components/ tests/
         isort custom_components/ tests/
         ;;
+    "ha-test")
+        echo "🏠 Starting Home Assistant test instance..."
+        cd /workspace/homeassistant_test
+        echo "📝 Integration available at: http://localhost:8123"
+        echo "📝 Add Firefly Cloud integration through Settings > Devices & Services"
+        hass --config . --debug
+        ;;
+    "ha-check")
+        echo "🏠 Checking Home Assistant configuration..."
+        cd /workspace/homeassistant_test
+        hass --config . --script check_config
+        ;;
     "validate")
         echo "✅ Running full validation suite..."
         echo "🎨 Formatting code..."
         black custom_components/ tests/
         isort custom_components/ tests/
         echo "🔍 Running linting..."
-        flake8 custom_components/ tests/ --max-line-length=88 --extend-ignore=E203,W503
+        flake8 custom_components/ tests/
+        pylint custom_components/
         echo "🧪 Running tests with coverage..."
-        python -m pytest tests/ --cov=custom_components.firefly_cloud --cov-report=html --cov-report=term-missing --cov-fail-under=95
+        pytest tests/ --cov=custom_components.firefly_cloud --cov-report=html --cov-report=term-missing --cov-fail-under=95
+        echo "🏠 Validating Home Assistant configuration..."
+        cd /workspace/homeassistant_test && hass --config . --script check_config
         ;;
     "clean")
         echo "🧹 Cleaning up..."
@@ -55,6 +70,14 @@ case "$1" in
         find . -type f -name "*.pyc" -delete
         find . -type f -name ".coverage" -delete
         find . -type f -name "coverage.xml" -delete
+        rm -rf /workspace/homeassistant_test/.storage 2>/dev/null || true
+        rm -f /workspace/homeassistant_test/home-assistant.log* 2>/dev/null || true
+        ;;
+    "install")
+        echo "📦 Installing integration for testing..."
+        mkdir -p /workspace/homeassistant_test/custom_components
+        ln -sf /workspace/custom_components/firefly_cloud /workspace/homeassistant_test/custom_components/firefly_cloud
+        echo "✅ Integration installed in test Home Assistant instance"
         ;;
     "help"|*)
         echo "🚀 Firefly Cloud Home Assistant Integration Development Helper"
@@ -67,14 +90,17 @@ case "$1" in
         echo "  test-single  - Run a single test function"
         echo "  lint         - Run all linting tools"
         echo "  format       - Format code with black and isort"
-        echo "  validate     - Run full validation suite (format + lint + test)"
-        echo "  clean        - Clean up temporary files"
+        echo "  ha-test      - Start Home Assistant test instance"
+        echo "  ha-check     - Check Home Assistant configuration"
+        echo "  validate     - Run full validation suite (format + lint + test + config)"
+        echo "  clean        - Clean up temporary files and logs"
+        echo "  install      - Install integration symlink for testing"
         echo "  help         - Show this help message"
         echo ""
-        echo "🎯 Silver Tier Quality Requirements:"
+        echo "🎯 Silver Tier Quality:"
         echo "  • Must achieve >95% test coverage"
         echo "  • All linting must pass"
-        echo "  • Modern Python async patterns"
+        echo "  • Integration must load successfully in Home Assistant"
         echo ""
         echo "🔗 Firefly Cloud Integration Features:"
         echo "  • Today's Schedule sensor"

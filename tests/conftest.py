@@ -16,16 +16,44 @@ except ImportError:
     pass
 
 # Configure pytest for Home Assistant testing
-@pytest.fixture
+@pytest_asyncio.fixture
 async def hass():
     """Return a Home Assistant instance for testing."""
     from homeassistant.core import HomeAssistant
-    from homeassistant.config import Config
+    from homeassistant.config_entries import ConfigEntries
+    from homeassistant.helpers import integration_platform, frame
+    import tempfile
     
-    hass = HomeAssistant()
-    hass.config = Config(hass)
-    hass.data = {}
-    return hass
+    with tempfile.TemporaryDirectory() as temp_dir:
+        hass = HomeAssistant(temp_dir)
+        hass.data = {}
+        hass.data["integrations"] = {}
+        hass.config_entries = ConfigEntries(hass, {})
+        
+        # Set up required components for config flow testing
+        hass.data["components"] = set()
+        hass.data["setup_started"] = set()
+        hass.data["preload_platforms"] = set()
+        hass.data["registries_loaded"] = set()
+        hass.data["missing_platforms"] = {}
+        
+        # Mock the integration registry and loader
+        mock_integration = AsyncMock()
+        mock_integration.domain = "firefly_cloud"
+        mock_integration.name = "Firefly Cloud"
+        mock_integration.dependencies = set()
+        mock_integration.requirements = []
+        mock_integration.config_flow = True
+        mock_integration.file_path = temp_dir + "/custom_components/firefly_cloud"
+        
+        with patch("homeassistant.helpers.frame.report_usage", create=True):
+            with patch("homeassistant.loader.async_get_integration", return_value=mock_integration):
+                with patch("homeassistant.helpers.integration_platform.async_process_integration_platforms"):
+                    await hass.async_start()
+                    try:
+                        yield hass
+                    finally:
+                        await hass.async_stop()
 
 from custom_components.firefly_cloud.const import (
     CONF_DEVICE_ID,
@@ -59,6 +87,8 @@ def mock_config_entry() -> ConfigEntry:
         },
         options={},
         entry_id="test-entry-id",
+        unique_id="test-unique-id",
+        source="user",
     )
 
 
@@ -251,14 +281,43 @@ def mock_coordinator_data():
     }
 
 
+def mock_http_response(text="", json_data=None, status=200):
+    """Create a mock HTTP response."""
+    response = AsyncMock()
+    response.text = AsyncMock(return_value=text)
+    if json_data:
+        response.json = AsyncMock(return_value=json_data)
+    response.status = status
+    response.raise_for_status = MagicMock()
+    return response
+
+
 @pytest.fixture
 def mock_aiohttp_session():
     """Return a mock aiohttp session."""
-    session = AsyncMock()
+    session = MagicMock()
     
-    # Configure the context manager behavior
-    response = AsyncMock()
-    session.get.return_value.__aenter__.return_value = response
-    session.post.return_value.__aenter__.return_value = response
+    # Store for configuring responses per test
+    session._mock_responses = {}
+    
+    # Create async context manager mocks that return configured responses
+    def create_context_manager_for_get(*args, **kwargs):
+        context_manager = AsyncMock()
+        # Use the stored response or create a default one
+        response = session._mock_responses.get('get', mock_http_response())
+        context_manager.__aenter__.return_value = response
+        context_manager.__aexit__.return_value = None
+        return context_manager
+    
+    def create_context_manager_for_post(*args, **kwargs):
+        context_manager = AsyncMock()
+        # Use the stored response or create a default one
+        response = session._mock_responses.get('post', mock_http_response())
+        context_manager.__aenter__.return_value = response
+        context_manager.__aexit__.return_value = None
+        return context_manager
+    
+    session.get = MagicMock(side_effect=create_context_manager_for_get)
+    session.post = MagicMock(side_effect=create_context_manager_for_post)
     
     return session

@@ -1,6 +1,6 @@
 """Data update coordinator for Firefly Cloud integration."""
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from homeassistant.core import HomeAssistant
@@ -48,8 +48,8 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
             if not self._user_info:
                 self._user_info = await self.api.get_user_info()
 
-            # Calculate date ranges
-            now = datetime.now()
+            # Calculate date ranges (timezone-aware)
+            now = datetime.now(timezone.utc)
             today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
             today_end = today_start + timedelta(days=1)
             week_start = today_start
@@ -148,10 +148,18 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
                         if set_date_str
                         else None
                     ),
-                    "subject": task.get("subject", {}).get("name", "Unknown Subject"),
+                    "subject": (
+                        task.get("subject", {}).get("name", "Unknown Subject")
+                        if isinstance(task.get("subject"), dict)
+                        else task.get("subject", "Unknown Subject")
+                    ),
                     "task_type": self._determine_task_type(task),
                     "completion_status": task.get("completionStatus", "Unknown"),
-                    "setter": task.get("setter", {}).get("name", "Unknown"),
+                    "setter": (
+                        task.get("setter", {}).get("name", "Unknown")
+                        if isinstance(task.get("setter"), dict)
+                        else task.get("setter", "Unknown")
+                    ),
                     "raw_data": task,  # Keep raw data for debugging
                 }
                 processed_tasks.append(processed_task)

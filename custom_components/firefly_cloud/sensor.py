@@ -97,14 +97,17 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
         if not self.coordinator.data:
             return None
 
-        if self._sensor_type == SENSOR_TODAY_SCHEDULE:
-            return len(self.coordinator.data["events"]["today"])
-        elif self._sensor_type == SENSOR_WEEK_SCHEDULE:
-            return len(self.coordinator.data["events"]["week"])
-        elif self._sensor_type == SENSOR_UPCOMING_TASKS:
-            return len(self.coordinator.data["tasks"]["upcoming"])
-        elif self._sensor_type == SENSOR_TASKS_DUE_TODAY:
-            return len(self.coordinator.data["tasks"]["due_today"])
+        try:
+            if self._sensor_type == SENSOR_TODAY_SCHEDULE:
+                return len(self.coordinator.data.get("events", {}).get("today", []))
+            elif self._sensor_type == SENSOR_WEEK_SCHEDULE:
+                return len(self.coordinator.data.get("events", {}).get("week", []))
+            elif self._sensor_type == SENSOR_UPCOMING_TASKS:
+                return len(self.coordinator.data.get("tasks", {}).get("upcoming", []))
+            elif self._sensor_type == SENSOR_TASKS_DUE_TODAY:
+                return len(self.coordinator.data.get("tasks", {}).get("due_today", []))
+        except (KeyError, TypeError, AttributeError):
+            return 0
 
         return None
 
@@ -131,8 +134,13 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
 
     def _get_today_schedule_attributes(self) -> Dict[str, Any]:
         """Get attributes for today's schedule sensor."""
-        events = self.coordinator.data["events"]["today"]
-        special_requirements = self.coordinator.get_special_requirements_today()
+        events = self.coordinator.data.get("events", {}).get("today", [])
+        
+        # Check if coordinator has the method before calling it
+        if hasattr(self.coordinator, 'get_special_requirements_today'):
+            special_requirements = self.coordinator.get_special_requirements_today()
+        else:
+            special_requirements = []
         
         # Current and next class
         now = datetime.now()
@@ -182,7 +190,7 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
 
     def _get_week_schedule_attributes(self) -> Dict[str, Any]:
         """Get attributes for week schedule sensor."""
-        events = self.coordinator.data["events"]["week"]
+        events = self.coordinator.data.get("events", {}).get("week", [])
         
         # Group events by day
         schedule_by_day = {}
@@ -222,11 +230,14 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
 
     def _get_upcoming_tasks_attributes(self) -> Dict[str, Any]:
         """Get attributes for upcoming tasks sensor."""
-        tasks = self.coordinator.data["tasks"]["upcoming"]
-        overdue_tasks = self.coordinator.data["tasks"]["overdue"]
+        tasks = self.coordinator.data.get("tasks", {}).get("upcoming", [])
+        overdue_tasks = self.coordinator.data.get("tasks", {}).get("overdue", [])
         
         # Group tasks by subject
-        tasks_by_subject = self.coordinator.get_tasks_by_subject()
+        if hasattr(self.coordinator, 'get_tasks_by_subject'):
+            tasks_by_subject = self.coordinator.get_tasks_by_subject()
+        else:
+            tasks_by_subject = {}
         
         # Group tasks by due date
         tasks_by_due_date = {}
@@ -300,7 +311,7 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
 
     def _get_tasks_due_today_attributes(self) -> Dict[str, Any]:
         """Get attributes for tasks due today sensor."""
-        tasks = self.coordinator.data["tasks"]["due_today"]
+        tasks = self.coordinator.data.get("tasks", {}).get("due_today", [])
         
         # Categorize by urgency/type
         urgent_tasks = [

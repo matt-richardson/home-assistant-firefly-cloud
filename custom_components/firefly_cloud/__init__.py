@@ -63,6 +63,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         
         _LOGGER.info("Successfully connected to Firefly at %s", host)
 
+    except ConfigEntryAuthFailed:
+        # Re-raise ConfigEntryAuthFailed as-is
+        raise
     except FireflyTokenExpiredError as err:
         _LOGGER.warning("Firefly authentication token expired")
         raise ConfigEntryAuthFailed("Authentication token expired") from err

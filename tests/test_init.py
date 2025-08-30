@@ -31,6 +31,7 @@ async def test_async_setup_entry_success(
         patch("custom_components.firefly_cloud.FireflyAPIClient") as mock_api_class,
         patch("custom_components.firefly_cloud.FireflyUpdateCoordinator") as mock_coordinator_class,
         patch("homeassistant.helpers.aiohttp_client.async_get_clientsession"),
+        patch.object(hass.config_entries, "async_forward_entry_setups", return_value=True),
     ):
         mock_api_class.return_value = mock_firefly_api
         mock_coordinator = AsyncMock()
@@ -60,9 +61,10 @@ async def test_async_setup_entry_auth_failed(
     with (
         patch("custom_components.firefly_cloud.FireflyAPIClient") as mock_api_class,
         patch("homeassistant.helpers.aiohttp_client.async_get_clientsession"),
+        patch.object(hass.config_entries, "async_forward_entry_setups", return_value=True),
     ):
         mock_api = AsyncMock()
-        mock_api.verify_credentials.return_value = False
+        mock_api.verify_credentials = AsyncMock(return_value=False)
         mock_api_class.return_value = mock_api
         
         with pytest.raises(ConfigEntryAuthFailed):
@@ -134,17 +136,19 @@ async def test_async_unload_entry_success(
     """Test successful unloading of config entry."""
     # Set up hass.data as if integration was loaded
     coordinator = AsyncMock()
-    hass.data[DOMAIN] = {mock_config_entry.entry_id: coordinator}
+    hass.data.setdefault(DOMAIN, {})
+    hass.data[DOMAIN][mock_config_entry.entry_id] = coordinator
     
-    with patch(
-        "homeassistant.config_entries.ConfigEntries.async_unload_platforms"
+    with patch.object(
+        hass.config_entries, "async_unload_platforms"
     ) as mock_unload_platforms:
         mock_unload_platforms.return_value = True
         
         result = await async_unload_entry(hass, mock_config_entry)
         
         assert result is True
-        assert mock_config_entry.entry_id not in hass.data[DOMAIN]
+        # Domain should be removed entirely since it was the only entry
+        assert DOMAIN not in hass.data
         coordinator.async_shutdown.assert_called_once()
 
 
@@ -156,10 +160,11 @@ async def test_async_unload_entry_failure(
     """Test failed unloading of config entry."""
     # Set up hass.data as if integration was loaded
     coordinator = AsyncMock()
-    hass.data[DOMAIN] = {mock_config_entry.entry_id: coordinator}
+    hass.data.setdefault(DOMAIN, {})
+    hass.data[DOMAIN][mock_config_entry.entry_id] = coordinator
     
-    with patch(
-        "homeassistant.config_entries.ConfigEntries.async_unload_platforms"
+    with patch.object(
+        hass.config_entries, "async_unload_platforms"
     ) as mock_unload_platforms:
         mock_unload_platforms.return_value = False
         
