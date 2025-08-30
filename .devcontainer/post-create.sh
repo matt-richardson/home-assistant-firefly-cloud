@@ -14,31 +14,9 @@ sudo apt-get install -y curl wget git
 echo "🐍 Installing Python dependencies..."
 python -m pip install --upgrade pip setuptools wheel
 
-# Install Home Assistant and core dependencies
-echo "🏠 Installing Home Assistant and core dependencies..."
-pip install \
-    homeassistant \
-    aiohttp>=3.8.0 \
-    lxml>=4.9.0 \
-    python-dateutil>=2.8.0 \
-    voluptuous \
-    async-timeout
-
-# Install development tools
-echo "🔧 Installing development tools..."
-pip install \
-    black \
-    flake8 \
-    mypy \
-    pylint \
-    isort \
-    yamllint \
-    codespell \
-    pytest>=6.2.5 \
-    pytest-asyncio \
-    pytest-cov \
-    pytest-xdist \
-    pytest-mock
+# Install all development dependencies with compatibility fixes
+echo "🏠 Installing Home Assistant and development dependencies..."
+pip install -r /workspace/requirements-dev.txt
 
 # Create a basic Home Assistant config directory for testing
 echo "🏠 Setting up Home Assistant test environment..."
@@ -51,7 +29,13 @@ ln -sf /workspace/custom_components/firefly_cloud /workspace/homeassistant_test/
 # Create a basic Home Assistant configuration
 cat > /workspace/homeassistant_test/configuration.yaml << EOF
 # Basic Home Assistant configuration for testing Firefly Cloud integration
-default_config:
+
+# Minimal configuration for integration testing
+http:
+api:
+frontend:
+config:
+websocket_api:
 
 logger:
   default: info
