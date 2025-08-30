@@ -67,3 +67,4 @@ Thumbs.db
 *.tmp
 *.bak
 *.orig
+test_results.xml
