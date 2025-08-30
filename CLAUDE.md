@@ -57,5 +57,56 @@ Target test structure in `tests/` with fixtures in `tests/fixtures/`.
 ## Development Workflow
 
 Always run tests before saying that a change is complete.
-Always commit to git after a change is complete
-.
+Always commit to git after a change is complete.
+
+## Manual Testing Approach
+
+### DevContainer Testing (Recommended)
+
+The project includes a complete VS Code devcontainer setup for comprehensive manual testing:
+
+**Setup:**
+1. Open project in VS Code
+2. Command Palette > "Dev Containers: Reopen in Container"
+3. Wait for automatic setup completion
+
+**Testing Commands:**
+```bash
+./dev.sh test-cov      # Unit tests with >95% coverage requirement
+./dev.sh ha-test       # Start Home Assistant test instance on port 8123
+./dev.sh validate      # Full validation suite (format + lint + test + config)
+./dev.sh lint          # Run all linting tools (black, flake8, mypy, pylint)
+```
+
+**Manual Integration Testing:**
+1. Run `./dev.sh ha-test` to start Home Assistant
+2. Navigate to http://localhost:8123 in browser
+3. Go to Settings > Devices & Services
+4. Add Firefly Cloud integration
+5. Complete authentication flow with real Firefly credentials
+6. Verify sensors are created and updating with real data
+
+**VS Code Integration:**
+- Use Test Explorer to run/debug individual tests
+- Set breakpoints in integration code for debugging
+- Port 8123 automatically forwarded for Home Assistant access
+- Code formatting on save with black/isort
+
+### Error Scenario Testing
+
+Test the following error conditions:
+- Invalid school codes during setup
+- Network connectivity failures
+- Authentication token expiry and reauthentication
+- API rate limiting responses
+- Missing or malformed API responses
+
+### Sensor Validation
+
+After successful setup, verify these sensors are created for each child:
+- `sensor.firefly_today_schedule_*` - Today's classes with times/locations
+- `sensor.firefly_week_schedule_*` - Weekly view with equipment requirements  
+- `sensor.firefly_upcoming_tasks_*` - Homework and assignments
+- `sensor.firefly_tasks_due_today_*` - Today's due tasks
+
+Check sensor attributes contain structured data suitable for dashboard cards.

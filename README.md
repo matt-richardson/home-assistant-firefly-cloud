@@ -95,13 +95,46 @@ Use the `./dev.sh` helper script for common development tasks:
 ./dev.sh clean         # Clean temporary files and caches
 ```
 
-#### Testing the Integration
+#### Manual Testing Workflow
 
-The dev container automatically sets up a Home Assistant test instance:
-- Navigate to http://localhost:8123 after running `./dev.sh ha-test`
-- Integration is pre-installed and ready for configuration
+The dev container provides multiple approaches for manual testing:
+
+**1. Unit and Integration Tests**
+```bash
+./dev.sh test-cov      # Run full test suite with coverage
+./dev.sh test-single test_authentication  # Run specific test
+```
+
+**2. Home Assistant Integration Testing**
+```bash
+./dev.sh ha-test       # Start Home Assistant test instance
+```
+- Navigate to http://localhost:8123
+- Integration pre-installed and symlinked
 - Add Firefly Cloud through Settings > Devices & Services
-- Debug logging is enabled for development
+- Complete authentication flow with real Firefly credentials
+- Verify four sensors are created for each child
+- Debug logging enabled for troubleshooting
+
+**3. VS Code Testing Features**
+- **Test Explorer**: Run/debug tests directly in VS Code interface
+- **Python Debugger**: Set breakpoints in integration code
+- **Port Forwarding**: Home Assistant automatically accessible at localhost:8123
+- **Auto-formatting**: Code formatted on save with black/isort
+
+**4. Manual Sensor Validation**
+After adding integration, verify sensors show:
+- `sensor.firefly_today_schedule_*` - Current day's classes
+- `sensor.firefly_week_schedule_*` - Weekly view with equipment requirements
+- `sensor.firefly_upcoming_tasks_*` - Homework and assignments
+- `sensor.firefly_tasks_due_today_*` - Today's due tasks
+
+**5. Error Scenario Testing**
+Test integration behavior with:
+- Invalid school codes
+- Network connectivity issues
+- Authentication token expiry
+- API rate limiting responses
 
 #### File Structure in Dev Container
 
