@@ -71,3 +71,4 @@ test_results.xml
 homeassistant_test/home-assistant.log*
 homeassistant_test/secrets.yaml
 homeassistant_test/home-assistant_v2.db
+/homeassistant_test/blueprints
