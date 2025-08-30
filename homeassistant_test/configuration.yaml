@@ -1,0 +1,15 @@
+# Basic Home Assistant configuration for testing Firefly Cloud integration
+
+# Minimal configuration for integration testing
+http:
+api:
+frontend:
+config:
+websocket_api:
+
+logger:
+  default: info
+  logs:
+    custom_components.firefly_cloud: debug
+
+# Firefly Cloud integration will be configured through the UI
