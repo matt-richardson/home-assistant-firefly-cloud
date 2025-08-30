@@ -1,6 +1,6 @@
 {
   "name": "Home Assistant Firefly Cloud Dev",
-  "image": "mcr.microsoft.com/devcontainers/python:3.11",
+  "image": "mcr.microsoft.com/devcontainers/python:3.13",
   
   "features": {
     "ghcr.io/devcontainers/features/git:1": {},
