@@ -8,7 +8,7 @@ echo "🚀 Setting up Firefly Cloud Home Assistant integration development envir
 # Update system packages
 echo "📦 Updating system packages..."
 sudo apt-get update
-sudo apt-get install -y curl wget git
+sudo apt-get install -y curl wget git ffmpeg libturbojpeg0-dev
 
 # Install Python dependencies
 echo "🐍 Installing Python dependencies..."
