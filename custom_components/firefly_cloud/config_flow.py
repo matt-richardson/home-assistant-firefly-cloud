@@ -149,16 +149,9 @@ class FireflyCloudConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors=errors,
             description_placeholders={
                 "auth_url": auth_url,
-                "device_id": self._school_info["device_id"],
-                "instructions": (
-                    "1. Click the link above to open Firefly in your browser\n"
-                    "2. Log in with your Firefly credentials\n"
-                    "3. After successful login, open browser developer tools (F12)\n"
-                    "4. Go to Console tab and type: document.documentElement.outerHTML\n"
-                    "5. Copy the entire response (it should contain <token>...</token>)\n"
-                    "6. Paste it in the field below"
-                ),
+                "device_id": self._school_info["device_id"] if self._school_info else "Unknown",
             },
+            last_step=False,
         )
 
     async def async_step_reauth(
