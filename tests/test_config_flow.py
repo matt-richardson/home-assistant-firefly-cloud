@@ -54,7 +54,7 @@ async def test_form_user_flow_success(hass: HomeAssistant, mock_setup_entry) -> 
     with patch(
         "custom_components.firefly_cloud.config_flow.FireflyAPIClient.get_school_info",
         return_value=mock_school_info,
-    ):
+    ), patch("homeassistant.helpers.aiohttp_client.async_get_clientsession"):
         result2 = await hass.config_entries.flow.async_configure(
             result["flow_id"],
             {"school_code": "testschool"},
@@ -74,7 +74,7 @@ async def test_form_school_not_found(hass: HomeAssistant) -> None:
     with patch(
         "custom_components.firefly_cloud.config_flow.FireflyAPIClient.get_school_info",
         side_effect=FireflySchoolNotFoundError("School not found"),
-    ):
+    ), patch("homeassistant.helpers.aiohttp_client.async_get_clientsession"):
         result2 = await hass.config_entries.flow.async_configure(
             result["flow_id"],
             {"school_code": "invalid"},
@@ -95,7 +95,7 @@ async def test_form_connection_error(hass: HomeAssistant) -> None:
     with patch(
         "custom_components.firefly_cloud.config_flow.FireflyAPIClient.get_school_info",
         side_effect=FireflyConnectionError("Connection failed"),
-    ):
+    ), patch("homeassistant.helpers.aiohttp_client.async_get_clientsession"):
         result2 = await hass.config_entries.flow.async_configure(
             result["flow_id"],
             {"school_code": "testschool"},
@@ -125,7 +125,7 @@ async def test_form_auth_step_success(hass: HomeAssistant, mock_setup_entry) -> 
     with patch(
         "custom_components.firefly_cloud.config_flow.FireflyAPIClient.get_school_info",
         return_value=mock_school_info,
-    ):
+    ), patch("homeassistant.helpers.aiohttp_client.async_get_clientsession"):
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"],
             {"school_code": "testschool"},
@@ -195,7 +195,7 @@ async def test_form_auth_invalid_response(hass: HomeAssistant) -> None:
     with patch(
         "custom_components.firefly_cloud.config_flow.FireflyAPIClient.get_school_info",
         return_value=mock_school_info,
-    ):
+    ), patch("homeassistant.helpers.aiohttp_client.async_get_clientsession"):
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"],
             {"school_code": "testschool"},
@@ -235,7 +235,7 @@ async def test_form_auth_credentials_verification_failed(hass: HomeAssistant) ->
     with patch(
         "custom_components.firefly_cloud.config_flow.FireflyAPIClient.get_school_info",
         return_value=mock_school_info,
-    ):
+    ), patch("homeassistant.helpers.aiohttp_client.async_get_clientsession"):
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"],
             {"school_code": "testschool"},
@@ -322,6 +322,8 @@ async def test_abort_if_already_configured(hass: HomeAssistant) -> None:
         entry_id="existing-entry-id",
         unique_id="testschool",
         source="user",
+        discovery_keys={},
+        subentries_data={},
     )
     # Add to the config entries registry
     hass.config_entries._entries[existing_entry.entry_id] = existing_entry

@@ -76,15 +76,17 @@ class FireflyCloudConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         secret="",  # Will be set after authentication
                     )
 
-                    return await self.async_step_auth()
-
             except FireflySchoolNotFoundError:
                 errors["base"] = "school_not_found"
             except FireflyConnectionError:
                 errors["base"] = "cannot_connect"
-            except Exception:  # pylint: disable=broad-except
-                _LOGGER.exception("Unexpected error during school lookup")
+            except Exception as exc:  # pylint: disable=broad-except
+                _LOGGER.exception("Unexpected error during school lookup: %s", exc)
                 errors["base"] = "unknown"
+            else:
+                # Only proceed to auth step if no errors occurred during school lookup
+                if not errors:
+                    return await self.async_step_auth()
 
         return self.async_show_form(
             step_id="user",
@@ -252,15 +254,11 @@ class FireflyCloudConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         config_entry: config_entries.ConfigEntry,
     ) -> "FireflyCloudOptionsFlowHandler":
         """Get the options flow for this handler."""
-        return FireflyCloudOptionsFlowHandler(config_entry)
+        return FireflyCloudOptionsFlowHandler()
 
 
 class FireflyCloudOptionsFlowHandler(config_entries.OptionsFlow):
     """Handle Firefly Cloud options."""
-
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        """Initialize options flow."""
-        self.config_entry = config_entry
 
     async def async_step_init(
         self, user_input: Optional[Dict[str, Any]] = None

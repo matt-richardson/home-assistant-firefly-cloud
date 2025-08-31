@@ -32,13 +32,11 @@ async def test_get_school_info_success(mock_aiohttp_session, mock_school_info):
     """Test successful school info retrieval."""
     # Mock XML response
     xml_response = """<?xml version="1.0"?>
-    <root>
-        <response exists="true" enabled="true">
-            <name>Test School</name>
-            <installationId>test-installation-id</installationId>
-            <address ssl="true">testschool.fireflycloud.net</address>
-        </response>
-    </root>"""
+    <response exists="true" enabled="true">
+        <name>Test School</name>
+        <installationId>test-installation-id</installationId>
+        <address ssl="true">testschool.fireflycloud.net</address>
+    </response>"""
     
     from tests.conftest import mock_http_response
     mock_aiohttp_session._mock_responses['get'] = mock_http_response(text=xml_response)
@@ -57,10 +55,8 @@ async def test_get_school_info_success(mock_aiohttp_session, mock_school_info):
 async def test_get_school_info_not_found(mock_aiohttp_session):
     """Test school not found."""
     xml_response = """<?xml version="1.0"?>
-    <root>
-        <response exists="false">
-        </response>
-    </root>"""
+    <response exists="false">
+    </response>"""
     
     from tests.conftest import mock_http_response
     mock_aiohttp_session._mock_responses['get'] = mock_http_response(text=xml_response)
@@ -80,13 +76,11 @@ async def test_get_school_info_invalid_code():
 async def test_get_api_version_success(api_client, mock_aiohttp_session):
     """Test successful API version retrieval."""
     xml_response = """<?xml version="1.0"?>
-    <root>
-        <version>
-            <majorVersion>1</majorVersion>
-            <minorVersion>2</minorVersion>
-            <incrementVersion>3</incrementVersion>
-        </version>
-    </root>"""
+    <version>
+        <majorVersion>1</majorVersion>
+        <minorVersion>2</minorVersion>
+        <incrementVersion>3</incrementVersion>
+    </version>"""
     
     from tests.conftest import mock_http_response
     mock_aiohttp_session._mock_responses['get'] = mock_http_response(text=xml_response)
@@ -128,12 +122,10 @@ async def test_verify_credentials_invalid(api_client, mock_aiohttp_session):
 @pytest.mark.asyncio
 async def test_parse_authentication_response_success(api_client):
     """Test successful authentication response parsing."""
-    xml_response = """<auth>
-        <token>
-            <secret>test-secret-789</secret>
-            <user username="john.doe" fullname="John Doe" email="john.doe@test.com" role="student" guid="test-user-123"/>
-        </token>
-    </auth>"""
+    xml_response = """<token>
+        <secret>test-secret-789</secret>
+        <user username="john.doe" fullname="John Doe" email="john.doe@test.com" role="student" guid="test-user-123"/>
+    </token>"""
     
     result = await api_client.parse_authentication_response(xml_response)
     

@@ -1,6 +1,6 @@
 """Test the Firefly Cloud sensor platform."""
 from datetime import datetime, timedelta
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from homeassistant.core import HomeAssistant
@@ -22,7 +22,7 @@ from custom_components.firefly_cloud.const import (
 @pytest.fixture
 def mock_coordinator():
     """Return a mock coordinator with data."""
-    coordinator = AsyncMock()
+    coordinator = MagicMock()
     now = datetime.now()
     
     # Mock coordinator data
