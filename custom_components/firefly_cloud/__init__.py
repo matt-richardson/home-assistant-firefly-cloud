@@ -14,6 +14,7 @@ from .const import (
     CONF_HOST,
     CONF_SECRET,
     CONF_TASK_LOOKAHEAD_DAYS,
+    CONF_USER_GUID,
     DEFAULT_TASK_LOOKAHEAD_DAYS,
     DOMAIN,
     PARALLEL_UPDATES,
@@ -34,6 +35,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     host = entry.data[CONF_HOST]
     device_id = entry.data[CONF_DEVICE_ID]
     secret = entry.data[CONF_SECRET]
+    user_guid = entry.data[CONF_USER_GUID]
     
     # Get task lookahead days from options or data
     task_lookahead_days = (
@@ -50,6 +52,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         host=host,
         device_id=device_id,
         secret=secret,
+        user_guid=user_guid,
     )
 
     try:

@@ -48,6 +48,7 @@ class FireflyAPIClient:
         device_id: str,
         secret: str,
         app_id: str = DEFAULT_APP_ID,
+        user_guid: Optional[str] = None,
     ) -> None:
         """Initialize the API client."""
         self._session = session
@@ -56,6 +57,10 @@ class FireflyAPIClient:
         self._secret = secret
         self._app_id = app_id
         self._user_info: Optional[Dict[str, Any]] = None
+        
+        # If user_guid is provided, create minimal user info
+        if user_guid:
+            self._user_info = {"guid": user_guid}
 
     @classmethod
     async def get_school_info(
@@ -266,7 +271,8 @@ class FireflyAPIClient:
         if self._user_info:
             return self._user_info
 
-        # If we don't have cached user info, we need to re-authenticate
+        # User info should be provided during initialization from stored config
+        # If we don't have it, we need to re-authenticate
         raise FireflyAuthenticationError("No user information available")
 
     async def get_events(
@@ -282,8 +288,8 @@ class FireflyAPIClient:
         query = f"""
         query GetEvents {{
             events(
-                start: "{start.isoformat()}Z",
-                end: "{end.isoformat()}Z",
+                start: "{start.strftime('%Y-%m-%dT%H:%M:%S')}Z",
+                end: "{end.strftime('%Y-%m-%dT%H:%M:%S')}Z",
                 for_guid: "{user_guid}"
             ) {{
                 end,
