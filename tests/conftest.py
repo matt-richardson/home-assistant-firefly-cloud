@@ -1,19 +1,11 @@
 """Test configuration for Firefly Cloud integration."""
-import json
 from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime, timedelta
+from types import MappingProxyType
 
 import pytest
 import pytest_asyncio
-from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_NAME
-
-# Import Home Assistant test utilities
-try:
-    from homeassistant.testing import get_fixture_path
-except ImportError:
-    pass
 
 # Configure pytest for Home Assistant testing
 @pytest_asyncio.fixture
@@ -21,29 +13,28 @@ async def hass():
     """Return a Home Assistant instance for testing."""
     from homeassistant.core import HomeAssistant
     from homeassistant.config_entries import ConfigEntries
-    from homeassistant.helpers import integration_platform, frame
     import tempfile
-    
+
     with tempfile.TemporaryDirectory() as temp_dir:
         hass = HomeAssistant(temp_dir)
         hass.data = {}
         hass.data["integrations"] = {}
         hass.config_entries = ConfigEntries(hass, {})
-        
+
         # Set up required components for config flow testing
         hass.data["components"] = set()
         hass.data["setup_started"] = set()
         hass.data["preload_platforms"] = set()
         hass.data["registries_loaded"] = set()
         hass.data["missing_platforms"] = {}
-        
-        # Add network component data to prevent KeyError 
+
+        # Add network component data to prevent KeyError
         # Mock the network component structure that Home Assistant expects
         from unittest.mock import MagicMock
         network_adapter = MagicMock()
         network_adapter.adapters = []
         hass.data["network"] = network_adapter
-        
+
         # Mock the integration registry and loader
         mock_integration = AsyncMock()
         mock_integration.domain = "firefly_cloud"
@@ -52,7 +43,7 @@ async def hass():
         mock_integration.requirements = []
         mock_integration.config_flow = True
         mock_integration.file_path = temp_dir + "/custom_components/firefly_cloud"
-        
+
         # Setup required Home Assistant components
         with patch("homeassistant.loader.async_get_integration", return_value=mock_integration):
             with patch("homeassistant.helpers.integration_platform.async_process_integration_platforms"):
@@ -98,7 +89,7 @@ def mock_config_entry() -> ConfigEntry:
         entry_id="test-entry-id",
         unique_id="test-unique-id",
         source="user",
-        discovery_keys={},
+        discovery_keys=MappingProxyType({}),
         subentries_data={},
     )
 
@@ -135,7 +126,7 @@ def mock_events():
     """Return mock event data."""
     now = datetime.now()
     today = now.replace(hour=9, minute=0, second=0, microsecond=0)
-    
+
     return [
         {
             "start": today.isoformat() + "Z",
@@ -173,7 +164,7 @@ def mock_tasks():
     now = datetime.now()
     tomorrow = now + timedelta(days=1)
     next_week = now + timedelta(days=7)
-    
+
     return [
         {
             "guid": "task-1",
@@ -245,7 +236,7 @@ def mock_firefly_api():
             "guid": "test-child-123",
         },
         {
-            "username": "child2", 
+            "username": "child2",
             "fullname": "Child Two",
             "email": "child2@test.com",
             "role": "student",
@@ -270,7 +261,7 @@ def mock_coordinator_data():
             "attendees": [],
         }
     ]
-    
+
     upcoming_tasks = [
         {
             "id": "task-1",
@@ -285,7 +276,7 @@ def mock_coordinator_data():
             "raw_data": {},
         }
     ]
-    
+
     return {
         "user_info": {
             "username": "john.doe",
@@ -332,7 +323,7 @@ def mock_http_response(text="", json_data=None, status=200, raise_for_status_exc
     if json_data:
         response.json = AsyncMock(return_value=json_data)
     response.status = status
-    
+
     if raise_for_status_exception:
         response.raise_for_status = MagicMock(side_effect=raise_for_status_exception)
     else:
@@ -344,28 +335,28 @@ def mock_http_response(text="", json_data=None, status=200, raise_for_status_exc
 def mock_aiohttp_session():
     """Return a mock aiohttp session."""
     session = MagicMock()
-    
+
     # Store for configuring responses per test
     session._mock_responses = {}
-    
+
     # Create async context manager mocks that return configured responses
-    def create_context_manager_for_get(*args, **kwargs):
+    def create_context_manager_for_get(*_args, **_kwargs):
         context_manager = AsyncMock()
         # Use the stored response or create a default one
         response = session._mock_responses.get('get', mock_http_response())
         context_manager.__aenter__.return_value = response
         context_manager.__aexit__.return_value = None
         return context_manager
-    
-    def create_context_manager_for_post(*args, **kwargs):
+
+    def create_context_manager_for_post(*_args, **_kwargs):
         context_manager = AsyncMock()
         # Use the stored response or create a default one
         response = session._mock_responses.get('post', mock_http_response())
         context_manager.__aenter__.return_value = response
         context_manager.__aexit__.return_value = None
         return context_manager
-    
+
     session.get = MagicMock(side_effect=create_context_manager_for_get)
     session.post = MagicMock(side_effect=create_context_manager_for_post)
-    
+
     return session

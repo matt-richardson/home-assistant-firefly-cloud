@@ -99,7 +99,9 @@ class FireflyAPIClient:
             device_id = str(uuid4())
 
             token_url = quote(
-                f"{url}/Login/api/gettoken?ffauth_device_id={device_id}&ffauth_secret=&device_id={device_id}&app_id={DEFAULT_APP_ID}"
+                f"{url}/Login/api/gettoken?"
+                f"ffauth_device_id={device_id}&ffauth_secret="
+                f"&device_id={device_id}&app_id={DEFAULT_APP_ID}"
             )
 
             return {
@@ -237,7 +239,7 @@ class FireflyAPIClient:
                         if response.status == 401:
                             raise FireflyTokenExpiredError(
                                 "Authentication token expired")
-                        elif response.status == 429:
+                        if response.status == 429:
                             raise FireflyRateLimitError("Rate limit exceeded")
 
                         response.raise_for_status()
@@ -249,10 +251,10 @@ class FireflyAPIClient:
 
                         return result.get("data", {})
 
-            except asyncio.TimeoutError:
+            except asyncio.TimeoutError as exc:
                 if attempt == MAX_RETRIES - 1:
                     raise FireflyConnectionError(
-                        "Timeout executing GraphQL query")
+                        "Timeout executing GraphQL query") from exc
                 await asyncio.sleep(RETRY_DELAY_BASE ** attempt)
                 continue
             except (FireflyTokenExpiredError, FireflyRateLimitError):
@@ -263,6 +265,9 @@ class FireflyAPIClient:
                         f"Error executing query: {err}") from err
                 await asyncio.sleep(RETRY_DELAY_BASE ** attempt)
                 continue
+        
+        # This should never be reached due to MAX_RETRIES logic, but satisfy type checker
+        raise FireflyConnectionError("Failed to execute GraphQL query after all retries")
 
     async def get_user_info(self) -> Dict[str, Any]:
         """Get current user information."""
@@ -373,7 +378,7 @@ class FireflyAPIClient:
                         if response.status == 401:
                             raise FireflyTokenExpiredError(
                                 "Authentication token expired")
-                        elif response.status == 429:
+                        if response.status == 429:
                             raise FireflyRateLimitError("Rate limit exceeded")
 
                         response.raise_for_status()
@@ -404,10 +409,10 @@ class FireflyAPIClient:
 
                         return converted_events
 
-            except asyncio.TimeoutError:
+            except asyncio.TimeoutError as exc:
                 if attempt == MAX_RETRIES - 1:
                     raise FireflyConnectionError(
-                        "Timeout getting events via REST API")
+                        "Timeout getting events via REST API") from exc
                 await asyncio.sleep(RETRY_DELAY_BASE ** attempt)
                 continue
             except (FireflyTokenExpiredError, FireflyRateLimitError):
@@ -467,16 +472,16 @@ class FireflyAPIClient:
                         if response.status == 401:
                             raise FireflyTokenExpiredError(
                                 "Authentication token expired")
-                        elif response.status == 429:
+                        if response.status == 429:
                             raise FireflyRateLimitError("Rate limit exceeded")
 
                         response.raise_for_status()
                         data = await response.json()
                         return data.get("items", [])
 
-            except asyncio.TimeoutError:
+            except asyncio.TimeoutError as exc:
                 if attempt == MAX_RETRIES - 1:
-                    raise FireflyConnectionError("Timeout getting tasks")
+                    raise FireflyConnectionError("Timeout getting tasks") from exc
                 await asyncio.sleep(RETRY_DELAY_BASE ** attempt)
                 continue
             except (FireflyTokenExpiredError, FireflyRateLimitError):
@@ -491,7 +496,9 @@ class FireflyAPIClient:
         # Should never reach here due to exception handling above
         return []
 
-    async def get_participating_groups(self, user_guid: Optional[str] = None) -> List[Dict[str, Any]]:
+    async def get_participating_groups(
+        self, user_guid: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
         """Get groups/classes the user participates in."""
         if not user_guid and self._user_info:
             user_guid = self._user_info["guid"]
@@ -522,6 +529,8 @@ class FireflyAPIClient:
     def get_auth_url(self) -> str:
         """Get the authentication URL for browser redirect."""
         redirect = quote(
-            f"{self._host}/Login/api/gettoken?ffauth_device_id={self._device_id}&ffauth_secret=&device_id={self._device_id}&app_id={self._app_id}"
+            f"{self._host}/Login/api/gettoken?"
+            f"ffauth_device_id={self._device_id}&ffauth_secret="
+            f"&device_id={self._device_id}&app_id={self._app_id}"
         )
         return f"{self._host}/login/login.aspx?prelogin={redirect}"
