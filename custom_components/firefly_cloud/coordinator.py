@@ -66,7 +66,6 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
             
             # Fetch data for each child/user
             for child_guid in target_guids:
-                _LOGGER.debug("Fetching data for child GUID: %s", child_guid)
                 
                 # Fetch data in parallel for this child
                 events_today = await self.api.get_events(today_start, today_end, child_guid)

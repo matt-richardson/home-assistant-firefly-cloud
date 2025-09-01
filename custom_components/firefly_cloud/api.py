@@ -339,18 +339,8 @@ class FireflyAPIClient:
         }}
         """
 
-        _LOGGER.debug(
-            "Executing events query for user %s from %s to %s",
-            user_guid,
-            start.strftime('%Y-%m-%dT%H:%M:%S'),
-            end.strftime('%Y-%m-%dT%H:%M:%S')
-        )
-        _LOGGER.debug("GraphQL query: %s", query)
-
         try:
             data = await self._graphql_query(query)
-            _LOGGER.debug("Events query returned %d events",
-                          len(data.get("events", [])))
             return data.get("events", [])
         # except aiohttp.ClientResponseError as err:
         except FireflyConnectionError as err:
@@ -377,7 +367,6 @@ class FireflyAPIClient:
             "datetime": start.strftime('%Y-%m-%dT%H:%M')
         }
 
-        _LOGGER.debug("Fetching events via REST API: %s", url)
 
         for attempt in range(MAX_RETRIES):
             try:
@@ -415,8 +404,6 @@ class FireflyAPIClient:
                             }
                             converted_events.append(converted_event)
 
-                        _LOGGER.debug("REST API returned %d events",
-                                      len(converted_events))
                         return converted_events
 
             except asyncio.TimeoutError:
