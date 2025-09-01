@@ -56,6 +56,7 @@ async def hass():
                         await hass.async_stop()
 
 from custom_components.firefly_cloud.const import (
+    CONF_CHILDREN_GUIDS,
     CONF_DEVICE_ID,
     CONF_HOST,
     CONF_SCHOOL_CODE,
@@ -83,6 +84,7 @@ def mock_config_entry() -> ConfigEntry:
             CONF_DEVICE_ID: "test-device-123",
             CONF_SECRET: "test-secret-456",
             CONF_USER_GUID: "test-user-789",
+            CONF_CHILDREN_GUIDS: ["test-child-123", "test-child-456"],
             CONF_TASK_LOOKAHEAD_DAYS: DEFAULT_TASK_LOOKAHEAD_DAYS,
         },
         options={},
@@ -227,6 +229,22 @@ def mock_firefly_api():
         "role": "student",
         "guid": "test-user-789",
     }
+    api.get_children_info.return_value = [
+        {
+            "username": "child1",
+            "fullname": "Child One",
+            "email": "child1@test.com",
+            "role": "student",
+            "guid": "test-child-123",
+        },
+        {
+            "username": "child2", 
+            "fullname": "Child Two",
+            "email": "child2@test.com",
+            "role": "student",
+            "guid": "test-child-456",
+        }
+    ]
     return api
 
 
@@ -269,15 +287,32 @@ def mock_coordinator_data():
             "role": "student",
             "guid": "test-user-789",
         },
-        "events": {
-            "today": today_events,
-            "week": today_events,
-        },
-        "tasks": {
-            "all": upcoming_tasks,
-            "due_today": [],
-            "upcoming": upcoming_tasks,
-            "overdue": [],
+        "children_guids": ["test-child-123", "test-child-456"],
+        "children_data": {
+            "test-child-123": {
+                "events": {
+                    "today": today_events,
+                    "week": today_events,
+                },
+                "tasks": {
+                    "all": upcoming_tasks,
+                    "due_today": [],
+                    "upcoming": upcoming_tasks,
+                    "overdue": [],
+                },
+            },
+            "test-child-456": {
+                "events": {
+                    "today": [],
+                    "week": [],
+                },
+                "tasks": {
+                    "all": [],
+                    "due_today": [],
+                    "upcoming": [],
+                    "overdue": [],
+                },
+            },
         },
         "last_updated": now,
     }

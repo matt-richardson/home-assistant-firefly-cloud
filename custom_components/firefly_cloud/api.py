@@ -57,7 +57,7 @@ class FireflyAPIClient:
         self._secret = secret
         self._app_id = app_id
         self._user_info: Optional[Dict[str, Any]] = None
-        
+
         # If user_guid is provided, create minimal user info
         if user_guid:
             self._user_info = {"guid": user_guid}
@@ -275,6 +275,36 @@ class FireflyAPIClient:
         # If we don't have it, we need to re-authenticate
         raise FireflyAuthenticationError("No user information available")
 
+    async def get_children_info(self) -> List[Dict[str, Any]]:
+        """Get children information if authenticated user is a parent."""
+        if not self._user_info:
+            raise FireflyAuthenticationError("No user information available")
+
+        # If user role is student, return themselves as the only "child"
+        if self._user_info.get("role") == "student":
+            return [self._user_info]
+
+        # If user role is parent, query for their children
+        query = f"""
+        query GetChildren {{
+            users(guid: "{self._user_info['guid']}") {{
+                children {{
+                    guid,
+                    username,
+                    name
+                }}
+            }}
+        }}
+        """
+        response = await self._graphql_query(query)
+        users_data = response["users"]
+
+        if not users_data or not users_data[0].get("children"):
+            # If no children found, return empty list
+            return []
+
+        return users_data[0]["children"]
+
     async def get_events(
         self, start: datetime, end: datetime, user_guid: Optional[str] = None
     ) -> List[Dict[str, Any]]:
@@ -292,12 +322,12 @@ class FireflyAPIClient:
                 end: "{end.strftime('%Y-%m-%dT%H:%M:%S')}Z",
                 for_guid: "{user_guid}"
             ) {{
+                guid,
                 end,
                 location,
                 start,
                 subject,
                 description,
-                guild,
                 attendees {{
                     role,
                     principal {{
@@ -309,8 +339,103 @@ class FireflyAPIClient:
         }}
         """
 
-        data = await self._graphql_query(query)
-        return data.get("events", [])
+        _LOGGER.debug(
+            "Executing events query for user %s from %s to %s",
+            user_guid,
+            start.strftime('%Y-%m-%dT%H:%M:%S'),
+            end.strftime('%Y-%m-%dT%H:%M:%S')
+        )
+        _LOGGER.debug("GraphQL query: %s", query)
+
+        try:
+            data = await self._graphql_query(query)
+            _LOGGER.debug("Events query returned %d events",
+                          len(data.get("events", [])))
+            return data.get("events", [])
+        # except aiohttp.ClientResponseError as err:
+        except FireflyConnectionError as err:
+            _LOGGER.warning(
+                "GraphQL events query failed, trying REST API: %s", err)
+            # Fallback to REST API for timetable data
+            return await self._get_events_rest_api(start, end, user_guid)
+
+    async def _get_events_rest_api(
+        self, start: datetime, end: datetime, user_guid: str
+    ) -> List[Dict[str, Any]]:
+        """Get events using the REST API timetable endpoint."""
+        # Determine the time period (week/day) based on date range
+        days_diff = (end - start).days
+        if days_diff <= 1:
+            period = "day"
+        else:
+            period = "week"
+
+        url = f"{self._host}/api/v3/timetable/{user_guid}/{period}"
+        params = {
+            "ffauth_device_id": self._device_id,
+            "ffauth_secret": self._secret,
+            "datetime": start.strftime('%Y-%m-%dT%H:%M')
+        }
+
+        _LOGGER.debug("Fetching events via REST API: %s", url)
+
+        for attempt in range(MAX_RETRIES):
+            try:
+                async with async_timeout.timeout(TIMEOUT_SECONDS):
+                    async with self._session.get(url, params=params) as response:
+                        if response.status == 401:
+                            raise FireflyTokenExpiredError(
+                                "Authentication token expired")
+                        elif response.status == 429:
+                            raise FireflyRateLimitError("Rate limit exceeded")
+
+                        response.raise_for_status()
+                        events_data = await response.json()
+
+                        # Convert REST API format to match GraphQL format
+                        converted_events = []
+                        for event in events_data:
+                            converted_event = {
+                                "guid": event.get("guid"),
+                                "start": event.get("startUtc", event.get("startZoned")),
+                                "end": event.get("endUtc", event.get("endZoned")),
+                                "location": event.get("location", ""),
+                                "subject": event.get("subject", ""),
+                                "description": event.get("description", ""),
+                                "attendees": [
+                                    {
+                                        "role": str(attendee.get("role", "")),
+                                        "principal": {
+                                            "guid": attendee.get("guid", {}).get("value", ""),
+                                            "name": attendee.get("name", "")
+                                        }
+                                    }
+                                    for attendee in event.get("attendees", [])
+                                ]
+                            }
+                            converted_events.append(converted_event)
+
+                        _LOGGER.debug("REST API returned %d events",
+                                      len(converted_events))
+                        return converted_events
+
+            except asyncio.TimeoutError:
+                if attempt == MAX_RETRIES - 1:
+                    raise FireflyConnectionError(
+                        "Timeout getting events via REST API")
+                await asyncio.sleep(RETRY_DELAY_BASE ** attempt)
+                continue
+            except (FireflyTokenExpiredError, FireflyRateLimitError):
+                raise
+            except aiohttp.ClientError as err:
+                if attempt == MAX_RETRIES - 1:
+                    raise FireflyConnectionError(
+                        f"Error getting events via REST API: {err}") from err
+                await asyncio.sleep(RETRY_DELAY_BASE ** attempt)
+                continue
+
+        # Should never reach here due to exception handling above
+        return []
 
     async def get_tasks(
         self,
@@ -371,6 +496,9 @@ class FireflyAPIClient:
                         f"Error getting tasks: {err}") from err
                 await asyncio.sleep(RETRY_DELAY_BASE ** attempt)
                 continue
+
+        # Should never reach here due to exception handling above
+        return []
 
     async def get_participating_groups(self, user_guid: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get groups/classes the user participates in."""

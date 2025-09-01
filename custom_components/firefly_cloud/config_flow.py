@@ -10,6 +10,7 @@ from homeassistant.helpers import aiohttp_client
 
 from .api import FireflyAPIClient
 from .const import (
+    CONF_CHILDREN_GUIDS,
     CONF_DEVICE_ID,
     CONF_HOST,
     CONF_SCHOOL_CODE,
@@ -81,7 +82,8 @@ class FireflyCloudConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             except FireflyConnectionError:
                 errors["base"] = "cannot_connect"
             except Exception as exc:  # pylint: disable=broad-except
-                _LOGGER.exception("Unexpected error during school lookup: %s", exc)
+                _LOGGER.exception(
+                    "Unexpected error during school lookup: %s", exc)
                 errors["base"] = "unknown"
             else:
                 # Only proceed to auth step if no errors occurred during school lookup
@@ -119,10 +121,17 @@ class FireflyCloudConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 else:
                     # Get user info to validate
                     user_info = await self._api_client.get_user_info()
-                    
+
+                    # Get children info for parent accounts
+                    children_info = await self._api_client.get_children_info()
+                    children_guids = [child["guid"] for child in children_info]
+
+                    # Create title based on role
+                    title = f"{self._school_info['name']} - {user_info['fullname']}"
+
                     # Create the config entry
                     return self.async_create_entry(
-                        title=f"{self._school_info['name']} - {user_info['fullname']}",
+                        title=title,
                         data={
                             CONF_SCHOOL_CODE: self.unique_id,
                             CONF_SCHOOL_NAME: self._school_info["name"],
@@ -130,6 +139,7 @@ class FireflyCloudConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                             CONF_DEVICE_ID: self._school_info["device_id"],
                             CONF_SECRET: auth_data["secret"],
                             CONF_USER_GUID: user_info["guid"],
+                            CONF_CHILDREN_GUIDS: children_guids,
                             CONF_TASK_LOOKAHEAD_DAYS: DEFAULT_TASK_LOOKAHEAD_DAYS,
                         },
                     )
@@ -144,7 +154,7 @@ class FireflyCloudConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         # Show authentication form with browser redirect URL
         auth_url = self._api_client.get_auth_url()
-        
+
         return self.async_show_form(
             step_id="auth",
             data_schema=STEP_AUTH_DATA_SCHEMA,
@@ -162,7 +172,7 @@ class FireflyCloudConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Handle reauthentication."""
         # Store the entry for later use
         self.context["entry_id"] = entry_data.get("entry_id")
-        
+
         # Recreate school info from stored data
         self._school_info = {
             "name": entry_data.get(CONF_SCHOOL_NAME),
@@ -204,18 +214,18 @@ class FireflyCloudConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     # Update the existing config entry
                     entry_id = self.context["entry_id"]
                     entry = self.hass.config_entries.async_get_entry(entry_id)
-                    
+
                     if entry:
                         new_data = entry.data.copy()
                         new_data[CONF_SECRET] = auth_data["secret"]
-                        
+
                         self.hass.config_entries.async_update_entry(
                             entry, data=new_data
                         )
-                        
+
                         # Reload the integration
                         await self.hass.config_entries.async_reload(entry_id)
-                        
+
                         return self.async_abort(reason="reauth_successful")
 
             except FireflyAuthenticationError:
@@ -228,7 +238,7 @@ class FireflyCloudConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         # Show reauthentication form
         auth_url = self._api_client.get_auth_url()
-        
+
         return self.async_show_form(
             step_id="reauth_confirm",
             data_schema=STEP_AUTH_DATA_SCHEMA,
@@ -272,7 +282,8 @@ class FireflyCloudOptionsFlowHandler(config_entries.OptionsFlow):
                 CONF_TASK_LOOKAHEAD_DAYS,
                 default=self.config_entry.options.get(
                     CONF_TASK_LOOKAHEAD_DAYS,
-                    self.config_entry.data.get(CONF_TASK_LOOKAHEAD_DAYS, DEFAULT_TASK_LOOKAHEAD_DAYS)
+                    self.config_entry.data.get(
+                        CONF_TASK_LOOKAHEAD_DAYS, DEFAULT_TASK_LOOKAHEAD_DAYS)
                 ),
             ): vol.All(int, vol.Range(min=1, max=30)),
         })

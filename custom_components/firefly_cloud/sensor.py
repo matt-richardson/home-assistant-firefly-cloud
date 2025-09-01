@@ -11,6 +11,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
+    CONF_CHILDREN_GUIDS,
     CONF_SCHOOL_NAME,
     CONF_USER_GUID,
     DOMAIN,
@@ -33,17 +34,24 @@ async def async_setup_entry(
     """Set up Firefly Cloud sensor platform."""
     coordinator: FireflyUpdateCoordinator = hass.data[DOMAIN][config_entry.entry_id]
     
-    # Create sensors for each type
+    # Get children GUIDs from config or use user GUID if no children
+    children_guids = config_entry.data.get(CONF_CHILDREN_GUIDS, [])
+    if not children_guids:
+        children_guids = [config_entry.data[CONF_USER_GUID]]
+    
+    # Create sensors for each child and each sensor type
     entities: List[SensorEntity] = []
     
-    for sensor_type in SENSOR_TYPES:
-        entities.append(
-            FireflySensor(
-                coordinator=coordinator,
-                config_entry=config_entry,
-                sensor_type=sensor_type,
+    for child_guid in children_guids:
+        for sensor_type in SENSOR_TYPES:
+            entities.append(
+                FireflySensor(
+                    coordinator=coordinator,
+                    config_entry=config_entry,
+                    sensor_type=sensor_type,
+                    child_guid=child_guid,
+                )
             )
-        )
     
     async_add_entities(entities)
 
@@ -56,19 +64,21 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
         coordinator: FireflyUpdateCoordinator,
         config_entry: ConfigEntry,
         sensor_type: str,
+        child_guid: str,
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
         self._config_entry = config_entry
         self._sensor_type = sensor_type
         self._sensor_config = SENSOR_TYPES[sensor_type]
+        self._child_guid = child_guid
         
         # Generate unique entity ID
         school_name = config_entry.data.get(CONF_SCHOOL_NAME, "firefly")
-        self._attr_unique_id = f"{config_entry.entry_id}_{sensor_type}"
+        self._attr_unique_id = f"{config_entry.entry_id}_{sensor_type}_{child_guid}"
         
-        # Set entity properties
-        self._attr_name = f"{school_name} {self._sensor_config['name']}"
+        # Set entity properties - will be updated with child name when data is available
+        self._attr_name = f"{school_name} {self._sensor_config['name']} ({child_guid[:8]})"
         self._attr_icon = self._sensor_config["icon"]
         self._attr_native_unit_of_measurement = self._sensor_config["unit"]
         self._attr_device_class = self._sensor_config["device_class"]
@@ -89,6 +99,7 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
         return (
             self.coordinator.last_update_success
             and self.coordinator.data is not None
+            and self._child_guid in self.coordinator.data.get("children_data", {})
         )
 
     @property
@@ -97,15 +108,18 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
         if not self.coordinator.data:
             return None
 
+        # Get data for this specific child
+        child_data = self.coordinator.data.get("children_data", {}).get(self._child_guid, {})
+        
         try:
             if self._sensor_type == SENSOR_TODAY_SCHEDULE:
-                return len(self.coordinator.data.get("events", {}).get("today", []))
+                return len(child_data.get("events", {}).get("today", []))
             elif self._sensor_type == SENSOR_WEEK_SCHEDULE:
-                return len(self.coordinator.data.get("events", {}).get("week", []))
+                return len(child_data.get("events", {}).get("week", []))
             elif self._sensor_type == SENSOR_UPCOMING_TASKS:
-                return len(self.coordinator.data.get("tasks", {}).get("upcoming", []))
+                return len(child_data.get("tasks", {}).get("upcoming", []))
             elif self._sensor_type == SENSOR_TASKS_DUE_TODAY:
-                return len(self.coordinator.data.get("tasks", {}).get("due_today", []))
+                return len(child_data.get("tasks", {}).get("due_today", []))
         except (KeyError, TypeError, AttributeError):
             return 0
 
@@ -117,24 +131,28 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
         if not self.coordinator.data:
             return {}
 
+        # Get data for this specific child
+        child_data = self.coordinator.data.get("children_data", {}).get(self._child_guid, {})
+
         attributes = {
             "last_updated": self.coordinator.data.get("last_updated"),
+            "child_guid": self._child_guid,
         }
 
         if self._sensor_type == SENSOR_TODAY_SCHEDULE:
-            attributes.update(self._get_today_schedule_attributes())
+            attributes.update(self._get_today_schedule_attributes(child_data))
         elif self._sensor_type == SENSOR_WEEK_SCHEDULE:
-            attributes.update(self._get_week_schedule_attributes())
+            attributes.update(self._get_week_schedule_attributes(child_data))
         elif self._sensor_type == SENSOR_UPCOMING_TASKS:
-            attributes.update(self._get_upcoming_tasks_attributes())
+            attributes.update(self._get_upcoming_tasks_attributes(child_data))
         elif self._sensor_type == SENSOR_TASKS_DUE_TODAY:
-            attributes.update(self._get_tasks_due_today_attributes())
+            attributes.update(self._get_tasks_due_today_attributes(child_data))
 
         return attributes
 
-    def _get_today_schedule_attributes(self) -> Dict[str, Any]:
+    def _get_today_schedule_attributes(self, child_data: Dict[str, Any]) -> Dict[str, Any]:
         """Get attributes for today's schedule sensor."""
-        events = self.coordinator.data.get("events", {}).get("today", [])
+        events = child_data.get("events", {}).get("today", [])
         
         # Check if coordinator has the method before calling it
         if hasattr(self.coordinator, 'get_special_requirements_today'):
@@ -188,9 +206,9 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
         
         return attributes
 
-    def _get_week_schedule_attributes(self) -> Dict[str, Any]:
+    def _get_week_schedule_attributes(self, child_data: Dict[str, Any]) -> Dict[str, Any]:
         """Get attributes for week schedule sensor."""
-        events = self.coordinator.data.get("events", {}).get("week", [])
+        events = child_data.get("events", {}).get("week", [])
         
         # Group events by day
         schedule_by_day = {}
@@ -228,10 +246,10 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
             "total_classes_this_week": len(events),
         }
 
-    def _get_upcoming_tasks_attributes(self) -> Dict[str, Any]:
+    def _get_upcoming_tasks_attributes(self, child_data: Dict[str, Any]) -> Dict[str, Any]:
         """Get attributes for upcoming tasks sensor."""
-        tasks = self.coordinator.data.get("tasks", {}).get("upcoming", [])
-        overdue_tasks = self.coordinator.data.get("tasks", {}).get("overdue", [])
+        tasks = child_data.get("tasks", {}).get("upcoming", [])
+        overdue_tasks = child_data.get("tasks", {}).get("overdue", [])
         
         # Group tasks by subject
         if hasattr(self.coordinator, 'get_tasks_by_subject'):
@@ -309,9 +327,9 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
             ],
         }
 
-    def _get_tasks_due_today_attributes(self) -> Dict[str, Any]:
+    def _get_tasks_due_today_attributes(self, child_data: Dict[str, Any]) -> Dict[str, Any]:
         """Get attributes for tasks due today sensor."""
-        tasks = self.coordinator.data.get("tasks", {}).get("due_today", [])
+        tasks = child_data.get("tasks", {}).get("due_today", [])
         
         # Categorize by urgency/type
         urgent_tasks = [

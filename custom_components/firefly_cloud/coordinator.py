@@ -29,6 +29,7 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
         hass: HomeAssistant,
         api: FireflyAPIClient,
         task_lookahead_days: int = DEFAULT_TASK_LOOKAHEAD_DAYS,
+        children_guids: Optional[List[str]] = None,
     ) -> None:
         """Initialize the coordinator."""
         super().__init__(
@@ -39,6 +40,7 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
         )
         self.api = api
         self.task_lookahead_days = task_lookahead_days
+        self.children_guids = children_guids or []
         self._user_info: Optional[Dict[str, Any]] = None
 
     async def _async_update_data(self) -> Dict[str, Any]:
@@ -56,34 +58,52 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
             week_end = today_start + timedelta(days=7)
             task_end = today_start + timedelta(days=self.task_lookahead_days)
 
-            user_guid = self._user_info["guid"]
-
-            # Fetch data in parallel
-            events_today = await self.api.get_events(today_start, today_end, user_guid)
-            events_week = await self.api.get_events(week_start, week_end, user_guid)
-            tasks = await self.api.get_tasks()
+            # Determine which users to fetch data for
+            target_guids = self.children_guids if self.children_guids else [self._user_info["guid"]]
+            
+            # Initialize data structure for multi-child support
+            children_data = {}
+            
+            # Fetch data for each child/user
+            for child_guid in target_guids:
+                _LOGGER.debug("Fetching data for child GUID: %s", child_guid)
+                
+                # Fetch data in parallel for this child
+                events_today = await self.api.get_events(today_start, today_end, child_guid)
+                events_week = await self.api.get_events(week_start, week_end, child_guid)
+                tasks = await self.api.get_tasks()  # Tasks API doesn't take user_guid parameter
+                
+                children_data[child_guid] = {
+                    "events": {
+                        "today": self._process_events(events_today),
+                        "week": self._process_events(events_week),
+                    },
+                    "tasks": {
+                        "all": self._process_tasks(tasks),
+                        "due_today": self._filter_tasks_by_date(tasks, today_start, today_end),
+                        "upcoming": self._filter_tasks_by_date(tasks, now, task_end),
+                        "overdue": self._filter_overdue_tasks(tasks, now),
+                    },
+                }
 
             # Process and organize the data
             data = {
                 "user_info": self._user_info,
-                "events": {
-                    "today": self._process_events(events_today),
-                    "week": self._process_events(events_week),
-                },
-                "tasks": {
-                    "all": self._process_tasks(tasks),
-                    "due_today": self._filter_tasks_by_date(tasks, today_start, today_end),
-                    "upcoming": self._filter_tasks_by_date(tasks, now, task_end),
-                    "overdue": self._filter_overdue_tasks(tasks, now),
-                },
+                "children_guids": target_guids,
+                "children_data": children_data,
                 "last_updated": now,
             }
 
+            total_events_today = sum(len(child_data["events"]["today"]) for child_data in children_data.values())
+            total_events_week = sum(len(child_data["events"]["week"]) for child_data in children_data.values()) 
+            total_tasks = sum(len(child_data["tasks"]["all"]) for child_data in children_data.values())
+            
             _LOGGER.debug(
-                "Successfully updated Firefly data: %d events today, %d events this week, %d total tasks",
-                len(events_today),
-                len(events_week), 
-                len(tasks),
+                "Successfully updated Firefly data for %d children: %d events today, %d events this week, %d total tasks",
+                len(target_guids),
+                total_events_today,
+                total_events_week,
+                total_tasks,
             )
 
             return data
