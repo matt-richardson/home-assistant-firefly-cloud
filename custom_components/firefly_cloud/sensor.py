@@ -161,14 +161,23 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
             special_requirements = []
         
         # Current and next class
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
         current_class = None
         next_class = None
         
         for event in events:
-            if event["start"] <= now <= event["end"]:
+            event_start = event["start"] 
+            event_end = event["end"]
+            
+            # Ensure event times are timezone-aware for comparison
+            if hasattr(event_start, 'tzinfo') and event_start.tzinfo is None:
+                event_start = event_start.replace(tzinfo=timezone.utc)
+            if hasattr(event_end, 'tzinfo') and event_end.tzinfo is None:
+                event_end = event_end.replace(tzinfo=timezone.utc)
+            
+            if event_start <= now <= event_end:
                 current_class = event
-            elif event["start"] > now and next_class is None:
+            elif event_start > now and next_class is None:
                 next_class = event
         
         attributes = {

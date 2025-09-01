@@ -15,13 +15,11 @@ from .const import (
     FIREFLY_API_VERSION_PATH,
     FIREFLY_APP_GATEWAY,
     FIREFLY_GRAPHQL_PATH,
-    FIREFLY_TASK_API_PATH,
     FIREFLY_VERIFY_TOKEN_PATH,
     MAX_RETRIES,
     RETRY_DELAY_BASE,
     TASK_ARCHIVE_ALL,
     TASK_OWNER_ONLY_SETTERS,
-    TASK_SORT_DUE_DATE_ASC,
     TASK_STATUS_TODO,
     TIMEOUT_SECONDS,
 )
@@ -426,6 +424,7 @@ class FireflyAPIClient:
 
     async def get_tasks(
         self,
+        student_guid: Optional[str] = None,
         page: int = 0,
         page_size: int = 100,
         completion_status: str = TASK_STATUS_TODO,
@@ -435,9 +434,9 @@ class FireflyAPIClient:
     ) -> List[Dict[str, Any]]:
         """Get tasks/assignments."""
         if sorting_criteria is None:
-            sorting_criteria = [TASK_SORT_DUE_DATE_ASC]
+            sorting_criteria = [{"column": "DueDate", "order": "Descending"}]
 
-        url = f"{self._host}{FIREFLY_TASK_API_PATH}"
+        url = f"{self._host}/api/v2/taskListing/view/parent/tasks/all/filterBy"
         params = {
             "ffauth_device_id": self._device_id,
             "ffauth_secret": self._secret,
@@ -453,6 +452,11 @@ class FireflyAPIClient:
             "markingStatus": "All",
             "sortingCriteria": sorting_criteria,
         }
+
+        # Add student GUID filter if provided (for parent accounts)
+        if student_guid:
+            payload["forStudentGuid"] = student_guid
+
 
         for attempt in range(MAX_RETRIES):
             try:

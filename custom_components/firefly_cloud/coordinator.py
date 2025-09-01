@@ -70,7 +70,7 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
                 # Fetch data in parallel for this child
                 events_today = await self.api.get_events(today_start, today_end, child_guid)
                 events_week = await self.api.get_events(week_start, week_end, child_guid)
-                tasks = await self.api.get_tasks()  # Tasks API doesn't take user_guid parameter
+                tasks = await self.api.get_tasks(student_guid=child_guid)
                 
                 children_data[child_guid] = {
                     "events": {
@@ -209,13 +209,29 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
         """Filter tasks by date range."""
         filtered_tasks = []
         
+        
+        # Ensure start and end are timezone-aware for comparison
+        if start.tzinfo is None:
+            start = start.replace(tzinfo=timezone.utc)
+        if end.tzinfo is None:
+            end = end.replace(tzinfo=timezone.utc)
+        
         for task in tasks:
             due_date_str = task.get("dueDate")
             if not due_date_str:
                 continue
                 
             try:
-                due_date = datetime.fromisoformat(due_date_str.replace("Z", "+00:00"))
+                # Parse the due date and ensure it's timezone-aware
+                if due_date_str.endswith("Z"):
+                    due_date = datetime.fromisoformat(due_date_str.replace("Z", "+00:00"))
+                else:
+                    # If no timezone info, parse as naive then add UTC timezone
+                    due_date = datetime.fromisoformat(due_date_str)
+                    if due_date.tzinfo is None:
+                        due_date = due_date.replace(tzinfo=timezone.utc)
+                
+                    
                 if start <= due_date < end:
                     filtered_tasks.append(task)
             except ValueError:
@@ -237,7 +253,18 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
                 continue
                 
             try:
-                due_date = datetime.fromisoformat(due_date_str.replace("Z", "+00:00"))
+                if due_date_str.endswith("Z"):
+                    due_date = datetime.fromisoformat(due_date_str.replace("Z", "+00:00"))
+                else:
+                    # If no timezone info, parse as naive then add UTC timezone
+                    due_date = datetime.fromisoformat(due_date_str)
+                    if due_date.tzinfo is None:
+                        due_date = due_date.replace(tzinfo=timezone.utc)
+                        
+                # Ensure now is timezone-aware
+                if now.tzinfo is None:
+                    now = now.replace(tzinfo=timezone.utc)
+                    
                 if due_date < now:
                     overdue_tasks.append(task)
             except ValueError:
