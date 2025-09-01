@@ -1,5 +1,5 @@
 """Sensor platform for Firefly Cloud integration."""
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 from typing import Any, Dict, List, Optional
 
@@ -78,7 +78,8 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
         self._attr_unique_id = f"{config_entry.entry_id}_{sensor_type}_{child_guid}"
         
         # Set entity properties - will be updated with child name when data is available
-        self._attr_name = f"{school_name} {self._sensor_config['name']} ({child_guid[:8]})"
+        self._base_name = f"{school_name} {self._sensor_config['name']}"
+        self._attr_name = f"{self._base_name} ({child_guid[:8]})"
         self._attr_icon = self._sensor_config["icon"]
         self._attr_native_unit_of_measurement = self._sensor_config["unit"]
         self._attr_device_class = self._sensor_config["device_class"]
@@ -92,6 +93,16 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
             sw_version="1.0.0",
             configuration_url=config_entry.data.get("host"),
         )
+
+    @property
+    def name(self) -> str:
+        """Return the display name of the sensor."""
+        if self.coordinator.data and self._child_guid in self.coordinator.data.get("children_data", {}):
+            child_data = self.coordinator.data["children_data"][self._child_guid]
+            child_name = child_data.get("name")
+            if child_name:
+                return f"{self._base_name} ({child_name})"
+        return self._attr_name
 
     @property
     def available(self) -> bool:
@@ -109,7 +120,13 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
             return None
 
         # Get data for this specific child
-        child_data = self.coordinator.data.get("children_data", {}).get(self._child_guid, {})
+        children_data = self.coordinator.data.get("children_data", {})
+        
+        # Return None if child doesn't exist
+        if self._child_guid not in children_data:
+            return None
+            
+        child_data = children_data[self._child_guid]
         
         try:
             if self._sensor_type == SENSOR_TODAY_SCHEDULE:

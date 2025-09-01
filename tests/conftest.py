@@ -37,6 +37,13 @@ async def hass():
         hass.data["registries_loaded"] = set()
         hass.data["missing_platforms"] = {}
         
+        # Add network component data to prevent KeyError 
+        # Mock the network component structure that Home Assistant expects
+        from unittest.mock import MagicMock
+        network_adapter = MagicMock()
+        network_adapter.adapters = []
+        hass.data["network"] = network_adapter
+        
         # Mock the integration registry and loader
         mock_integration = AsyncMock()
         mock_integration.domain = "firefly_cloud"
@@ -46,14 +53,14 @@ async def hass():
         mock_integration.config_flow = True
         mock_integration.file_path = temp_dir + "/custom_components/firefly_cloud"
         
-        with patch("homeassistant.helpers.frame.report_usage", create=True):
-            with patch("homeassistant.loader.async_get_integration", return_value=mock_integration):
-                with patch("homeassistant.helpers.integration_platform.async_process_integration_platforms"):
-                    await hass.async_start()
-                    try:
-                        yield hass
-                    finally:
-                        await hass.async_stop()
+        # Setup required Home Assistant components
+        with patch("homeassistant.loader.async_get_integration", return_value=mock_integration):
+            with patch("homeassistant.helpers.integration_platform.async_process_integration_platforms"):
+                await hass.async_start()
+                try:
+                    yield hass
+                finally:
+                    await hass.async_stop()
 
 from custom_components.firefly_cloud.const import (
     CONF_CHILDREN_GUIDS,
@@ -318,14 +325,18 @@ def mock_coordinator_data():
     }
 
 
-def mock_http_response(text="", json_data=None, status=200):
+def mock_http_response(text="", json_data=None, status=200, raise_for_status_exception=None):
     """Create a mock HTTP response."""
     response = AsyncMock()
     response.text = AsyncMock(return_value=text)
     if json_data:
         response.json = AsyncMock(return_value=json_data)
     response.status = status
-    response.raise_for_status = MagicMock()
+    
+    if raise_for_status_exception:
+        response.raise_for_status = MagicMock(side_effect=raise_for_status_exception)
+    else:
+        response.raise_for_status = MagicMock()
     return response
 
 

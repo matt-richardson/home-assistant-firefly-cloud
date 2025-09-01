@@ -132,7 +132,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
         # Stop the coordinator's update loop
         if coordinator:
-            await coordinator.async_shutdown()
+            try:
+                await coordinator.async_shutdown()
+            except Exception as err:
+                _LOGGER.warning("Error shutting down coordinator: %s", err)
 
         # Clean up hass.data if this was the last entry
         if not hass.data[DOMAIN]:
