@@ -1,5 +1,5 @@
 """Test the Firefly Cloud coordinator."""
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -171,15 +171,15 @@ async def test_coordinator_process_tasks(hass: HomeAssistant, mock_api):
 @pytest.mark.asyncio
 async def test_coordinator_filter_tasks_due_today(hass: HomeAssistant, mock_api):
     """Test filtering tasks due today."""
-    # Mock task due today
-    now = datetime.now()
-    today_end = now.replace(hour=23, minute=59, second=59, microsecond=0)
+    # Mock task due today - use UTC time to match coordinator behavior
+    now_utc = datetime.now(timezone.utc)
+    today_end_utc = now_utc.replace(hour=23, minute=59, second=59, microsecond=0)
     task_due_today = {
         "guid": "urgent-task",
         "title": "Submit Report", 
         "description": "Final report submission",
-        "dueDate": today_end.isoformat() + "Z",
-        "setDate": (now - timedelta(days=7)).isoformat() + "Z",
+        "dueDate": today_end_utc.isoformat().replace('+00:00', 'Z'),
+        "setDate": (now_utc - timedelta(days=7)).isoformat().replace('+00:00', 'Z'),
         "subject": {"name": "English"},
         "completionStatus": "Todo",
         "setter": {"name": "Ms. Johnson"},
@@ -205,14 +205,14 @@ async def test_coordinator_filter_tasks_due_today(hass: HomeAssistant, mock_api)
 @pytest.mark.asyncio
 async def test_coordinator_filter_overdue_tasks(hass: HomeAssistant, mock_api):
     """Test filtering overdue tasks."""
-    # Mock overdue task
-    now = datetime.now()
+    # Mock overdue task - use UTC time to match coordinator behavior
+    now_utc = datetime.now(timezone.utc)
     overdue_task = {
         "guid": "overdue-task",
         "title": "Late Assignment",
         "description": "Should have been submitted yesterday",
-        "dueDate": (now - timedelta(days=1)).isoformat() + "Z",
-        "setDate": (now - timedelta(days=7)).isoformat() + "Z",
+        "dueDate": (now_utc - timedelta(days=1)).isoformat().replace('+00:00', 'Z'),
+        "setDate": (now_utc - timedelta(days=7)).isoformat().replace('+00:00', 'Z'),
         "subject": {"name": "History"},
         "completionStatus": "Todo",
         "setter": {"name": "Mr. Wilson"}, 
@@ -315,7 +315,8 @@ async def test_coordinator_partial_failure_recovery(hass: HomeAssistant, mock_ap
 @pytest.mark.asyncio 
 async def test_coordinator_task_lookahead_filtering(hass: HomeAssistant, mock_api):
     """Test task filtering based on lookahead days."""
-    now = datetime.now()
+    # Use UTC time to match coordinator behavior
+    now_utc = datetime.now(timezone.utc)
     
     # Mock tasks: one within lookahead, one beyond
     tasks = [
@@ -323,8 +324,8 @@ async def test_coordinator_task_lookahead_filtering(hass: HomeAssistant, mock_ap
             "guid": "task-near",
             "title": "Near Task",
             "description": "Due soon",
-            "dueDate": (now + timedelta(days=3)).isoformat() + "Z",  # Within 7 days
-            "setDate": (now - timedelta(days=1)).isoformat() + "Z",
+            "dueDate": (now_utc + timedelta(days=3)).isoformat().replace('+00:00', 'Z'),  # Within 7 days
+            "setDate": (now_utc - timedelta(days=1)).isoformat().replace('+00:00', 'Z'),
             "subject": {"name": "Math"},
             "completionStatus": "Todo",
             "setter": {"name": "Teacher"},
@@ -333,8 +334,8 @@ async def test_coordinator_task_lookahead_filtering(hass: HomeAssistant, mock_ap
             "guid": "task-far",
             "title": "Far Task", 
             "description": "Due later",
-            "dueDate": (now + timedelta(days=10)).isoformat() + "Z",  # Beyond 7 days
-            "setDate": (now - timedelta(days=1)).isoformat() + "Z",
+            "dueDate": (now_utc + timedelta(days=10)).isoformat().replace('+00:00', 'Z'),  # Beyond 7 days
+            "setDate": (now_utc - timedelta(days=1)).isoformat().replace('+00:00', 'Z'),
             "subject": {"name": "Science"},
             "completionStatus": "Todo",
             "setter": {"name": "Teacher"},
@@ -378,13 +379,14 @@ async def test_coordinator_shutdown(hass: HomeAssistant, mock_api):
 @pytest.mark.asyncio
 async def test_coordinator_multiple_event_days(hass: HomeAssistant, mock_api):
     """Test coordinator with events spanning multiple days."""
-    now = datetime.now()
+    # Use UTC time to match coordinator behavior
+    now_utc = datetime.now(timezone.utc)
     
     # Mock events for different days
     events = [
         {
-            "start": now.replace(hour=9, minute=0, second=0, microsecond=0).isoformat() + "Z",
-            "end": now.replace(hour=10, minute=0, second=0, microsecond=0).isoformat() + "Z",
+            "start": now_utc.replace(hour=9, minute=0, second=0, microsecond=0).isoformat().replace('+00:00', 'Z'),
+            "end": now_utc.replace(hour=10, minute=0, second=0, microsecond=0).isoformat().replace('+00:00', 'Z'),
             "subject": "Today's Class",
             "location": "Room 1",
             "description": "Today",
@@ -392,8 +394,8 @@ async def test_coordinator_multiple_event_days(hass: HomeAssistant, mock_api):
             "attendees": [],
         },
         {
-            "start": (now.replace(hour=11, minute=0, second=0, microsecond=0) + timedelta(days=1)).isoformat() + "Z",
-            "end": (now.replace(hour=12, minute=0, second=0, microsecond=0) + timedelta(days=1)).isoformat() + "Z",
+            "start": (now_utc.replace(hour=11, minute=0, second=0, microsecond=0) + timedelta(days=1)).isoformat().replace('+00:00', 'Z'),
+            "end": (now_utc.replace(hour=12, minute=0, second=0, microsecond=0) + timedelta(days=1)).isoformat().replace('+00:00', 'Z'),
             "subject": "Tomorrow's Class",
             "location": "Room 2", 
             "description": "Tomorrow",
