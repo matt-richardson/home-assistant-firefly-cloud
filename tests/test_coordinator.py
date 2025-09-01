@@ -87,8 +87,8 @@ async def test_coordinator_first_refresh_success(hass: HomeAssistant, mock_api):
     
     assert coordinator.data is not None
     assert "user_info" in coordinator.data
-    assert "events" in coordinator.data
-    assert "tasks" in coordinator.data
+    assert "children_data" in coordinator.data
+    assert "children_guids" in coordinator.data
     assert coordinator.data["user_info"]["username"] == "john.doe"
 
 
@@ -105,8 +105,8 @@ async def test_coordinator_update_data_success(hass: HomeAssistant, mock_api):
     
     assert data is not None
     assert "user_info" in data
-    assert "events" in data
-    assert "tasks" in data
+    assert "children_data" in data
+    assert "children_guids" in data
     assert "last_updated" in data
     
     # Verify API calls were made
@@ -126,16 +126,20 @@ async def test_coordinator_process_events(hass: HomeAssistant, mock_api):
     
     data = await coordinator._async_update_data()
     
-    assert "events" in data
-    assert "today" in data["events"]
-    assert "week" in data["events"]
+    assert "children_data" in data
+    child_guid = list(data["children_data"].keys())[0]  # Get first child
+    child_data = data["children_data"][child_guid]
+    
+    assert "events" in child_data
+    assert "today" in child_data["events"]
+    assert "week" in child_data["events"]
     
     # Should have today's events
-    assert len(data["events"]["today"]) == 1
-    assert data["events"]["today"][0]["subject"] == "Mathematics"
+    assert len(child_data["events"]["today"]) == 1
+    assert child_data["events"]["today"][0]["subject"] == "Mathematics"
     
     # Week events should include today's events
-    assert len(data["events"]["week"]) >= 1
+    assert len(child_data["events"]["week"]) >= 1
 
 
 @pytest.mark.asyncio
@@ -149,15 +153,19 @@ async def test_coordinator_process_tasks(hass: HomeAssistant, mock_api):
     
     data = await coordinator._async_update_data()
     
-    assert "tasks" in data
-    assert "all" in data["tasks"]
-    assert "due_today" in data["tasks"]
-    assert "upcoming" in data["tasks"]
-    assert "overdue" in data["tasks"]
+    assert "children_data" in data
+    child_guid = list(data["children_data"].keys())[0]  # Get first child
+    child_data = data["children_data"][child_guid]
+    
+    assert "tasks" in child_data
+    assert "all" in child_data["tasks"]
+    assert "due_today" in child_data["tasks"]
+    assert "upcoming" in child_data["tasks"]
+    assert "overdue" in child_data["tasks"]
     
     # Should have all tasks
-    assert len(data["tasks"]["all"]) == 1
-    assert data["tasks"]["all"][0]["title"] == "Math Homework"
+    assert len(child_data["tasks"]["all"]) == 1
+    assert child_data["tasks"]["all"][0]["title"] == "Math Homework"
 
 
 @pytest.mark.asyncio
@@ -187,8 +195,11 @@ async def test_coordinator_filter_tasks_due_today(hass: HomeAssistant, mock_api)
     
     data = await coordinator._async_update_data()
     
-    assert len(data["tasks"]["due_today"]) == 1
-    assert data["tasks"]["due_today"][0]["title"] == "Submit Report"
+    child_guid = list(data["children_data"].keys())[0]
+    child_data = data["children_data"][child_guid]
+    
+    assert len(child_data["tasks"]["due_today"]) == 1
+    assert child_data["tasks"]["due_today"][0]["title"] == "Submit Report"
 
 
 @pytest.mark.asyncio
@@ -217,8 +228,11 @@ async def test_coordinator_filter_overdue_tasks(hass: HomeAssistant, mock_api):
     
     data = await coordinator._async_update_data()
     
-    assert len(data["tasks"]["overdue"]) == 1
-    assert data["tasks"]["overdue"][0]["title"] == "Late Assignment"
+    child_guid = list(data["children_data"].keys())[0]
+    child_data = data["children_data"][child_guid]
+    
+    assert len(child_data["tasks"]["overdue"]) == 1
+    assert child_data["tasks"]["overdue"][0]["title"] == "Late Assignment"
 
 
 @pytest.mark.asyncio
@@ -337,12 +351,15 @@ async def test_coordinator_task_lookahead_filtering(hass: HomeAssistant, mock_ap
     
     data = await coordinator._async_update_data()
     
+    child_guid = list(data["children_data"].keys())[0]
+    child_data = data["children_data"][child_guid]
+    
     # Upcoming tasks should only include the near task
-    assert len(data["tasks"]["upcoming"]) == 1
-    assert data["tasks"]["upcoming"][0]["title"] == "Near Task"
+    assert len(child_data["tasks"]["upcoming"]) == 1
+    assert child_data["tasks"]["upcoming"][0]["title"] == "Near Task"
     
     # All tasks should include both
-    assert len(data["tasks"]["all"]) == 2
+    assert len(child_data["tasks"]["all"]) == 2
 
 
 @pytest.mark.asyncio
@@ -395,10 +412,13 @@ async def test_coordinator_multiple_event_days(hass: HomeAssistant, mock_api):
     
     data = await coordinator._async_update_data()
     
+    child_guid = list(data["children_data"].keys())[0]
+    child_data = data["children_data"][child_guid]
+    
     # Both events are returned (UTC timezone handling)
-    assert len(data["events"]["today"]) == 2
-    assert len(data["events"]["week"]) == 2
+    assert len(child_data["events"]["today"]) == 2
+    assert len(child_data["events"]["week"]) == 2
     # Verify both events are processed correctly
-    subjects = [event["subject"] for event in data["events"]["today"]]
+    subjects = [event["subject"] for event in child_data["events"]["today"]]
     assert "Today's Class" in subjects
     assert "Tomorrow's Class" in subjects

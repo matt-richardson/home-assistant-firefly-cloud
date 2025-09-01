@@ -164,6 +164,10 @@ async def test_form_auth_step_success(hass: HomeAssistant, mock_setup_entry) -> 
             "custom_components.firefly_cloud.config_flow.FireflyAPIClient.get_user_info",
             return_value=mock_user_info,
         ),
+        patch(
+            "custom_components.firefly_cloud.config_flow.FireflyAPIClient.get_children_info",
+            return_value=[mock_user_info],  # Student returns themselves as only child
+        ),
     ):
         result2 = await hass.config_entries.flow.async_configure(
             result["flow_id"],
