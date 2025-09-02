@@ -17,8 +17,7 @@ async def hass():
 
     with tempfile.TemporaryDirectory() as temp_dir:
         hass = HomeAssistant(temp_dir)
-        hass.data = {}
-        hass.data["integrations"] = {}
+        # Use proper initialization instead of direct assignment
         hass.config_entries = ConfigEntries(hass, {})
 
         # Set up required components for config flow testing
@@ -27,6 +26,7 @@ async def hass():
         hass.data["preload_platforms"] = set()
         hass.data["registries_loaded"] = set()
         hass.data["missing_platforms"] = {}
+        hass.data["integrations"] = {}
 
         # Add network component data to prevent KeyError
         # Mock the network component structure that Home Assistant expects
@@ -45,8 +45,12 @@ async def hass():
         mock_integration.file_path = temp_dir + "/custom_components/firefly_cloud"
 
         # Setup required Home Assistant components
-        with patch("homeassistant.loader.async_get_integration", return_value=mock_integration):
-            with patch("homeassistant.helpers.integration_platform.async_process_integration_platforms"):
+        with patch(
+            "homeassistant.loader.async_get_integration", return_value=mock_integration
+        ):
+            with patch(
+                "homeassistant.helpers.integration_platform.async_process_integration_platforms"
+            ):
                 await hass.async_start()
                 try:
                     yield hass
@@ -340,7 +344,7 @@ def mock_aiohttp_session():
     session._mock_responses = {}
 
     # Create async context manager mocks that return configured responses
-    def create_context_manager_for_get(*_args, **_kwargs):
+    def create_context_manager_for_get(*_args, **_kwargs):  # pylint: disable=unused-argument
         context_manager = AsyncMock()
         # Use the stored response or create a default one
         response = session._mock_responses.get('get', mock_http_response())
@@ -348,7 +352,7 @@ def mock_aiohttp_session():
         context_manager.__aexit__.return_value = None
         return context_manager
 
-    def create_context_manager_for_post(*_args, **_kwargs):
+    def create_context_manager_for_post(*_args, **_kwargs):  # pylint: disable=unused-argument
         context_manager = AsyncMock()
         # Use the stored response or create a default one
         response = session._mock_responses.get('post', mock_http_response())
