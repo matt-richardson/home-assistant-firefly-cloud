@@ -5,6 +5,7 @@ from types import MappingProxyType
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
 from custom_components.firefly_cloud.sensor import (
@@ -18,6 +19,12 @@ from custom_components.firefly_cloud.const import (
     SENSOR_UPCOMING_TASKS,
     SENSOR_TASKS_DUE_TODAY,
     SENSOR_TYPES,
+    CONF_SCHOOL_NAME,
+    CONF_HOST,
+    CONF_DEVICE_ID,
+    CONF_SECRET,
+    CONF_USER_GUID,
+    CONF_CHILDREN_GUIDS,
 )
 
 
@@ -121,7 +128,7 @@ async def test_async_setup_entry(hass: HomeAssistant, mock_config_entry, mock_co
 
     entities = []
 
-    def mock_add_entities(new_entities, update_before_add=False):
+    def mock_add_entities(new_entities, update_before_add=False):  # pylint: disable=unused-argument
         entities.extend(new_entities)
 
     await async_setup_entry(hass, mock_config_entry, mock_add_entities)
@@ -549,17 +556,6 @@ async def test_sensor_coordinator_data_update(mock_coordinator, mock_config_entr
 @pytest.mark.asyncio
 async def test_async_setup_entry_no_children(hass: HomeAssistant):
     """Test sensor setup when no children data available."""
-    from homeassistant.config_entries import ConfigEntry
-    from custom_components.firefly_cloud.const import (
-        DOMAIN,
-        CONF_SCHOOL_NAME,
-        CONF_HOST,
-        CONF_DEVICE_ID,
-        CONF_SECRET,
-        CONF_USER_GUID,
-        CONF_CHILDREN_GUIDS,
-    )
-
     # Create config entry with no children
     config_entry = ConfigEntry(
         version=1,
@@ -593,7 +589,7 @@ async def test_async_setup_entry_no_children(hass: HomeAssistant):
 
     entities = []
 
-    def mock_add_entities(new_entities, update_before_add=False):
+    def mock_add_entities(new_entities, update_before_add=False):  # pylint: disable=unused-argument
         entities.extend(new_entities)
 
     await async_setup_entry(hass, config_entry, mock_add_entities)
@@ -605,17 +601,6 @@ async def test_async_setup_entry_no_children(hass: HomeAssistant):
 @pytest.mark.asyncio
 async def test_async_setup_entry_multiple_children(hass: HomeAssistant):
     """Test sensor setup with multiple children."""
-    from homeassistant.config_entries import ConfigEntry
-    from custom_components.firefly_cloud.const import (
-        DOMAIN,
-        CONF_SCHOOL_NAME,
-        CONF_HOST,
-        CONF_DEVICE_ID,
-        CONF_SECRET,
-        CONF_USER_GUID,
-        CONF_CHILDREN_GUIDS,
-    )
-
     # Create config entry with 3 children
     config_entry = ConfigEntry(
         version=1,
@@ -662,7 +647,7 @@ async def test_async_setup_entry_multiple_children(hass: HomeAssistant):
 
     entities = []
 
-    def mock_add_entities(new_entities, update_before_add=False):
+    def mock_add_entities(new_entities, update_before_add=False):  # pylint: disable=unused-argument
         entities.extend(new_entities)
 
     await async_setup_entry(hass, config_entry, mock_add_entities)
