@@ -25,7 +25,7 @@ def mock_setup_entry():
 
 
 @pytest.mark.asyncio
-async def test_form_user_flow(hass: HomeAssistant, mock_setup_entry) -> None:
+async def test_form_user_flow(hass: HomeAssistant, mock_setup_entry) -> None:  # pylint: disable=unused-argument
     """Test we get the form for user flow."""
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
@@ -37,7 +37,7 @@ async def test_form_user_flow(hass: HomeAssistant, mock_setup_entry) -> None:
 
 
 @pytest.mark.asyncio
-async def test_form_user_flow_success(hass: HomeAssistant, mock_setup_entry) -> None:
+async def test_form_user_flow_success(hass: HomeAssistant, mock_setup_entry) -> None:  # pylint: disable=unused-argument
     """Test successful user flow."""
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
@@ -107,7 +107,7 @@ async def test_form_connection_error(hass: HomeAssistant) -> None:
 
 
 @pytest.mark.asyncio
-async def test_form_auth_step_success(hass: HomeAssistant, mock_setup_entry) -> None:
+async def test_form_auth_step_success(hass: HomeAssistant, mock_setup_entry) -> None:  # pylint: disable=unused-argument
     """Test successful authentication step."""
     # Start flow and get to auth step
     result = await hass.config_entries.flow.async_init(
@@ -368,7 +368,7 @@ async def test_abort_if_already_configured(hass: HomeAssistant) -> None:
 
 @pytest.mark.skip(reason="Reauth flow requires complex Home Assistant internals mocking")
 @pytest.mark.asyncio
-async def test_reauth_flow_success(hass: HomeAssistant, mock_config_entry, mock_setup_entry) -> None:
+async def test_reauth_flow_success(hass: HomeAssistant, mock_config_entry, mock_setup_entry) -> None:  # pylint: disable=unused-argument
     """Test successful reauthentication flow."""
     # Add existing entry to hass properly
     hass.config_entries._entries[mock_config_entry.entry_id] = mock_config_entry
@@ -687,7 +687,7 @@ async def test_user_step_unexpected_error(hass: HomeAssistant) -> None:
 
 
 @pytest.mark.asyncio
-async def test_auth_step_multiple_children(hass: HomeAssistant, mock_setup_entry) -> None:
+async def test_auth_step_multiple_children(hass: HomeAssistant, mock_setup_entry) -> None:  # pylint: disable=unused-argument
     """Test authentication step with parent having multiple children."""
     # Start flow and get to auth step
     result = await hass.config_entries.flow.async_init(

@@ -28,7 +28,7 @@ def api_client(mock_aiohttp_session):
 
 
 @pytest.mark.asyncio
-async def test_get_school_info_success(mock_aiohttp_session, mock_school_info):
+async def test_get_school_info_success(mock_aiohttp_session, mock_school_info):  # pylint: disable=unused-argument
     """Test successful school info retrieval."""
     # Mock XML response
     xml_response = """<?xml version="1.0"?>
