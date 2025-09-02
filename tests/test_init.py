@@ -36,18 +36,18 @@ async def test_async_setup_entry_success(
         mock_api_class.return_value = mock_firefly_api
         mock_coordinator = AsyncMock()
         mock_coordinator_class.return_value = mock_coordinator
-        
+
         # Test successful setup
         result = await async_setup_entry(hass, mock_config_entry)
-        
+
         assert result is True
         assert DOMAIN in hass.data
         assert mock_config_entry.entry_id in hass.data[DOMAIN]
-        
+
         # Verify API client methods were called
         mock_firefly_api.verify_credentials.assert_called_once()
         mock_firefly_api.get_api_version.assert_called_once()
-        
+
         # Verify coordinator was created and data fetched
         mock_coordinator.async_config_entry_first_refresh.assert_called_once()
 
@@ -66,7 +66,7 @@ async def test_async_setup_entry_auth_failed(
         mock_api = AsyncMock()
         mock_api.verify_credentials = AsyncMock(return_value=False)
         mock_api_class.return_value = mock_api
-        
+
         with pytest.raises(ConfigEntryAuthFailed):
             await async_setup_entry(hass, mock_config_entry)
 
@@ -84,7 +84,7 @@ async def test_async_setup_entry_token_expired(
         mock_api = AsyncMock()
         mock_api.verify_credentials.side_effect = FireflyTokenExpiredError("Token expired")
         mock_api_class.return_value = mock_api
-        
+
         with pytest.raises(ConfigEntryAuthFailed):
             await async_setup_entry(hass, mock_config_entry)
 
@@ -102,7 +102,7 @@ async def test_async_setup_entry_connection_error(
         mock_api = AsyncMock()
         mock_api.verify_credentials.side_effect = FireflyConnectionError("Connection failed")
         mock_api_class.return_value = mock_api
-        
+
         with pytest.raises(ConfigEntryNotReady):
             await async_setup_entry(hass, mock_config_entry)
 
@@ -123,7 +123,7 @@ async def test_async_setup_entry_coordinator_fetch_failure(
         mock_coordinator = AsyncMock()
         mock_coordinator.async_config_entry_first_refresh.side_effect = Exception("Fetch failed")
         mock_coordinator_class.return_value = mock_coordinator
-        
+
         with pytest.raises(ConfigEntryNotReady):
             await async_setup_entry(hass, mock_config_entry)
 
@@ -138,14 +138,14 @@ async def test_async_unload_entry_success(
     coordinator = AsyncMock()
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][mock_config_entry.entry_id] = coordinator
-    
+
     with patch.object(
         hass.config_entries, "async_unload_platforms"
     ) as mock_unload_platforms:
         mock_unload_platforms.return_value = True
-        
+
         result = await async_unload_entry(hass, mock_config_entry)
-        
+
         assert result is True
         # Domain should be removed entirely since it was the only entry
         assert DOMAIN not in hass.data
@@ -162,14 +162,14 @@ async def test_async_unload_entry_failure(
     coordinator = AsyncMock()
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][mock_config_entry.entry_id] = coordinator
-    
+
     with patch.object(
         hass.config_entries, "async_unload_platforms"
     ) as mock_unload_platforms:
         mock_unload_platforms.return_value = False
-        
+
         result = await async_unload_entry(hass, mock_config_entry)
-        
+
         assert result is False
         assert mock_config_entry.entry_id in hass.data[DOMAIN]
         coordinator.async_shutdown.assert_not_called()
@@ -187,9 +187,9 @@ async def test_async_reload_entry(
     ):
         mock_unload.return_value = True
         mock_setup.return_value = True
-        
+
         await async_reload_entry(hass, mock_config_entry)
-        
+
         mock_unload.assert_called_once_with(hass, mock_config_entry)
         mock_setup.assert_called_once_with(hass, mock_config_entry)
 
@@ -218,7 +218,7 @@ async def test_async_setup_entry_authentication_error(
         mock_api = AsyncMock()
         mock_api.verify_credentials.side_effect = FireflyAuthenticationError("Auth failed")
         mock_api_class.return_value = mock_api
-        
+
         with pytest.raises(ConfigEntryAuthFailed, match="Authentication failed"):
             await async_setup_entry(hass, mock_config_entry)
 
@@ -236,7 +236,7 @@ async def test_async_setup_entry_unexpected_error(
         mock_api = AsyncMock()
         mock_api.verify_credentials.side_effect = ValueError("Unexpected error")
         mock_api_class.return_value = mock_api
-        
+
         with pytest.raises(ConfigEntryNotReady, match="Unexpected error"):
             await async_setup_entry(hass, mock_config_entry)
 
@@ -254,7 +254,7 @@ async def test_async_setup_entry_api_version_check_error(
     ):
         mock_api_class.return_value = mock_firefly_api
         mock_firefly_api.get_api_version.side_effect = FireflyConnectionError("Version check failed")
-        
+
         with pytest.raises(ConfigEntryNotReady, match="Failed to connect"):
             await async_setup_entry(hass, mock_config_entry)
 
@@ -266,7 +266,7 @@ async def test_async_setup_entry_with_children_guids(
 ) -> None:
     """Test setup with pre-configured children GUIDs."""
     from custom_components.firefly_cloud.const import CONF_CHILDREN_GUIDS
-    
+
     # Create config entry with children GUIDs
     config_entry = Mock()
     config_entry.entry_id = "test-entry-id"
@@ -278,7 +278,7 @@ async def test_async_setup_entry_with_children_guids(
         CONF_CHILDREN_GUIDS: ["child-1", "child-2"],
         "task_lookahead_days": 7,
     }
-    
+
     with (
         patch("custom_components.firefly_cloud.FireflyAPIClient") as mock_api_class,
         patch("custom_components.firefly_cloud.FireflyUpdateCoordinator") as mock_coordinator_class,
@@ -288,11 +288,11 @@ async def test_async_setup_entry_with_children_guids(
         mock_api_class.return_value = mock_firefly_api
         mock_coordinator = AsyncMock()
         mock_coordinator_class.return_value = mock_coordinator
-        
+
         result = await async_setup_entry(hass, config_entry)
-        
+
         assert result is True
-        
+
         # Verify coordinator was created with children GUIDs
         mock_coordinator_class.assert_called_once()
         call_kwargs = mock_coordinator_class.call_args[1]
@@ -315,10 +315,10 @@ async def test_async_setup_entry_forward_setup_failure(
         mock_api_class.return_value = mock_firefly_api
         mock_coordinator = AsyncMock()
         mock_coordinator_class.return_value = mock_coordinator
-        
+
         # Should still succeed even if forward setup fails (platforms might fail later)
         result = await async_setup_entry(hass, mock_config_entry)
-        
+
         assert result is True
         assert DOMAIN in hass.data
         assert mock_config_entry.entry_id in hass.data[DOMAIN]
@@ -333,21 +333,21 @@ async def test_async_unload_entry_multiple_entries(
     # Set up hass.data with multiple entries
     coordinator1 = AsyncMock()
     coordinator2 = AsyncMock()
-    
+
     other_entry = Mock()
     other_entry.entry_id = "other-entry-id"
-    
+
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][mock_config_entry.entry_id] = coordinator1
     hass.data[DOMAIN][other_entry.entry_id] = coordinator2
-    
+
     with patch.object(
         hass.config_entries, "async_unload_platforms"
     ) as mock_unload_platforms:
         mock_unload_platforms.return_value = True
-        
+
         result = await async_unload_entry(hass, mock_config_entry)
-        
+
         assert result is True
         # Only the specific entry should be removed, domain should remain
         assert DOMAIN in hass.data
@@ -365,18 +365,18 @@ async def test_async_unload_entry_coordinator_shutdown_error(
     """Test unloading when coordinator shutdown fails."""
     coordinator = AsyncMock()
     coordinator.async_shutdown.side_effect = Exception("Shutdown failed")
-    
+
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][mock_config_entry.entry_id] = coordinator
-    
+
     with patch.object(
         hass.config_entries, "async_unload_platforms"
     ) as mock_unload_platforms:
         mock_unload_platforms.return_value = True
-        
-        # Should still succeed even if coordinator shutdown fails  
+
+        # Should still succeed even if coordinator shutdown fails
         result = await async_unload_entry(hass, mock_config_entry)
-        
+
         # Check that unload succeeded and cleanup happened
         assert result is True
         # The entry should be removed from the domain data
@@ -391,7 +391,7 @@ async def test_async_setup_entry_default_task_lookahead(
 ) -> None:
     """Test setup uses default task lookahead when not specified."""
     from custom_components.firefly_cloud.const import DEFAULT_TASK_LOOKAHEAD_DAYS
-    
+
     # Create config entry without task_lookahead_days
     config_entry = Mock()
     config_entry.entry_id = "test-entry-id"
@@ -404,7 +404,7 @@ async def test_async_setup_entry_default_task_lookahead(
     # Mock options properly
     config_entry.options = MagicMock()
     config_entry.options.get = Mock(return_value=None)
-    
+
     with (
         patch("custom_components.firefly_cloud.FireflyAPIClient") as mock_api_class,
         patch("custom_components.firefly_cloud.FireflyUpdateCoordinator") as mock_coordinator_class,
@@ -414,11 +414,11 @@ async def test_async_setup_entry_default_task_lookahead(
         mock_api_class.return_value = mock_firefly_api
         mock_coordinator = AsyncMock()
         mock_coordinator_class.return_value = mock_coordinator
-        
+
         result = await async_setup_entry(hass, config_entry)
-        
+
         assert result is True
-        
+
         # Verify coordinator was created with default task lookahead
         mock_coordinator_class.assert_called_once()
         call_kwargs = mock_coordinator_class.call_args[1]
@@ -438,10 +438,10 @@ async def test_async_setup_entry_credentials_verification_false(
         mock_api = AsyncMock()
         mock_api.verify_credentials.return_value = False  # This will cause the failure before get_api_version
         mock_api_class.return_value = mock_api
-        
+
         with pytest.raises(ConfigEntryAuthFailed, match="Invalid credentials"):
             await async_setup_entry(hass, mock_config_entry)
-        
+
         # Verify verify_credentials was called, but get_api_version should not be called
         mock_api.verify_credentials.assert_called_once()
         mock_api.get_api_version.assert_not_called()
@@ -459,9 +459,9 @@ async def test_async_reload_entry_unload_failure(
     ):
         mock_unload.return_value = False  # Unload fails
         mock_setup.return_value = True
-        
+
         await async_reload_entry(hass, mock_config_entry)
-        
+
         mock_unload.assert_called_once_with(hass, mock_config_entry)
         # Setup should still be called even if unload fails
         mock_setup.assert_called_once_with(hass, mock_config_entry)
@@ -479,10 +479,10 @@ async def test_async_reload_entry_setup_failure(
     ):
         mock_unload.return_value = True
         mock_setup.side_effect = ConfigEntryNotReady("Setup failed")
-        
+
         with pytest.raises(ConfigEntryNotReady):
             await async_reload_entry(hass, mock_config_entry)
-        
+
         mock_unload.assert_called_once_with(hass, mock_config_entry)
         mock_setup.assert_called_once_with(hass, mock_config_entry)
 
@@ -505,11 +505,11 @@ async def test_async_setup_entry_creates_api_client_correctly(
         mock_api_class.return_value = mock_firefly_api
         mock_coordinator = AsyncMock()
         mock_coordinator_class.return_value = mock_coordinator
-        
+
         result = await async_setup_entry(hass, mock_config_entry)
-        
+
         assert result is True
-        
+
         # Verify API client was created with correct parameters
         mock_api_class.assert_called_once_with(
             session=mock_session,
@@ -518,6 +518,6 @@ async def test_async_setup_entry_creates_api_client_correctly(
             secret=mock_config_entry.data["secret"],
             user_guid=mock_config_entry.data["user_guid"],
         )
-        
+
         # Verify session was obtained
         mock_session_getter.assert_called_once_with(hass)

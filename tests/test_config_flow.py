@@ -30,7 +30,7 @@ async def test_form_user_flow(hass: HomeAssistant, mock_setup_entry) -> None:
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
-    
+
     assert result["type"] == FlowResultType.FORM
     assert result["errors"] == {}
     assert result["step_id"] == "user"
@@ -116,7 +116,7 @@ async def test_form_auth_step_success(hass: HomeAssistant, mock_setup_entry) -> 
 
     mock_school_info = {
         "enabled": True,
-        "name": "Test School", 
+        "name": "Test School",
         "host": "testschool.fireflycloud.net",
         "url": "https://testschool.fireflycloud.net",
         "device_id": "test-device-123",
@@ -191,7 +191,7 @@ async def test_form_auth_invalid_response(hass: HomeAssistant) -> None:
     mock_school_info = {
         "enabled": True,
         "name": "Test School",
-        "host": "testschool.fireflycloud.net", 
+        "host": "testschool.fireflycloud.net",
         "url": "https://testschool.fireflycloud.net",
         "device_id": "test-device-123",
     }
@@ -250,7 +250,7 @@ async def test_form_auth_credentials_verification_failed(hass: HomeAssistant) ->
         "secret": "test-secret",
         "user": {
             "username": "john.doe",
-            "fullname": "John Doe", 
+            "fullname": "John Doe",
             "email": "john.doe@test.com",
             "role": "student",
             "guid": "test-guid",
@@ -281,30 +281,30 @@ async def test_form_auth_credentials_verification_failed(hass: HomeAssistant) ->
 async def test_options_flow(hass: HomeAssistant, mock_config_entry) -> None:
     """Test options flow."""
     hass.config_entries._entries[mock_config_entry.entry_id] = mock_config_entry
-    
+
     result = await hass.config_entries.options.async_init(mock_config_entry.entry_id)
-    
+
     assert result["type"] == FlowResultType.FORM
     assert result["step_id"] == "init"
-    
+
     result2 = await hass.config_entries.options.async_configure(
         result["flow_id"],
         user_input={"task_lookahead_days": 10},
     )
-    
+
     assert result2["type"] == FlowResultType.CREATE_ENTRY
     assert result2["data"]["task_lookahead_days"] == 10
 
 
-@pytest.mark.asyncio  
+@pytest.mark.asyncio
 async def test_abort_if_already_configured(hass: HomeAssistant) -> None:
     """Test abort if already configured."""
     from custom_components.firefly_cloud.const import (
-        DOMAIN, CONF_SCHOOL_CODE, CONF_SCHOOL_NAME, CONF_HOST, 
+        DOMAIN, CONF_SCHOOL_CODE, CONF_SCHOOL_NAME, CONF_HOST,
         CONF_DEVICE_ID, CONF_SECRET, CONF_USER_GUID, CONF_TASK_LOOKAHEAD_DAYS,
         DEFAULT_TASK_LOOKAHEAD_DAYS
     )
-    
+
     # Create an existing config entry with the same unique_id as the school code we'll test
     # and add it manually to Home Assistant's registry
     from homeassistant.config_entries import ConfigEntry
@@ -331,20 +331,20 @@ async def test_abort_if_already_configured(hass: HomeAssistant) -> None:
     )
     # Add to the config entries registry
     hass.config_entries._entries[existing_entry.entry_id] = existing_entry
-    
+
     # Also need to ensure the unique_id is properly tracked
     # Let's trigger the internal indexing by calling the method directly
     hass.config_entries._async_schedule_save()
-    
+
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
-    
+
     # If the flow was already aborted in the init step, result will be the abort
     if result["type"] == FlowResultType.ABORT:
         assert result["reason"] == "single_instance_allowed"
         return
-    
+
     mock_school_info = {
         "enabled": True,
         "name": "Test School",
@@ -370,19 +370,19 @@ async def test_abort_if_already_configured(hass: HomeAssistant) -> None:
 @pytest.mark.asyncio
 async def test_reauth_flow_success(hass: HomeAssistant, mock_config_entry, mock_setup_entry) -> None:
     """Test successful reauthentication flow."""
-    # Add existing entry to hass properly  
+    # Add existing entry to hass properly
     hass.config_entries._entries[mock_config_entry.entry_id] = mock_config_entry
-    
+
     # Start reauth flow
     result = await hass.config_entries.flow.async_init(
         DOMAIN,
         context={"source": config_entries.SOURCE_REAUTH, "entry_id": mock_config_entry.entry_id},
         data=mock_config_entry.data,
     )
-    
+
     assert result["type"] == FlowResultType.FORM
     assert result["step_id"] == "reauth_confirm"
-    
+
     # Mock successful authentication
     mock_auth_response = {
         "secret": "new-test-secret",
@@ -394,7 +394,7 @@ async def test_reauth_flow_success(hass: HomeAssistant, mock_config_entry, mock_
             "guid": "test-guid",
         },
     }
-    
+
     with (
         patch(
             "custom_components.firefly_cloud.config_flow.FireflyAPIClient.parse_authentication_response",
@@ -409,7 +409,7 @@ async def test_reauth_flow_success(hass: HomeAssistant, mock_config_entry, mock_
             result["flow_id"],
             {"auth_response": "mock_auth_response"},
         )
-    
+
     assert result2["type"] == FlowResultType.ABORT
     assert result2["reason"] == "reauth_successful"
 
@@ -420,14 +420,14 @@ async def test_reauth_flow_invalid_auth(hass: HomeAssistant, mock_config_entry) 
     """Test reauthentication flow with invalid auth."""
     # Add existing entry to hass properly
     hass.config_entries._entries[mock_config_entry.entry_id] = mock_config_entry
-    
+
     # Start reauth flow
     result = await hass.config_entries.flow.async_init(
         DOMAIN,
         context={"source": config_entries.SOURCE_REAUTH, "entry_id": mock_config_entry.entry_id},
         data=mock_config_entry.data,
     )
-    
+
     # Mock invalid authentication
     with patch(
         "custom_components.firefly_cloud.config_flow.FireflyAPIClient.parse_authentication_response",
@@ -437,7 +437,7 @@ async def test_reauth_flow_invalid_auth(hass: HomeAssistant, mock_config_entry) 
             result["flow_id"],
             {"auth_response": "invalid_response"},
         )
-    
+
     assert result2["type"] == FlowResultType.FORM
     assert result2["step_id"] == "reauth_confirm"
     assert result2["errors"] == {"base": "invalid_auth"}
@@ -449,20 +449,20 @@ async def test_reauth_flow_connection_error(hass: HomeAssistant, mock_config_ent
     """Test reauthentication flow with connection error."""
     # Add existing entry to hass properly
     hass.config_entries._entries[mock_config_entry.entry_id] = mock_config_entry
-    
+
     # Start reauth flow
     result = await hass.config_entries.flow.async_init(
         DOMAIN,
         context={"source": config_entries.SOURCE_REAUTH, "entry_id": mock_config_entry.entry_id},
         data=mock_config_entry.data,
     )
-    
+
     # Mock connection error
     mock_auth_response = {
         "secret": "test-secret",
         "user": {"username": "john.doe", "fullname": "John Doe", "email": "john.doe@test.com", "role": "student", "guid": "test-guid"},
     }
-    
+
     with (
         patch(
             "custom_components.firefly_cloud.config_flow.FireflyAPIClient.parse_authentication_response",
@@ -477,7 +477,7 @@ async def test_reauth_flow_connection_error(hass: HomeAssistant, mock_config_ent
             result["flow_id"],
             {"auth_response": "mock_auth_response"},
         )
-    
+
     assert result2["type"] == FlowResultType.FORM
     assert result2["step_id"] == "reauth_confirm"
     assert result2["errors"] == {"base": "cannot_connect"}
@@ -489,20 +489,20 @@ async def test_reauth_flow_credentials_failed(hass: HomeAssistant, mock_config_e
     """Test reauthentication flow with credential verification failure."""
     # Add existing entry to hass properly
     hass.config_entries._entries[mock_config_entry.entry_id] = mock_config_entry
-    
+
     # Start reauth flow
     result = await hass.config_entries.flow.async_init(
         DOMAIN,
         context={"source": config_entries.SOURCE_REAUTH, "entry_id": mock_config_entry.entry_id},
         data=mock_config_entry.data,
     )
-    
+
     # Mock failed credential verification
     mock_auth_response = {
         "secret": "test-secret",
         "user": {"username": "john.doe", "fullname": "John Doe", "email": "john.doe@test.com", "role": "student", "guid": "test-guid"},
     }
-    
+
     with (
         patch(
             "custom_components.firefly_cloud.config_flow.FireflyAPIClient.parse_authentication_response",
@@ -517,7 +517,7 @@ async def test_reauth_flow_credentials_failed(hass: HomeAssistant, mock_config_e
             result["flow_id"],
             {"auth_response": "mock_auth_response"},
         )
-    
+
     assert result2["type"] == FlowResultType.FORM
     assert result2["step_id"] == "reauth_confirm"
     assert result2["errors"] == {"base": "invalid_auth"}
@@ -529,14 +529,14 @@ async def test_reauth_flow_unexpected_error(hass: HomeAssistant, mock_config_ent
     """Test reauthentication flow with unexpected error."""
     # Add existing entry to hass properly
     hass.config_entries._entries[mock_config_entry.entry_id] = mock_config_entry
-    
+
     # Start reauth flow
     result = await hass.config_entries.flow.async_init(
         DOMAIN,
         context={"source": config_entries.SOURCE_REAUTH, "entry_id": mock_config_entry.entry_id},
         data=mock_config_entry.data,
     )
-    
+
     # Mock unexpected error
     with patch(
         "custom_components.firefly_cloud.config_flow.FireflyAPIClient.parse_authentication_response",
@@ -546,7 +546,7 @@ async def test_reauth_flow_unexpected_error(hass: HomeAssistant, mock_config_ent
             result["flow_id"],
             {"auth_response": "mock_auth_response"},
         )
-    
+
     assert result2["type"] == FlowResultType.FORM
     assert result2["step_id"] == "reauth_confirm"
     assert result2["errors"] == {"base": "unknown"}
