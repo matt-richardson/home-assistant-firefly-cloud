@@ -14,8 +14,6 @@ from custom_components.firefly_cloud.sensor import (
 )
 from custom_components.firefly_cloud.const import (
     DOMAIN,
-    SENSOR_TODAY_SCHEDULE,
-    SENSOR_WEEK_SCHEDULE,
     SENSOR_UPCOMING_TASKS,
     SENSOR_TASKS_DUE_TODAY,
     SENSOR_TYPES,
@@ -133,39 +131,13 @@ async def test_async_setup_entry(hass: HomeAssistant, mock_config_entry, mock_co
 
     await async_setup_entry(hass, mock_config_entry, mock_add_entities)
 
-    assert len(entities) == 8  # 4 sensor types × 2 children
+    assert len(entities) == 2  # 2 sensor types × 1 child
     assert all(isinstance(e, FireflySensor) for e in entities)
 
     # Check that all sensor types are created
     sensor_types = [e._sensor_type for e in entities]
-    assert SENSOR_TODAY_SCHEDULE in sensor_types
-    assert SENSOR_WEEK_SCHEDULE in sensor_types
     assert SENSOR_UPCOMING_TASKS in sensor_types
     assert SENSOR_TASKS_DUE_TODAY in sensor_types
-
-
-@pytest.mark.asyncio
-async def test_today_schedule_sensor(mock_coordinator, mock_config_entry):
-    """Test today schedule sensor."""
-    sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_TODAY_SCHEDULE, "test-user-123")
-
-    assert "Today's Schedule" in sensor.name
-    assert sensor.unique_id == f"{mock_config_entry.entry_id}_{SENSOR_TODAY_SCHEDULE}_test-user-123"
-    assert sensor.icon == "mdi:calendar-today"
-    assert sensor.native_value == 1
-    assert sensor.native_unit_of_measurement == "classes"
-
-
-@pytest.mark.asyncio
-async def test_week_schedule_sensor(mock_coordinator, mock_config_entry):
-    """Test week schedule sensor."""
-    sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_WEEK_SCHEDULE, "test-user-123")
-
-    assert "Week Schedule" in sensor.name
-    assert sensor.unique_id == f"{mock_config_entry.entry_id}_{SENSOR_WEEK_SCHEDULE}_test-user-123"
-    assert sensor.icon == "mdi:calendar-week"
-    assert sensor.native_value == 2
-    assert sensor.native_unit_of_measurement == "classes"
 
 
 @pytest.mark.asyncio
@@ -219,7 +191,7 @@ async def test_tasks_due_today_sensor_with_tasks(mock_coordinator, mock_config_e
 @pytest.mark.asyncio
 async def test_sensor_availability(mock_coordinator, mock_config_entry):
     """Test sensor availability."""
-    sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_TODAY_SCHEDULE, "test-user-123")
+    sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_UPCOMING_TASKS, "test-user-123")
 
     # Available when coordinator has successful update and child data exists
     mock_coordinator.last_update_success = True
@@ -239,7 +211,7 @@ async def test_sensor_availability(mock_coordinator, mock_config_entry):
 @pytest.mark.asyncio
 async def test_sensor_device_info(mock_coordinator, mock_config_entry):
     """Test sensor device info."""
-    sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_TODAY_SCHEDULE, "test-user-123")
+    sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_UPCOMING_TASKS, "test-user-123")
 
     device_info = sensor.device_info
     assert device_info is not None
@@ -256,7 +228,7 @@ async def test_sensor_no_coordinator_data(mock_config_entry):
     coordinator.data = None
     coordinator.last_update_success = False
 
-    sensor = FireflySensor(coordinator, mock_config_entry, SENSOR_TODAY_SCHEDULE, "test-user-123")
+    sensor = FireflySensor(coordinator, mock_config_entry, SENSOR_UPCOMING_TASKS, "test-user-123")
 
     assert sensor.available is False
     assert sensor.native_value is None
@@ -265,7 +237,7 @@ async def test_sensor_no_coordinator_data(mock_config_entry):
 @pytest.mark.asyncio
 async def test_sensor_extra_state_attributes(mock_coordinator, mock_config_entry):
     """Test sensor extra state attributes."""
-    sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_TODAY_SCHEDULE, "test-user-123")
+    sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_UPCOMING_TASKS, "test-user-123")
 
     attributes = sensor.extra_state_attributes
     assert isinstance(attributes, dict)
@@ -289,7 +261,7 @@ async def test_sensor_handles_missing_data_gracefully(mock_coordinator, mock_con
         "last_updated": datetime.now(),
     }
 
-    sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_TODAY_SCHEDULE, "test-user-123")
+    sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_UPCOMING_TASKS, "test-user-123")
 
     # Should not crash and return sensible defaults
     assert sensor.available is True
@@ -299,7 +271,7 @@ async def test_sensor_handles_missing_data_gracefully(mock_coordinator, mock_con
 @pytest.mark.asyncio
 async def test_all_sensor_types_defined():
     """Test that all sensor types have proper configuration."""
-    for sensor_type in [SENSOR_TODAY_SCHEDULE, SENSOR_WEEK_SCHEDULE, SENSOR_UPCOMING_TASKS, SENSOR_TASKS_DUE_TODAY]:
+    for sensor_type in [SENSOR_UPCOMING_TASKS, SENSOR_TASKS_DUE_TODAY]:
         assert sensor_type in SENSOR_TYPES
         config = SENSOR_TYPES[sensor_type]
         assert "name" in config
@@ -311,45 +283,10 @@ async def test_all_sensor_types_defined():
 @pytest.mark.asyncio
 async def test_sensor_with_nonexistent_child(mock_coordinator, mock_config_entry):
     """Test sensor with child GUID that doesn't exist in data."""
-    sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_TODAY_SCHEDULE, "nonexistent-child-123")
+    sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_UPCOMING_TASKS, "nonexistent-child-123")
 
     assert sensor.available is False
     assert sensor.native_value is None
-
-
-@pytest.mark.asyncio
-async def test_sensor_attributes_today_schedule(mock_coordinator, mock_config_entry):
-    """Test today schedule sensor attributes."""
-    sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_TODAY_SCHEDULE, "test-user-123")
-
-    attributes = sensor.extra_state_attributes
-    assert "classes" in attributes
-    assert "current_class" in attributes
-    assert "last_updated" in attributes
-
-    # Check class details
-    classes = attributes["classes"]
-    assert len(classes) == 1
-    assert classes[0]["subject"] == "Mathematics"
-    assert classes[0]["location"] == "Room 101"
-
-
-@pytest.mark.asyncio
-async def test_sensor_attributes_week_schedule(mock_coordinator, mock_config_entry):
-    """Test week schedule sensor attributes."""
-    sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_WEEK_SCHEDULE, "test-user-123")
-
-    attributes = sensor.extra_state_attributes
-    assert "schedule_by_day" in attributes
-    assert "special_days" in attributes
-    assert "total_classes_this_week" in attributes
-    assert "last_updated" in attributes
-
-    # Check schedule details
-    schedule_by_day = attributes["schedule_by_day"]
-    assert isinstance(schedule_by_day, dict)
-    # Should have entries for all 7 days of the week
-    assert len(schedule_by_day) == 7
 
 
 @pytest.mark.asyncio
@@ -410,13 +347,13 @@ async def test_sensor_attributes_tasks_due_today(mock_coordinator, mock_config_e
 @pytest.mark.asyncio
 async def test_sensor_state_class_properties(mock_coordinator, mock_config_entry):
     """Test sensor state class and device class properties."""
-    sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_TODAY_SCHEDULE, "test-user-123")
+    sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_UPCOMING_TASKS, "test-user-123")
 
     assert hasattr(sensor, "state_class")
     assert hasattr(sensor, "device_class")
 
     # Check that properties match sensor type configuration
-    sensor_config = SENSOR_TYPES[SENSOR_TODAY_SCHEDULE]
+    sensor_config = SENSOR_TYPES[SENSOR_UPCOMING_TASKS]
     if "state_class" in sensor_config:
         assert sensor.state_class == sensor_config["state_class"]
     if "device_class" in sensor_config:
@@ -426,33 +363,10 @@ async def test_sensor_state_class_properties(mock_coordinator, mock_config_entry
 @pytest.mark.asyncio
 async def test_sensor_entity_category(mock_coordinator, mock_config_entry):
     """Test sensor entity category if defined."""
-    sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_TODAY_SCHEDULE, "test-user-123")
+    sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_UPCOMING_TASKS, "test-user-123")
 
     # Entity category should be None for main sensors (they're not diagnostic/config)
     assert sensor.entity_category is None
-
-
-@pytest.mark.asyncio
-async def test_sensor_handles_empty_events(mock_coordinator, mock_config_entry):
-    """Test sensor handling empty events gracefully."""
-    # Clear events data
-    mock_coordinator.data["children_data"]["test-user-123"]["events"]["today"] = []
-    mock_coordinator.data["children_data"]["test-user-123"]["events"]["week"] = []
-
-    today_sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_TODAY_SCHEDULE, "test-user-123")
-    week_sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_WEEK_SCHEDULE, "test-user-123")
-
-    assert today_sensor.native_value == 0
-    assert week_sensor.native_value == 0
-    assert today_sensor.available is True
-    assert week_sensor.available is True
-
-    # Check attributes don't break
-    today_attrs = today_sensor.extra_state_attributes
-    week_attrs = week_sensor.extra_state_attributes
-
-    assert today_attrs["classes"] == []
-    assert week_attrs["schedule_by_day"] is not None
 
 
 @pytest.mark.asyncio
@@ -493,7 +407,7 @@ async def test_sensor_name_includes_child_name(mock_config_entry):
         }
     }
 
-    sensor = FireflySensor(coordinator, mock_config_entry, SENSOR_TODAY_SCHEDULE, "child-123")
+    sensor = FireflySensor(coordinator, mock_config_entry, SENSOR_UPCOMING_TASKS, "child-123")
 
     assert "John Doe" in sensor.name
     assert "Today's Schedule" in sensor.name
@@ -513,7 +427,7 @@ async def test_sensor_name_fallback_to_guid(mock_config_entry):
         }
     }
 
-    sensor = FireflySensor(coordinator, mock_config_entry, SENSOR_TODAY_SCHEDULE, "child-123")
+    sensor = FireflySensor(coordinator, mock_config_entry, SENSOR_UPCOMING_TASKS, "child-123")
 
     assert "child-12" in sensor.name  # First 8 chars of "child-123"
     assert "Today's Schedule" in sensor.name
@@ -522,7 +436,7 @@ async def test_sensor_name_fallback_to_guid(mock_config_entry):
 @pytest.mark.asyncio
 async def test_sensor_coordinator_data_update(mock_coordinator, mock_config_entry):
     """Test sensor updates when coordinator data changes."""
-    sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_TODAY_SCHEDULE, "test-user-123")
+    sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_UPCOMING_TASKS, "test-user-123")
 
     initial_value = sensor.native_value
     assert initial_value == 1
@@ -594,8 +508,8 @@ async def test_async_setup_entry_no_children(hass: HomeAssistant):
 
     await async_setup_entry(hass, config_entry, mock_add_entities)
 
-    # When children_guids is empty, uses user GUID, creating 4 entities (4 sensor types × 1 user)
-    assert len(entities) == 4
+    # When children_guids is empty, uses user GUID, creating 2 entities (2 sensor types × 1 user)
+    assert len(entities) == 2
 
 
 @pytest.mark.asyncio
@@ -652,8 +566,8 @@ async def test_async_setup_entry_multiple_children(hass: HomeAssistant):
 
     await async_setup_entry(hass, config_entry, mock_add_entities)
 
-    # Should create 4 sensors × 3 children = 12 entities
-    assert len(entities) == 12
+    # Should create 2 sensors × 3 children = 6 entities
+    assert len(entities) == 6
 
     # Check all children have sensors
     child_guids = [e._child_guid for e in entities]
@@ -665,9 +579,7 @@ async def test_async_setup_entry_multiple_children(hass: HomeAssistant):
     for child_guid in ["child-1", "child-2", "child-3"]:
         child_entities = [e for e in entities if e._child_guid == child_guid]
         sensor_types = [e._sensor_type for e in child_entities]
-        assert len(sensor_types) == 4
-        assert SENSOR_TODAY_SCHEDULE in sensor_types
-        assert SENSOR_WEEK_SCHEDULE in sensor_types
+        assert len(sensor_types) == 2
         assert SENSOR_UPCOMING_TASKS in sensor_types
         assert SENSOR_TASKS_DUE_TODAY in sensor_types
 
@@ -676,8 +588,6 @@ async def test_async_setup_entry_multiple_children(hass: HomeAssistant):
 async def test_sensor_device_info_consistency(mock_coordinator, mock_config_entry):
     """Test that all sensors have consistent device info."""
     sensors = [
-        FireflySensor(mock_coordinator, mock_config_entry, SENSOR_TODAY_SCHEDULE, "test-user-123"),
-        FireflySensor(mock_coordinator, mock_config_entry, SENSOR_WEEK_SCHEDULE, "test-user-123"),
         FireflySensor(mock_coordinator, mock_config_entry, SENSOR_UPCOMING_TASKS, "test-user-123"),
         FireflySensor(mock_coordinator, mock_config_entry, SENSOR_TASKS_DUE_TODAY, "test-user-123"),
     ]
@@ -695,7 +605,7 @@ async def test_sensor_device_info_consistency(mock_coordinator, mock_config_entr
 async def test_sensor_unique_ids_are_unique(mock_coordinator, mock_config_entry):
     """Test that all sensors have unique IDs."""
     children = ["child-1", "child-2"]
-    sensor_types = [SENSOR_TODAY_SCHEDULE, SENSOR_WEEK_SCHEDULE, SENSOR_UPCOMING_TASKS, SENSOR_TASKS_DUE_TODAY]
+    sensor_types = [SENSOR_UPCOMING_TASKS, SENSOR_TASKS_DUE_TODAY]
 
     # Mock coordinator data for multiple children
     mock_coordinator.data["children_guids"] = children
@@ -729,7 +639,7 @@ async def test_sensor_extra_state_attributes_no_data(mock_config_entry):
     coordinator.last_update_success = False
     coordinator.data = None
 
-    sensor = FireflySensor(coordinator, mock_config_entry, SENSOR_TODAY_SCHEDULE, "test-user-123")
+    sensor = FireflySensor(coordinator, mock_config_entry, SENSOR_UPCOMING_TASKS, "test-user-123")
 
     # Should not crash and return empty or minimal attributes
     attributes = sensor.extra_state_attributes

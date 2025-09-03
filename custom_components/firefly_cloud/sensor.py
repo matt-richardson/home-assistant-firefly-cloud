@@ -16,10 +16,8 @@ from .const import (
     CONF_USER_GUID,
     DOMAIN,
     SENSOR_TASKS_DUE_TODAY,
-    SENSOR_TODAY_SCHEDULE,
     SENSOR_TYPES,
     SENSOR_UPCOMING_TASKS,
-    SENSOR_WEEK_SCHEDULE,
 )
 from .coordinator import FireflyUpdateCoordinator
 
@@ -129,11 +127,7 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
         child_data = children_data[self._child_guid]
         
         try:
-            if self._sensor_type == SENSOR_TODAY_SCHEDULE:
-                return len(child_data.get("events", {}).get("today", []))
-            elif self._sensor_type == SENSOR_WEEK_SCHEDULE:
-                return len(child_data.get("events", {}).get("week", []))
-            elif self._sensor_type == SENSOR_UPCOMING_TASKS:
+            if self._sensor_type == SENSOR_UPCOMING_TASKS:
                 return len(child_data.get("tasks", {}).get("upcoming", []))
             elif self._sensor_type == SENSOR_TASKS_DUE_TODAY:
                 return len(child_data.get("tasks", {}).get("due_today", []))
@@ -156,121 +150,12 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
             "child_guid": self._child_guid,
         }
 
-        if self._sensor_type == SENSOR_TODAY_SCHEDULE:
-            attributes.update(self._get_today_schedule_attributes(child_data))
-        elif self._sensor_type == SENSOR_WEEK_SCHEDULE:
-            attributes.update(self._get_week_schedule_attributes(child_data))
-        elif self._sensor_type == SENSOR_UPCOMING_TASKS:
+        if self._sensor_type == SENSOR_UPCOMING_TASKS:
             attributes.update(self._get_upcoming_tasks_attributes(child_data))
         elif self._sensor_type == SENSOR_TASKS_DUE_TODAY:
             attributes.update(self._get_tasks_due_today_attributes(child_data))
 
         return attributes
-
-    def _get_today_schedule_attributes(self, child_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Get attributes for today's schedule sensor."""
-        events = child_data.get("events", {}).get("today", [])
-        
-        # Check if coordinator has the method before calling it
-        if hasattr(self.coordinator, 'get_special_requirements_today'):
-            special_requirements = self.coordinator.get_special_requirements_today()
-        else:
-            special_requirements = []
-        
-        # Current and next class
-        now = datetime.now(timezone.utc)
-        current_class = None
-        next_class = None
-        
-        for event in events:
-            event_start = event["start"] 
-            event_end = event["end"]
-            
-            # Ensure event times are timezone-aware for comparison
-            if hasattr(event_start, 'tzinfo') and event_start.tzinfo is None:
-                event_start = event_start.replace(tzinfo=timezone.utc)
-            if hasattr(event_end, 'tzinfo') and event_end.tzinfo is None:
-                event_end = event_end.replace(tzinfo=timezone.utc)
-            
-            if event_start <= now <= event_end:
-                current_class = event
-            elif event_start > now and next_class is None:
-                next_class = event
-        
-        attributes = {
-            "classes": [
-                {
-                    "start_time": event["start"].strftime("%H:%M"),
-                    "end_time": event["end"].strftime("%H:%M"),
-                    "subject": event["subject"],
-                    "location": event.get("location"),
-                    "description": event.get("description"),
-                }
-                for event in events
-            ],
-            "special_requirements": special_requirements,
-            "current_class": (
-                {
-                    "subject": current_class["subject"],
-                    "start_time": current_class["start"].strftime("%H:%M"),
-                    "end_time": current_class["end"].strftime("%H:%M"),
-                    "location": current_class.get("location"),
-                }
-                if current_class
-                else None
-            ),
-            "next_class": (
-                {
-                    "subject": next_class["subject"],
-                    "start_time": next_class["start"].strftime("%H:%M"),
-                    "location": next_class.get("location"),
-                }
-                if next_class
-                else None
-            ),
-        }
-        
-        return attributes
-
-    def _get_week_schedule_attributes(self, child_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Get attributes for week schedule sensor."""
-        events = child_data.get("events", {}).get("week", [])
-        
-        # Group events by day
-        schedule_by_day = {}
-        today = datetime.now().date()
-        
-        for i in range(7):
-            day_date = today + timedelta(days=i)
-            day_name = day_date.strftime("%A")
-            day_events = [
-                event for event in events
-                if event["start"].date() == day_date
-            ]
-            
-            schedule_by_day[day_name] = [
-                {
-                    "start_time": event["start"].strftime("%H:%M"),
-                    "end_time": event["end"].strftime("%H:%M"),
-                    "subject": event["subject"],
-                    "location": event.get("location"),
-                }
-                for event in day_events
-            ]
-        
-        # Identify special days (with requirements)
-        special_days = []
-        for day_name, day_events in schedule_by_day.items():
-            for event in day_events:
-                subject = event["subject"].lower()
-                if any(keyword in subject for keyword in ["pe", "sport", "games", "physical"]):
-                    special_days.append(f"{day_name}: Sports kit required")
-        
-        return {
-            "schedule_by_day": schedule_by_day,
-            "special_days": list(set(special_days)),
-            "total_classes_this_week": len(events),
-        }
 
     def _get_upcoming_tasks_attributes(self, child_data: Dict[str, Any]) -> Dict[str, Any]:
         """Get attributes for upcoming tasks sensor."""

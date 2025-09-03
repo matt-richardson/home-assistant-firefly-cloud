@@ -1,0 +1,45 @@
+[tool.pylint.main]
+# Specify additional paths to search for imports
+extension-pkg-allow-list = ["lxml"]
+
+[tool.pylint.messages_control]
+# Disable specific warnings that are acceptable in test files
+disable = [
+    "import-outside-toplevel",  # Common in test fixtures
+    "redefined-outer-name",     # Common with pytest fixtures
+    "protected-access",         # Common when testing internal interfaces
+    "reimported",              # Sometimes needed in test fixtures
+    "too-few-public-methods",  # Not relevant for test classes
+    "unused-import",           # Sometimes imports are needed for side effects
+]
+
+[tool.pylint.format]
+max-line-length = 120
+
+[tool.pylint.design]
+max-args = 10  # Allow more args for test functions
+
+[tool.black]
+line-length = 120
+target-version = ['py311']
+
+[tool.isort]
+profile = "black"
+line_length = 120
+
+[tool.mypy]
+python_version = "3.13"
+check_untyped_defs = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "--strict-markers --tb=short"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]

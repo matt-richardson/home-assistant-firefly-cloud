@@ -27,25 +27,11 @@ FIREFLY_GRAPHQL_PATH = "/_api/1.0/graphql"
 FIREFLY_TASK_API_PATH = "/api/v2/taskListing/view/student/tasks/all/filterBy"
 
 # Sensor types
-SENSOR_TODAY_SCHEDULE = "today_schedule"
-SENSOR_WEEK_SCHEDULE = "week_schedule"
 SENSOR_UPCOMING_TASKS = "upcoming_tasks"
 SENSOR_TASKS_DUE_TODAY = "tasks_due_today"
 
 # Sensor configurations
 SENSOR_TYPES = {
-    SENSOR_TODAY_SCHEDULE: {
-        "name": "Today's Schedule",
-        "icon": "mdi:calendar-today",
-        "unit": "classes",
-        "device_class": None,
-    },
-    SENSOR_WEEK_SCHEDULE: {
-        "name": "Week Schedule",
-        "icon": "mdi:calendar-week",
-        "unit": "classes",
-        "device_class": None,
-    },
     SENSOR_UPCOMING_TASKS: {
         "name": "Upcoming Tasks",
         "icon": "mdi:clipboard-text",

@@ -56,6 +56,8 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
             today_end = today_start + timedelta(days=1)
             week_start = today_start
             week_end = today_start + timedelta(days=7)
+            # Extended range for calendar view (30 days)
+            calendar_end = today_start + timedelta(days=30)
             task_end = today_start + timedelta(days=self.task_lookahead_days)
 
             # Determine which users to fetch data for
@@ -70,12 +72,13 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
                 # Fetch data in parallel for this child
                 events_today = await self.api.get_events(today_start, today_end, child_guid)
                 events_week = await self.api.get_events(week_start, week_end, child_guid)
+                events_calendar = await self.api.get_events(week_start, calendar_end, child_guid)
                 tasks = await self.api.get_tasks(student_guid=child_guid)
                 
                 children_data[child_guid] = {
                     "events": {
                         "today": self._process_events(events_today),
-                        "week": self._process_events(events_week),
+                        "week": self._process_events(events_calendar),  # Use extended range for calendar
                     },
                     "tasks": {
                         "all": self._process_tasks(tasks),
@@ -83,6 +86,7 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
                         "upcoming": self._filter_tasks_by_date(tasks, now, task_end),
                         "overdue": self._filter_overdue_tasks(tasks, now),
                     },
+                    "name": self._extract_child_name(child_guid),
                 }
 
             # Process and organize the data
@@ -324,3 +328,13 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
                 requirements.append(f"Special equipment for {event['subject']}")
         
         return list(set(requirements))  # Remove duplicates
+
+    def _extract_child_name(self, child_guid: str) -> Optional[str]:
+        """Extract child name from user info or return None if not available."""
+        if not self._user_info or child_guid == self._user_info.get("guid"):
+            # This is the main user account
+            return self._user_info.get("name") if self._user_info else None
+        
+        # For children, we would need additional API calls to get their names
+        # For now, return None and let the entity handle fallback display
+        return None
