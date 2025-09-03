@@ -40,9 +40,9 @@ def mock_coordinator():
             "role": "student",
             "guid": "test-user-123",
         },
-        "children_guids": ["test-user-123"],
+        "children_guids": ["test-child-123", "test-child-456"],
         "children_data": {
-            "test-user-123": {
+            "test-child-123": {
                 "name": "John Doe",
                 "events": {
                     "week": [
@@ -72,6 +72,18 @@ def mock_coordinator():
                     "upcoming": [],
                     "overdue": [],
                 },
+            },
+            "test-child-456": {
+                "name": "Jane Doe", 
+                "events": {
+                    "week": []
+                },
+                "tasks": {
+                    "all": [],
+                    "due_today": [],
+                    "upcoming": [],
+                    "overdue": [],
+                },
             }
         },
         "last_updated": now,
@@ -94,14 +106,14 @@ async def test_async_setup_entry(hass: HomeAssistant, mock_config_entry, mock_co
 
     await async_setup_entry(hass, mock_config_entry, mock_add_entities)
 
-    assert len(entities) == 1  # 1 calendar entity per child
+    assert len(entities) == 2  # 1 calendar entity per child (2 children in config)
     assert all(isinstance(e, FireflyCalendar) for e in entities)
 
 
 @pytest.mark.asyncio
 async def test_calendar_properties(mock_coordinator, mock_config_entry):
     """Test calendar basic properties."""
-    calendar = FireflyCalendar(mock_coordinator, mock_config_entry, "test-user-123")
+    calendar = FireflyCalendar(mock_coordinator, mock_config_entry, "test-child-123")
 
     assert "Schedule" in calendar.name
     assert calendar.unique_id == f"{mock_config_entry.entry_id}_calendar_test-user-123"
@@ -111,11 +123,11 @@ async def test_calendar_properties(mock_coordinator, mock_config_entry):
 @pytest.mark.asyncio
 async def test_calendar_availability(mock_coordinator, mock_config_entry):
     """Test calendar availability."""
-    calendar = FireflyCalendar(mock_coordinator, mock_config_entry, "test-user-123")
+    calendar = FireflyCalendar(mock_coordinator, mock_config_entry, "test-child-123")
 
     # Available when coordinator has successful update and child data exists
     mock_coordinator.last_update_success = True
-    mock_coordinator.data = {"children_data": {"test-user-123": {"some": "data"}}}
+    mock_coordinator.data = {"children_data": {"test-child-123": {"some": "data"}}}
     assert calendar.available is True
 
     # Unavailable when coordinator update failed
@@ -131,12 +143,12 @@ async def test_calendar_availability(mock_coordinator, mock_config_entry):
 @pytest.mark.asyncio
 async def test_calendar_current_event(mock_coordinator, mock_config_entry):
     """Test calendar current event property."""
-    calendar = FireflyCalendar(mock_coordinator, mock_config_entry, "test-user-123")
+    calendar = FireflyCalendar(mock_coordinator, mock_config_entry, "test-child-123")
 
     # Mock current time to be during first event
     now = dt_util.now()
-    mock_coordinator.data["children_data"]["test-user-123"]["events"]["week"][0]["start"] = now - timedelta(minutes=30)
-    mock_coordinator.data["children_data"]["test-user-123"]["events"]["week"][0]["end"] = now + timedelta(minutes=30)
+    mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"][0]["start"] = now - timedelta(minutes=30)
+    mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"][0]["end"] = now + timedelta(minutes=30)
 
     event = calendar.event
     assert event is not None
@@ -148,12 +160,12 @@ async def test_calendar_current_event(mock_coordinator, mock_config_entry):
 @pytest.mark.asyncio 
 async def test_calendar_next_event(mock_coordinator, mock_config_entry):
     """Test calendar next event when no current event."""
-    calendar = FireflyCalendar(mock_coordinator, mock_config_entry, "test-user-123")
+    calendar = FireflyCalendar(mock_coordinator, mock_config_entry, "test-child-123")
 
     # Mock both events to be in the future
     now = dt_util.now()
-    mock_coordinator.data["children_data"]["test-user-123"]["events"]["week"][0]["start"] = now + timedelta(hours=1)
-    mock_coordinator.data["children_data"]["test-user-123"]["events"]["week"][0]["end"] = now + timedelta(hours=2)
+    mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"][0]["start"] = now + timedelta(hours=1)
+    mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"][0]["end"] = now + timedelta(hours=2)
 
     event = calendar.event
     assert event is not None
@@ -164,10 +176,10 @@ async def test_calendar_next_event(mock_coordinator, mock_config_entry):
 @pytest.mark.asyncio
 async def test_calendar_no_events(mock_coordinator, mock_config_entry):
     """Test calendar with no events."""
-    calendar = FireflyCalendar(mock_coordinator, mock_config_entry, "test-user-123")
+    calendar = FireflyCalendar(mock_coordinator, mock_config_entry, "test-child-123")
 
     # Clear events
-    mock_coordinator.data["children_data"]["test-user-123"]["events"]["week"] = []
+    mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"] = []
 
     event = calendar.event
     assert event is None
@@ -176,7 +188,7 @@ async def test_calendar_no_events(mock_coordinator, mock_config_entry):
 @pytest.mark.asyncio
 async def test_calendar_get_events(mock_coordinator, mock_config_entry):
     """Test calendar get_events method."""
-    calendar = FireflyCalendar(mock_coordinator, mock_config_entry, "test-user-123")
+    calendar = FireflyCalendar(mock_coordinator, mock_config_entry, "test-child-123")
 
     now = dt_util.now()
     start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -193,7 +205,7 @@ async def test_calendar_get_events(mock_coordinator, mock_config_entry):
 @pytest.mark.asyncio
 async def test_calendar_get_events_filtered_by_date(mock_coordinator, mock_config_entry):
     """Test calendar get_events with date filtering."""
-    calendar = FireflyCalendar(mock_coordinator, mock_config_entry, "test-user-123")
+    calendar = FireflyCalendar(mock_coordinator, mock_config_entry, "test-child-123")
 
     now = dt_util.now()
     # Only request today's events
@@ -201,8 +213,8 @@ async def test_calendar_get_events_filtered_by_date(mock_coordinator, mock_confi
     end_date = start_date + timedelta(days=1)
 
     # Mock first event to be today, second to be tomorrow
-    mock_coordinator.data["children_data"]["test-user-123"]["events"]["week"][0]["start"] = now.replace(hour=9)
-    mock_coordinator.data["children_data"]["test-user-123"]["events"]["week"][0]["end"] = now.replace(hour=10)
+    mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"][0]["start"] = now.replace(hour=9)
+    mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"][0]["end"] = now.replace(hour=10)
     
     events = await calendar.async_get_events(None, start_date, end_date)
 
@@ -214,10 +226,10 @@ async def test_calendar_get_events_filtered_by_date(mock_coordinator, mock_confi
 @pytest.mark.asyncio
 async def test_calendar_convert_event_with_description(mock_coordinator, mock_config_entry):
     """Test calendar event conversion with full event data."""
-    calendar = FireflyCalendar(mock_coordinator, mock_config_entry, "test-user-123")
+    calendar = FireflyCalendar(mock_coordinator, mock_config_entry, "test-child-123")
 
     # Get first event from coordinator data
-    event_data = mock_coordinator.data["children_data"]["test-user-123"]["events"]["week"][0]
+    event_data = mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"][0]
     
     calendar_event = calendar._convert_to_calendar_event(event_data)
 
@@ -232,7 +244,7 @@ async def test_calendar_convert_event_with_description(mock_coordinator, mock_co
 @pytest.mark.asyncio
 async def test_calendar_device_info(mock_coordinator, mock_config_entry):
     """Test calendar device info."""
-    calendar = FireflyCalendar(mock_coordinator, mock_config_entry, "test-user-123")
+    calendar = FireflyCalendar(mock_coordinator, mock_config_entry, "test-child-123")
 
     device_info = calendar.device_info
     assert device_info is not None
@@ -347,7 +359,7 @@ async def test_calendar_multiple_children_setup(hass: HomeAssistant):
 @pytest.mark.asyncio
 async def test_calendar_event_build_description_empty_fields(mock_coordinator, mock_config_entry):
     """Test calendar event description building with empty optional fields."""
-    calendar = FireflyCalendar(mock_coordinator, mock_config_entry, "test-user-123")
+    calendar = FireflyCalendar(mock_coordinator, mock_config_entry, "test-child-123")
 
     # Event with minimal data
     event_data = {
@@ -371,7 +383,7 @@ async def test_calendar_event_build_description_empty_fields(mock_coordinator, m
 @pytest.mark.asyncio
 async def test_calendar_event_build_description_with_many_attendees(mock_coordinator, mock_config_entry):
     """Test calendar event description with many attendees (truncation)."""
-    calendar = FireflyCalendar(mock_coordinator, mock_config_entry, "test-user-123")
+    calendar = FireflyCalendar(mock_coordinator, mock_config_entry, "test-child-123")
 
     # Event with many attendees
     event_data = {
@@ -398,7 +410,7 @@ async def test_calendar_no_coordinator_data(mock_config_entry):
     coordinator.data = None
     coordinator.last_update_success = False
 
-    calendar = FireflyCalendar(coordinator, mock_config_entry, "test-user-123")
+    calendar = FireflyCalendar(coordinator, mock_config_entry, "test-child-123")
 
     assert calendar.available is False
     assert calendar.event is None
@@ -414,7 +426,7 @@ async def test_calendar_get_events_no_data(mock_config_entry):
     coordinator = MagicMock()
     coordinator.data = None
 
-    calendar = FireflyCalendar(coordinator, mock_config_entry, "test-user-123")
+    calendar = FireflyCalendar(coordinator, mock_config_entry, "test-child-123")
 
     now = dt_util.now()
     events = await calendar.async_get_events(None, now, now + timedelta(days=1))
