@@ -455,17 +455,20 @@ async def test_sensor_coordinator_data_update(mock_coordinator, mock_config_entr
     initial_value = sensor.native_value
     assert initial_value == 1
 
-    # Update coordinator data
+    # Update coordinator data - add a new task for UPCOMING_TASKS sensor
     now = datetime.now()
-    mock_coordinator.data["children_data"]["test-child-123"]["events"]["today"].append(
+    mock_coordinator.data["children_data"]["test-child-123"]["tasks"]["upcoming"].append(
         {
-            "start": now.replace(hour=14, minute=0, second=0, microsecond=0),
-            "end": now.replace(hour=15, minute=0, second=0, microsecond=0),
+            "id": "task-2",
+            "title": "Physics Homework", 
+            "description": "Complete lab report",
+            "due_date": now + timedelta(days=3),
+            "set_date": now - timedelta(days=1),
             "subject": "Physics",
-            "location": "Lab 2",
-            "description": "Physics experiment",
-            "guild": None,
-            "attendees": [],
+            "task_type": "homework",
+            "completion_status": "Todo",
+            "setter": "Dr. Smith",
+            "raw_data": {},
         }
     )
 
@@ -475,9 +478,9 @@ async def test_sensor_coordinator_data_update(mock_coordinator, mock_config_entr
 
     # Attributes should also update
     attributes = sensor.extra_state_attributes
-    assert len(attributes["classes"]) == 2
-    subjects = [event["subject"] for event in attributes["classes"]]
-    assert "Mathematics" in subjects
+    assert len(attributes["tasks"]) == 2
+    subjects = [task["subject"] for task in attributes["tasks"]]
+    assert "Mathematics" in subjects  
     assert "Physics" in subjects
 
 
