@@ -116,7 +116,7 @@ async def test_calendar_properties(mock_coordinator, mock_config_entry):
     calendar = FireflyCalendar(mock_coordinator, mock_config_entry, "test-child-123")
 
     assert "Schedule" in calendar.name
-    assert calendar.unique_id == f"{mock_config_entry.entry_id}_calendar_test-user-123"
+    assert calendar.unique_id == f"{mock_config_entry.entry_id}_calendar_test-child-123"
     assert calendar.icon == "mdi:calendar-month"
 
 

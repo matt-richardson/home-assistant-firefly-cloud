@@ -39,11 +39,12 @@ def mock_coordinator():
             "fullname": "John Doe",
             "email": "john.doe@test.com",
             "role": "student",
-            "guid": "test-child-123",
+            "guid": "test-user-123",
         },
         "children_guids": ["test-child-123", "test-child-456"],
         "children_data": {
             "test-child-123": {
+                "name": "John Doe",
                 "events": {
                     "today": [
                         {
@@ -111,6 +112,7 @@ def mock_coordinator():
                 },
             },
             "test-child-456": {
+                "name": "Jane Doe",
                 "events": {
                     "today": [],
                     "week": [],
@@ -158,7 +160,7 @@ async def test_upcoming_tasks_sensor(mock_coordinator, mock_config_entry):
     sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_UPCOMING_TASKS, "test-child-123")
 
     assert "Upcoming Tasks" in sensor.name
-    assert sensor.unique_id == f"{mock_config_entry.entry_id}_{SENSOR_UPCOMING_TASKS}_test-user-123"
+    assert sensor.unique_id == f"{mock_config_entry.entry_id}_{SENSOR_UPCOMING_TASKS}_test-child-123"
     assert sensor.icon == "mdi:clipboard-text"
     assert sensor.native_value == 1
     assert sensor.native_unit_of_measurement == "tasks"
@@ -170,7 +172,7 @@ async def test_tasks_due_today_sensor(mock_coordinator, mock_config_entry):
     sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_TASKS_DUE_TODAY, "test-child-123")
 
     assert "Tasks Due Today" in sensor.name
-    assert sensor.unique_id == f"{mock_config_entry.entry_id}_{SENSOR_TASKS_DUE_TODAY}_test-user-123"
+    assert sensor.unique_id == f"{mock_config_entry.entry_id}_{SENSOR_TASKS_DUE_TODAY}_test-child-123"
     assert sensor.icon == "mdi:clipboard-alert"
     assert sensor.native_value == 0
     assert sensor.native_unit_of_measurement == "tasks"
