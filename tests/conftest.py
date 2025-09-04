@@ -1,4 +1,5 @@
 """Test configuration for Firefly Cloud integration."""
+
 from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime, timedelta
 from types import MappingProxyType
@@ -32,6 +33,7 @@ async def hass():
         # Add network component data to prevent KeyError
         # Mock the network component structure that Home Assistant expects
         from unittest.mock import MagicMock
+
         network_adapter = MagicMock()
         network_adapter.adapters = []
         hass.data["network"] = network_adapter
@@ -46,17 +48,14 @@ async def hass():
         mock_integration.file_path = temp_dir + "/custom_components/firefly_cloud"
 
         # Setup required Home Assistant components
-        with patch(
-            "homeassistant.loader.async_get_integration", return_value=mock_integration
-        ):
-            with patch(
-                "homeassistant.helpers.integration_platform.async_process_integration_platforms"
-            ):
+        with patch("homeassistant.loader.async_get_integration", return_value=mock_integration):
+            with patch("homeassistant.helpers.integration_platform.async_process_integration_platforms"):
                 await hass.async_start()
                 try:
                     yield hass
                 finally:
                     await hass.async_stop()
+
 
 from custom_components.firefly_cloud.const import (
     CONF_CHILDREN_GUIDS,
@@ -246,7 +245,7 @@ def mock_firefly_api():
             "email": "child2@test.com",
             "role": "student",
             "guid": "test-child-456",
-        }
+        },
     ]
     return api
 
@@ -348,7 +347,7 @@ def mock_aiohttp_session():
     def create_context_manager_for_get(*_args, **_kwargs):  # pylint: disable=unused-argument
         context_manager = AsyncMock()
         # Use the stored response or create a default one
-        response = session._mock_responses.get('get', mock_http_response())
+        response = session._mock_responses.get("get", mock_http_response())
         context_manager.__aenter__.return_value = response
         context_manager.__aexit__.return_value = None
         return context_manager
@@ -356,7 +355,7 @@ def mock_aiohttp_session():
     def create_context_manager_for_post(*_args, **_kwargs):  # pylint: disable=unused-argument
         context_manager = AsyncMock()
         # Use the stored response or create a default one
-        response = session._mock_responses.get('post', mock_http_response())
+        response = session._mock_responses.get("post", mock_http_response())
         context_manager.__aenter__.return_value = response
         context_manager.__aexit__.return_value = None
         return context_manager

@@ -75,16 +75,14 @@ def mock_coordinator():
             },
             "test-child-456": {
                 "name": "Jane Doe",
-                "events": {
-                    "week": []
-                },
+                "events": {"week": []},
                 "tasks": {
                     "all": [],
                     "due_today": [],
                     "upcoming": [],
                     "overdue": [],
                 },
-            }
+            },
         },
         "last_updated": now,
     }

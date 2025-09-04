@@ -1,4 +1,5 @@
 """Test the Firefly Cloud API client."""
+
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
@@ -39,7 +40,8 @@ async def test_get_school_info_success(mock_aiohttp_session, mock_school_info): 
     </response>"""
 
     from tests.conftest import mock_http_response
-    mock_aiohttp_session._mock_responses['get'] = mock_http_response(text=xml_response)
+
+    mock_aiohttp_session._mock_responses["get"] = mock_http_response(text=xml_response)
 
     result = await FireflyAPIClient.get_school_info(mock_aiohttp_session, "testschool")
 
@@ -59,7 +61,8 @@ async def test_get_school_info_not_found(mock_aiohttp_session):
     </response>"""
 
     from tests.conftest import mock_http_response
-    mock_aiohttp_session._mock_responses['get'] = mock_http_response(text=xml_response)
+
+    mock_aiohttp_session._mock_responses["get"] = mock_http_response(text=xml_response)
 
     with pytest.raises(FireflySchoolNotFoundError):
         await FireflyAPIClient.get_school_info(mock_aiohttp_session, "nonexistent")
@@ -83,7 +86,8 @@ async def test_get_api_version_success(api_client, mock_aiohttp_session):
     </version>"""
 
     from tests.conftest import mock_http_response
-    mock_aiohttp_session._mock_responses['get'] = mock_http_response(text=xml_response)
+
+    mock_aiohttp_session._mock_responses["get"] = mock_http_response(text=xml_response)
 
     result = await api_client.get_api_version()
 
@@ -96,10 +100,8 @@ async def test_get_api_version_success(api_client, mock_aiohttp_session):
 async def test_verify_credentials_success(api_client, mock_aiohttp_session):
     """Test successful credential verification."""
     from tests.conftest import mock_http_response
-    mock_aiohttp_session._mock_responses['get'] = mock_http_response(
-        json_data={"valid": True},
-        status=200
-    )
+
+    mock_aiohttp_session._mock_responses["get"] = mock_http_response(json_data={"valid": True}, status=200)
 
     result = await api_client.verify_credentials()
 
@@ -110,9 +112,8 @@ async def test_verify_credentials_success(api_client, mock_aiohttp_session):
 async def test_verify_credentials_invalid(api_client, mock_aiohttp_session):
     """Test invalid credential verification."""
     from tests.conftest import mock_http_response
-    mock_aiohttp_session._mock_responses['get'] = mock_http_response(
-        status=401
-    )
+
+    mock_aiohttp_session._mock_responses["get"] = mock_http_response(status=401)
 
     result = await api_client.verify_credentials()
 
@@ -167,9 +168,9 @@ async def test_parse_authentication_response_invalid_xml():
 async def test_graphql_query_success(api_client, mock_aiohttp_session):
     """Test successful GraphQL query."""
     from tests.conftest import mock_http_response
-    mock_aiohttp_session._mock_responses['post'] = mock_http_response(
-        json_data={"data": {"test": "result"}},
-        status=200
+
+    mock_aiohttp_session._mock_responses["post"] = mock_http_response(
+        json_data={"data": {"test": "result"}}, status=200
     )
 
     result = await api_client._graphql_query("query { test }")
@@ -181,9 +182,8 @@ async def test_graphql_query_success(api_client, mock_aiohttp_session):
 async def test_graphql_query_token_expired(api_client, mock_aiohttp_session):
     """Test GraphQL query with expired token."""
     from tests.conftest import mock_http_response
-    mock_aiohttp_session._mock_responses['post'] = mock_http_response(
-        status=401
-    )
+
+    mock_aiohttp_session._mock_responses["post"] = mock_http_response(status=401)
 
     with pytest.raises(FireflyTokenExpiredError):
         await api_client._graphql_query("query { test }")
@@ -193,9 +193,8 @@ async def test_graphql_query_token_expired(api_client, mock_aiohttp_session):
 async def test_graphql_query_rate_limit(api_client, mock_aiohttp_session):
     """Test GraphQL query with rate limit."""
     from tests.conftest import mock_http_response
-    mock_aiohttp_session._mock_responses['post'] = mock_http_response(
-        status=429
-    )
+
+    mock_aiohttp_session._mock_responses["post"] = mock_http_response(status=429)
 
     with pytest.raises(FireflyRateLimitError):
         await api_client._graphql_query("query { test }")
@@ -205,9 +204,9 @@ async def test_graphql_query_rate_limit(api_client, mock_aiohttp_session):
 async def test_graphql_query_api_errors(api_client, mock_aiohttp_session):
     """Test GraphQL query with API errors."""
     from tests.conftest import mock_http_response
-    mock_aiohttp_session._mock_responses['post'] = mock_http_response(
-        json_data={"errors": [{"message": "Test error"}]},
-        status=200
+
+    mock_aiohttp_session._mock_responses["post"] = mock_http_response(
+        json_data={"errors": [{"message": "Test error"}]}, status=200
     )
 
     with pytest.raises(FireflyAPIError):
@@ -218,10 +217,8 @@ async def test_graphql_query_api_errors(api_client, mock_aiohttp_session):
 async def test_get_tasks_success(api_client, mock_aiohttp_session, mock_tasks):
     """Test successful task retrieval."""
     from tests.conftest import mock_http_response
-    mock_aiohttp_session._mock_responses['post'] = mock_http_response(
-        json_data={"items": mock_tasks},
-        status=200
-    )
+
+    mock_aiohttp_session._mock_responses["post"] = mock_http_response(json_data={"items": mock_tasks}, status=200)
 
     result = await api_client.get_tasks()
 
@@ -233,9 +230,8 @@ async def test_get_tasks_success(api_client, mock_aiohttp_session, mock_tasks):
 async def test_get_tasks_token_expired(api_client, mock_aiohttp_session):
     """Test task retrieval with expired token."""
     from tests.conftest import mock_http_response
-    mock_aiohttp_session._mock_responses['post'] = mock_http_response(
-        status=401
-    )
+
+    mock_aiohttp_session._mock_responses["post"] = mock_http_response(status=401)
 
     with pytest.raises(FireflyTokenExpiredError):
         await api_client.get_tasks()
@@ -300,7 +296,7 @@ async def test_get_children_info_parent_with_children(api_client):
 
     mock_children = [
         {"guid": "child-123", "username": "child1", "name": "Child One"},
-        {"guid": "child-456", "username": "child2", "name": "Child Two"}
+        {"guid": "child-456", "username": "child2", "name": "Child Two"},
     ]
 
     with patch.object(api_client, "_graphql_query") as mock_query:
@@ -360,9 +356,8 @@ async def test_get_events_no_user_guid(api_client):
 async def test_get_tasks_rate_limit(api_client, mock_aiohttp_session):
     """Test task retrieval with rate limit."""
     from tests.conftest import mock_http_response
-    mock_aiohttp_session._mock_responses['post'] = mock_http_response(
-        status=429
-    )
+
+    mock_aiohttp_session._mock_responses["post"] = mock_http_response(status=429)
 
     with pytest.raises(FireflyRateLimitError):
         await api_client.get_tasks()
@@ -372,10 +367,8 @@ async def test_get_tasks_rate_limit(api_client, mock_aiohttp_session):
 async def test_get_tasks_no_items_field(api_client, mock_aiohttp_session):
     """Test getting tasks when response has no items field."""
     from tests.conftest import mock_http_response
-    mock_aiohttp_session._mock_responses['post'] = mock_http_response(
-        json_data={"total": 0},
-        status=200
-    )
+
+    mock_aiohttp_session._mock_responses["post"] = mock_http_response(json_data={"total": 0}, status=200)
 
     result = await api_client.get_tasks()
 
@@ -386,7 +379,8 @@ async def test_get_tasks_no_items_field(api_client, mock_aiohttp_session):
 async def test_graphql_query_connection_error(api_client, mock_aiohttp_session):
     """Test GraphQL query with connection error."""
     from tests.conftest import mock_http_response
-    mock_aiohttp_session._mock_responses['post'] = mock_http_response(
+
+    mock_aiohttp_session._mock_responses["post"] = mock_http_response(
         raise_for_status_exception=FireflyConnectionError("Connection failed")
     )
 
@@ -400,9 +394,7 @@ async def test_graphql_query_timeout(api_client, mock_aiohttp_session):
     import asyncio
     from tests.conftest import mock_http_response
 
-    mock_aiohttp_session._mock_responses['post'] = mock_http_response(
-        raise_for_status_exception=asyncio.TimeoutError()
-    )
+    mock_aiohttp_session._mock_responses["post"] = mock_http_response(raise_for_status_exception=asyncio.TimeoutError())
 
     with pytest.raises(FireflyConnectionError):
         await api_client._graphql_query("query { test }")
@@ -437,7 +429,8 @@ async def test_parse_authentication_response_no_secret(api_client):
 async def test_get_school_info_network_error(mock_aiohttp_session):
     """Test school info retrieval with network error."""
     from tests.conftest import mock_http_response
-    mock_aiohttp_session._mock_responses['get'] = mock_http_response(
+
+    mock_aiohttp_session._mock_responses["get"] = mock_http_response(
         raise_for_status_exception=FireflyConnectionError("Network error")
     )
 
@@ -452,7 +445,8 @@ async def test_get_school_info_network_error(mock_aiohttp_session):
 async def test_get_api_version_invalid_xml(api_client, mock_aiohttp_session):
     """Test API version retrieval with invalid XML."""
     from tests.conftest import mock_http_response
-    mock_aiohttp_session._mock_responses['get'] = mock_http_response(text="invalid xml")
+
+    mock_aiohttp_session._mock_responses["get"] = mock_http_response(text="invalid xml")
 
     with pytest.raises(FireflyDataError):
         await api_client.get_api_version()
@@ -462,7 +456,8 @@ async def test_get_api_version_invalid_xml(api_client, mock_aiohttp_session):
 async def test_verify_credentials_connection_error(api_client, mock_aiohttp_session):
     """Test credential verification with connection error."""
     from tests.conftest import mock_http_response
-    mock_aiohttp_session._mock_responses['get'] = mock_http_response(
+
+    mock_aiohttp_session._mock_responses["get"] = mock_http_response(
         raise_for_status_exception=FireflyConnectionError("Connection failed")
     )
 

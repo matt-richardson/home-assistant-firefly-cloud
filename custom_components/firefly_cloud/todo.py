@@ -1,4 +1,5 @@
 """Todo platform for Firefly Cloud integration."""
+
 from datetime import datetime, date
 import logging
 from typing import Any, Dict, List, Optional
@@ -199,7 +200,7 @@ class FireflyTodoListEntity(CoordinatorEntity, TodoListEntity):  # pylint: disab
     async def async_move_todo_item(
         self,
         uid: str,  # pylint: disable=unused-argument
-        previous_uid: str | None = None  # pylint: disable=unused-argument
+        previous_uid: str | None = None,  # pylint: disable=unused-argument
     ) -> None:
         """Move a todo item."""
         raise NotImplementedError("Firefly Cloud integration is read-only")

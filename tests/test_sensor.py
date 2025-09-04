@@ -123,7 +123,7 @@ def mock_coordinator():
                     "upcoming": [],
                     "overdue": [],
                 },
-            }
+            },
         },
         "last_updated": now,
     }

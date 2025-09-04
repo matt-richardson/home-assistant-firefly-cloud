@@ -1,4 +1,5 @@
 """Config flow for Firefly Cloud integration."""
+
 import logging
 from typing import Any, Dict, Optional
 
@@ -29,13 +30,17 @@ from .exceptions import (
 
 _LOGGER = logging.getLogger(__name__)
 
-STEP_USER_DATA_SCHEMA = vol.Schema({
-    vol.Required(CONF_SCHOOL_CODE): str,
-})
+STEP_USER_DATA_SCHEMA = vol.Schema(
+    {
+        vol.Required(CONF_SCHOOL_CODE): str,
+    }
+)
 
-STEP_AUTH_DATA_SCHEMA = vol.Schema({
-    vol.Required("auth_response"): str,
-})
+STEP_AUTH_DATA_SCHEMA = vol.Schema(
+    {
+        vol.Required("auth_response"): str,
+    }
+)
 
 
 class FireflyCloudConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -48,9 +53,7 @@ class FireflyCloudConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._school_info: Optional[Dict[str, Any]] = None
         self._api_client: Optional[FireflyAPIClient] = None
 
-    async def async_step_user(
-        self, user_input: Optional[Dict[str, Any]] = None
-    ) -> FlowResult:
+    async def async_step_user(self, user_input: Optional[Dict[str, Any]] = None) -> FlowResult:  # type: ignore[override]
         """Handle the initial step."""
         errors: Dict[str, str] = {}
 
@@ -58,9 +61,7 @@ class FireflyCloudConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             try:
                 # Get school information
                 session = aiohttp_client.async_get_clientsession(self.hass)
-                self._school_info = await FireflyAPIClient.get_school_info(
-                    session, user_input[CONF_SCHOOL_CODE]
-                )
+                self._school_info = await FireflyAPIClient.get_school_info(session, user_input[CONF_SCHOOL_CODE])
 
                 if not self._school_info["enabled"]:
                     errors["base"] = "school_disabled"
@@ -82,15 +83,14 @@ class FireflyCloudConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             except FireflyConnectionError:
                 errors["base"] = "cannot_connect"
             except Exception as exc:  # pylint: disable=broad-except
-                _LOGGER.exception(
-                    "Unexpected error during school lookup: %s", exc)
+                _LOGGER.exception("Unexpected error during school lookup: %s", exc)
                 errors["base"] = "unknown"
             else:
                 # Only proceed to auth step if no errors occurred during school lookup
                 if not errors:
                     return await self.async_step_auth()
 
-        return self.async_show_form(
+        return self.async_show_form(  # type: ignore[return-value]
             step_id="user",
             data_schema=STEP_USER_DATA_SCHEMA,
             errors=errors,
@@ -99,79 +99,80 @@ class FireflyCloudConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             },
         )
 
-    async def async_step_auth(
-        self, user_input: Optional[Dict[str, Any]] = None
-    ) -> FlowResult:
+    async def async_step_auth(self, user_input: Optional[Dict[str, Any]] = None) -> FlowResult:
         """Handle the authentication step."""
         errors: Dict[str, str] = {}
 
         if user_input is not None:
-            try:
-                # Parse authentication response
-                auth_data = await self._api_client.parse_authentication_response(
-                    user_input["auth_response"]
-                )
-
-                # Update API client with secret
-                self._api_client._secret = auth_data["secret"]
-
-                # Verify credentials work
-                if not await self._api_client.verify_credentials():
-                    errors["base"] = "invalid_auth"
-                else:
-                    # Get user info to validate
-                    user_info = await self._api_client.get_user_info()
-
-                    # Get children info for parent accounts
-                    children_info = await self._api_client.get_children_info()
-                    children_guids = [child["guid"] for child in children_info]
-
-                    # Create title based on role
-                    title = f"{self._school_info['name']} - {user_info['fullname']}"
-
-                    # Create the config entry
-                    return self.async_create_entry(
-                        title=title,
-                        data={
-                            CONF_SCHOOL_CODE: self.unique_id,
-                            CONF_SCHOOL_NAME: self._school_info["name"],
-                            CONF_HOST: self._school_info["url"],
-                            CONF_DEVICE_ID: self._school_info["device_id"],
-                            CONF_SECRET: auth_data["secret"],
-                            CONF_USER_GUID: user_info["guid"],
-                            CONF_CHILDREN_GUIDS: children_guids,
-                            CONF_TASK_LOOKAHEAD_DAYS: DEFAULT_TASK_LOOKAHEAD_DAYS,
-                        },
-                    )
-
-            except FireflyAuthenticationError:
-                errors["base"] = "invalid_auth"
-            except FireflyConnectionError:
-                errors["base"] = "cannot_connect"
-            except Exception:  # pylint: disable=broad-except
-                _LOGGER.exception("Unexpected error during authentication")
+            if not self._api_client or not self._school_info:
                 errors["base"] = "unknown"
+            else:
+                try:
+                    # Parse authentication response
+                    auth_data = await self._api_client.parse_authentication_response(user_input["auth_response"])
+
+                    # Update API client with secret
+                    self._api_client._secret = auth_data["secret"]
+
+                    # Verify credentials work
+                    if not await self._api_client.verify_credentials():
+                        errors["base"] = "invalid_auth"
+                    else:
+                        # Get user info to validate
+                        user_info = await self._api_client.get_user_info()
+
+                        # Get children info for parent accounts
+                        children_info = await self._api_client.get_children_info()
+                        children_guids = [child["guid"] for child in children_info]
+
+                        # Create title based on role
+                        title = f"{self._school_info['name']} - {user_info['fullname']}"
+
+                        # Create the config entry
+                        return self.async_create_entry(  # type: ignore[return-value]
+                            title=title,
+                            data={
+                                CONF_SCHOOL_CODE: self.unique_id,
+                                CONF_SCHOOL_NAME: self._school_info["name"],
+                                CONF_HOST: self._school_info["url"],
+                                CONF_DEVICE_ID: self._school_info["device_id"],
+                                CONF_SECRET: auth_data["secret"],
+                                CONF_USER_GUID: user_info["guid"],
+                                CONF_CHILDREN_GUIDS: children_guids,
+                                CONF_TASK_LOOKAHEAD_DAYS: DEFAULT_TASK_LOOKAHEAD_DAYS,
+                            },
+                        )
+
+                except FireflyAuthenticationError:
+                    errors["base"] = "invalid_auth"
+                except FireflyConnectionError:
+                    errors["base"] = "cannot_connect"
+                except Exception:  # pylint: disable=broad-except
+                    _LOGGER.exception("Unexpected error during authentication")
+                    errors["base"] = "unknown"
 
         # Show authentication form with browser redirect URL
+        if not self._api_client or not self._school_info:
+            return self.async_abort(reason="missing_configuration")  # type: ignore[return-value]
         auth_url = self._api_client.get_auth_url()
 
-        return self.async_show_form(
+        return self.async_show_form(  # type: ignore[return-value]
             step_id="auth",
             data_schema=STEP_AUTH_DATA_SCHEMA,
             errors=errors,
             description_placeholders={
                 "auth_url": auth_url,
-                "device_id": self._school_info["device_id"] if self._school_info else "Unknown",
+                "device_id": self._school_info["device_id"],
             },
             last_step=False,
         )
 
-    async def async_step_reauth(
-        self, entry_data: Dict[str, Any]
-    ) -> FlowResult:
+    async def async_step_reauth(self, entry_data: Dict[str, Any]) -> FlowResult:
         """Handle reauthentication."""
         # Store the entry for later use
-        self.context["entry_id"] = entry_data.get("entry_id")
+        entry_id = entry_data.get("entry_id")
+        if entry_id:
+            self.context["entry_id"] = entry_id
 
         # Recreate school info from stored data
         self._school_info = {
@@ -191,55 +192,54 @@ class FireflyCloudConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return await self.async_step_reauth_confirm()
 
-    async def async_step_reauth_confirm(
-        self, user_input: Optional[Dict[str, Any]] = None
-    ) -> FlowResult:
+    async def async_step_reauth_confirm(self, user_input: Optional[Dict[str, Any]] = None) -> FlowResult:
         """Handle reauthentication confirmation."""
         errors: Dict[str, str] = {}
 
         if user_input is not None:
-            try:
-                # Parse authentication response
-                auth_data = await self._api_client.parse_authentication_response(
-                    user_input["auth_response"]
-                )
-
-                # Update API client with secret
-                self._api_client._secret = auth_data["secret"]
-
-                # Verify credentials work
-                if not await self._api_client.verify_credentials():
-                    errors["base"] = "invalid_auth"
-                else:
-                    # Update the existing config entry
-                    entry_id = self.context["entry_id"]
-                    entry = self.hass.config_entries.async_get_entry(entry_id)
-
-                    if entry:
-                        new_data = entry.data.copy()
-                        new_data[CONF_SECRET] = auth_data["secret"]
-
-                        self.hass.config_entries.async_update_entry(
-                            entry, data=new_data
-                        )
-
-                        # Reload the integration
-                        await self.hass.config_entries.async_reload(entry_id)
-
-                        return self.async_abort(reason="reauth_successful")
-
-            except FireflyAuthenticationError:
-                errors["base"] = "invalid_auth"
-            except FireflyConnectionError:
-                errors["base"] = "cannot_connect"
-            except Exception:  # pylint: disable=broad-except
-                _LOGGER.exception("Unexpected error during reauthentication")
+            if not self._api_client:
                 errors["base"] = "unknown"
+            else:
+                try:
+                    # Parse authentication response
+                    auth_data = await self._api_client.parse_authentication_response(user_input["auth_response"])
+
+                    # Update API client with secret
+                    self._api_client._secret = auth_data["secret"]
+
+                    # Verify credentials work
+                    if not await self._api_client.verify_credentials():
+                        errors["base"] = "invalid_auth"
+                    else:
+                        # Update the existing config entry
+                        entry_id = self.context["entry_id"]
+                        entry = self.hass.config_entries.async_get_entry(entry_id)
+
+                        if entry:
+                            new_data = entry.data.copy()
+                            new_data[CONF_SECRET] = auth_data["secret"]
+
+                            self.hass.config_entries.async_update_entry(entry, data=new_data)
+
+                            # Reload the integration
+                            await self.hass.config_entries.async_reload(entry_id)
+
+                            return self.async_abort(reason="reauth_successful")  # type: ignore[return-value]
+
+                except FireflyAuthenticationError:
+                    errors["base"] = "invalid_auth"
+                except FireflyConnectionError:
+                    errors["base"] = "cannot_connect"
+                except Exception:  # pylint: disable=broad-except
+                    _LOGGER.exception("Unexpected error during reauthentication")
+                    errors["base"] = "unknown"
 
         # Show reauthentication form
+        if not self._api_client or not self._school_info:
+            return self.async_abort(reason="missing_configuration")  # type: ignore[return-value]
         auth_url = self._api_client.get_auth_url()
 
-        return self.async_show_form(
+        return self.async_show_form(  # type: ignore[return-value]
             step_id="reauth_confirm",
             data_schema=STEP_AUTH_DATA_SCHEMA,
             errors=errors,
@@ -270,25 +270,24 @@ class FireflyCloudConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 class FireflyCloudOptionsFlowHandler(config_entries.OptionsFlow):
     """Handle Firefly Cloud options."""
 
-    async def async_step_init(
-        self, user_input: Optional[Dict[str, Any]] = None
-    ) -> FlowResult:
+    async def async_step_init(self, user_input: Optional[Dict[str, Any]] = None) -> FlowResult:
         """Manage the options."""
         if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
+            return self.async_create_entry(title="", data=user_input)  # type: ignore[return-value]
 
-        options_schema = vol.Schema({
-            vol.Optional(
-                CONF_TASK_LOOKAHEAD_DAYS,
-                default=self.config_entry.options.get(
+        options_schema = vol.Schema(
+            {
+                vol.Optional(
                     CONF_TASK_LOOKAHEAD_DAYS,
-                    self.config_entry.data.get(
-                        CONF_TASK_LOOKAHEAD_DAYS, DEFAULT_TASK_LOOKAHEAD_DAYS)
-                ),
-            ): vol.All(int, vol.Range(min=1, max=30)),
-        })
+                    default=self.config_entry.options.get(
+                        CONF_TASK_LOOKAHEAD_DAYS,
+                        self.config_entry.data.get(CONF_TASK_LOOKAHEAD_DAYS, DEFAULT_TASK_LOOKAHEAD_DAYS),
+                    ),
+                ): vol.All(int, vol.Range(min=1, max=30)),
+            }
+        )
 
-        return self.async_show_form(
+        return self.async_show_form(  # type: ignore[return-value]
             step_id="init",
             data_schema=options_schema,
             description_placeholders={

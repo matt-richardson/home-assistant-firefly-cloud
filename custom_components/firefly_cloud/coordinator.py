@@ -1,4 +1,5 @@
 """Data update coordinator for Firefly Cloud integration."""
+
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
@@ -178,16 +179,8 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
                     "id": task.get("guid", task.get("id", "unknown")),
                     "title": task.get("title", "Untitled Task"),
                     "description": task.get("description", ""),
-                    "due_date": (
-                        datetime.fromisoformat(due_date_str.replace("Z", "+00:00"))
-                        if due_date_str
-                        else None
-                    ),
-                    "set_date": (
-                        datetime.fromisoformat(set_date_str.replace("Z", "+00:00"))
-                        if set_date_str
-                        else None
-                    ),
+                    "due_date": (datetime.fromisoformat(due_date_str.replace("Z", "+00:00")) if due_date_str else None),
+                    "set_date": (datetime.fromisoformat(set_date_str.replace("Z", "+00:00")) if set_date_str else None),
                     "task_type": self._determine_task_type(task),
                     "completion_status": task.get("completionStatus", "Unknown"),
                     "setter": (
@@ -245,7 +238,6 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
                     if due_date.tzinfo is None:
                         due_date = due_date.replace(tzinfo=timezone.utc)
 
-
                 if start <= due_date < end:
                     filtered_tasks.append(task)
             except ValueError:
@@ -253,9 +245,7 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
 
         return self._process_tasks(filtered_tasks)
 
-    def _filter_overdue_tasks(
-        self, tasks: List[Dict[str, Any]], now: datetime
-    ) -> List[Dict[str, Any]]:
+    def _filter_overdue_tasks(self, tasks: List[Dict[str, Any]], now: datetime) -> List[Dict[str, Any]]:
         """Filter overdue tasks."""
         overdue_tasks = []
 
@@ -301,10 +291,7 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
 
         # For other days in the week, filter from week events
         week_events = self.data["events"]["week"]
-        return [
-            event for event in week_events
-            if day_start <= event["start"] < day_end
-        ]
+        return [event for event in week_events if day_start <= event["start"] < day_end]
 
     def get_tasks_by_subject(self) -> Dict[str, List[Dict[str, Any]]]:
         """Group tasks by subject."""

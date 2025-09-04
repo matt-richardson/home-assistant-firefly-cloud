@@ -1,4 +1,5 @@
 """Constants for the Firefly Cloud integration."""
+
 from datetime import timedelta
 
 DOMAIN = "firefly_cloud"

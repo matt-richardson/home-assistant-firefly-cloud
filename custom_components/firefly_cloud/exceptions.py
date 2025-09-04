@@ -1,4 +1,5 @@
 """Custom exceptions for the Firefly Cloud integration."""
+
 from homeassistant.exceptions import HomeAssistantError
 
 

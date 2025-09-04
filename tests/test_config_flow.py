@@ -1,4 +1,5 @@
 """Test the Firefly Cloud config flow."""
+
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -18,18 +19,14 @@ from custom_components.firefly_cloud.exceptions import (
 @pytest.fixture
 def mock_setup_entry():
     """Mock setting up config entry."""
-    with patch(
-        "custom_components.firefly_cloud.async_setup_entry", return_value=True
-    ) as mock_setup:
+    with patch("custom_components.firefly_cloud.async_setup_entry", return_value=True) as mock_setup:
         yield mock_setup
 
 
 @pytest.mark.asyncio
 async def test_form_user_flow(hass: HomeAssistant, mock_setup_entry) -> None:  # pylint: disable=unused-argument
     """Test we get the form for user flow."""
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
 
     assert result["type"] == FlowResultType.FORM
     assert result["errors"] == {}
@@ -39,9 +36,7 @@ async def test_form_user_flow(hass: HomeAssistant, mock_setup_entry) -> None:  #
 @pytest.mark.asyncio
 async def test_form_user_flow_success(hass: HomeAssistant, mock_setup_entry) -> None:  # pylint: disable=unused-argument
     """Test successful user flow."""
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
 
     mock_school_info = {
         "enabled": True,
@@ -51,10 +46,13 @@ async def test_form_user_flow_success(hass: HomeAssistant, mock_setup_entry) -> 
         "device_id": "test-device-123",
     }
 
-    with patch(
-        "custom_components.firefly_cloud.config_flow.FireflyAPIClient.get_school_info",
-        return_value=mock_school_info,
-    ), patch("homeassistant.helpers.aiohttp_client.async_get_clientsession"):
+    with (
+        patch(
+            "custom_components.firefly_cloud.config_flow.FireflyAPIClient.get_school_info",
+            return_value=mock_school_info,
+        ),
+        patch("homeassistant.helpers.aiohttp_client.async_get_clientsession"),
+    ):
         result2 = await hass.config_entries.flow.async_configure(
             result["flow_id"],
             {"school_code": "testschool"},
@@ -67,14 +65,15 @@ async def test_form_user_flow_success(hass: HomeAssistant, mock_setup_entry) -> 
 @pytest.mark.asyncio
 async def test_form_school_not_found(hass: HomeAssistant) -> None:
     """Test school not found error."""
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
 
-    with patch(
-        "custom_components.firefly_cloud.config_flow.FireflyAPIClient.get_school_info",
-        side_effect=FireflySchoolNotFoundError("School not found"),
-    ), patch("homeassistant.helpers.aiohttp_client.async_get_clientsession"):
+    with (
+        patch(
+            "custom_components.firefly_cloud.config_flow.FireflyAPIClient.get_school_info",
+            side_effect=FireflySchoolNotFoundError("School not found"),
+        ),
+        patch("homeassistant.helpers.aiohttp_client.async_get_clientsession"),
+    ):
         result2 = await hass.config_entries.flow.async_configure(
             result["flow_id"],
             {"school_code": "invalid"},
@@ -88,14 +87,15 @@ async def test_form_school_not_found(hass: HomeAssistant) -> None:
 @pytest.mark.asyncio
 async def test_form_connection_error(hass: HomeAssistant) -> None:
     """Test connection error."""
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
 
-    with patch(
-        "custom_components.firefly_cloud.config_flow.FireflyAPIClient.get_school_info",
-        side_effect=FireflyConnectionError("Connection failed"),
-    ), patch("homeassistant.helpers.aiohttp_client.async_get_clientsession"):
+    with (
+        patch(
+            "custom_components.firefly_cloud.config_flow.FireflyAPIClient.get_school_info",
+            side_effect=FireflyConnectionError("Connection failed"),
+        ),
+        patch("homeassistant.helpers.aiohttp_client.async_get_clientsession"),
+    ):
         result2 = await hass.config_entries.flow.async_configure(
             result["flow_id"],
             {"school_code": "testschool"},
@@ -110,9 +110,7 @@ async def test_form_connection_error(hass: HomeAssistant) -> None:
 async def test_form_auth_step_success(hass: HomeAssistant, mock_setup_entry) -> None:  # pylint: disable=unused-argument
     """Test successful authentication step."""
     # Start flow and get to auth step
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
 
     mock_school_info = {
         "enabled": True,
@@ -122,10 +120,13 @@ async def test_form_auth_step_success(hass: HomeAssistant, mock_setup_entry) -> 
         "device_id": "test-device-123",
     }
 
-    with patch(
-        "custom_components.firefly_cloud.config_flow.FireflyAPIClient.get_school_info",
-        return_value=mock_school_info,
-    ), patch("homeassistant.helpers.aiohttp_client.async_get_clientsession"):
+    with (
+        patch(
+            "custom_components.firefly_cloud.config_flow.FireflyAPIClient.get_school_info",
+            return_value=mock_school_info,
+        ),
+        patch("homeassistant.helpers.aiohttp_client.async_get_clientsession"),
+    ):
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"],
             {"school_code": "testschool"},
@@ -184,9 +185,7 @@ async def test_form_auth_step_success(hass: HomeAssistant, mock_setup_entry) -> 
 async def test_form_auth_invalid_response(hass: HomeAssistant) -> None:
     """Test invalid authentication response."""
     # Start flow and get to auth step
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
 
     mock_school_info = {
         "enabled": True,
@@ -196,10 +195,13 @@ async def test_form_auth_invalid_response(hass: HomeAssistant) -> None:
         "device_id": "test-device-123",
     }
 
-    with patch(
-        "custom_components.firefly_cloud.config_flow.FireflyAPIClient.get_school_info",
-        return_value=mock_school_info,
-    ), patch("homeassistant.helpers.aiohttp_client.async_get_clientsession"):
+    with (
+        patch(
+            "custom_components.firefly_cloud.config_flow.FireflyAPIClient.get_school_info",
+            return_value=mock_school_info,
+        ),
+        patch("homeassistant.helpers.aiohttp_client.async_get_clientsession"),
+    ):
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"],
             {"school_code": "testschool"},
@@ -224,9 +226,7 @@ async def test_form_auth_invalid_response(hass: HomeAssistant) -> None:
 async def test_form_auth_credentials_verification_failed(hass: HomeAssistant) -> None:
     """Test credentials verification failure."""
     # Start flow and get to auth step
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
 
     mock_school_info = {
         "enabled": True,
@@ -236,10 +236,13 @@ async def test_form_auth_credentials_verification_failed(hass: HomeAssistant) ->
         "device_id": "test-device-123",
     }
 
-    with patch(
-        "custom_components.firefly_cloud.config_flow.FireflyAPIClient.get_school_info",
-        return_value=mock_school_info,
-    ), patch("homeassistant.helpers.aiohttp_client.async_get_clientsession"):
+    with (
+        patch(
+            "custom_components.firefly_cloud.config_flow.FireflyAPIClient.get_school_info",
+            return_value=mock_school_info,
+        ),
+        patch("homeassistant.helpers.aiohttp_client.async_get_clientsession"),
+    ):
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"],
             {"school_code": "testschool"},
@@ -300,14 +303,21 @@ async def test_options_flow(hass: HomeAssistant, mock_config_entry) -> None:
 async def test_abort_if_already_configured(hass: HomeAssistant) -> None:
     """Test abort if already configured."""
     from custom_components.firefly_cloud.const import (
-        DOMAIN, CONF_SCHOOL_CODE, CONF_SCHOOL_NAME, CONF_HOST,
-        CONF_DEVICE_ID, CONF_SECRET, CONF_USER_GUID, CONF_TASK_LOOKAHEAD_DAYS,
-        DEFAULT_TASK_LOOKAHEAD_DAYS
+        DOMAIN,
+        CONF_SCHOOL_CODE,
+        CONF_SCHOOL_NAME,
+        CONF_HOST,
+        CONF_DEVICE_ID,
+        CONF_SECRET,
+        CONF_USER_GUID,
+        CONF_TASK_LOOKAHEAD_DAYS,
+        DEFAULT_TASK_LOOKAHEAD_DAYS,
     )
 
     # Create an existing config entry with the same unique_id as the school code we'll test
     # and add it manually to Home Assistant's registry
     from homeassistant.config_entries import ConfigEntry
+
     existing_entry = ConfigEntry(
         version=1,
         minor_version=1,
@@ -336,9 +346,7 @@ async def test_abort_if_already_configured(hass: HomeAssistant) -> None:
     # Let's trigger the internal indexing by calling the method directly
     hass.config_entries._async_schedule_save()
 
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
 
     # If the flow was already aborted in the init step, result will be the abort
     if result["type"] == FlowResultType.ABORT:
@@ -368,7 +376,9 @@ async def test_abort_if_already_configured(hass: HomeAssistant) -> None:
 
 @pytest.mark.skip(reason="Reauth flow requires complex Home Assistant internals mocking")
 @pytest.mark.asyncio
-async def test_reauth_flow_success(hass: HomeAssistant, mock_config_entry, mock_setup_entry) -> None:  # pylint: disable=unused-argument
+async def test_reauth_flow_success(
+    hass: HomeAssistant, mock_config_entry, mock_setup_entry
+) -> None:  # pylint: disable=unused-argument
     """Test successful reauthentication flow."""
     # Add existing entry to hass properly
     hass.config_entries._entries[mock_config_entry.entry_id] = mock_config_entry
@@ -460,7 +470,13 @@ async def test_reauth_flow_connection_error(hass: HomeAssistant, mock_config_ent
     # Mock connection error
     mock_auth_response = {
         "secret": "test-secret",
-        "user": {"username": "john.doe", "fullname": "John Doe", "email": "john.doe@test.com", "role": "student", "guid": "test-guid"},
+        "user": {
+            "username": "john.doe",
+            "fullname": "John Doe",
+            "email": "john.doe@test.com",
+            "role": "student",
+            "guid": "test-guid",
+        },
     }
 
     with (
@@ -500,7 +516,13 @@ async def test_reauth_flow_credentials_failed(hass: HomeAssistant, mock_config_e
     # Mock failed credential verification
     mock_auth_response = {
         "secret": "test-secret",
-        "user": {"username": "john.doe", "fullname": "John Doe", "email": "john.doe@test.com", "role": "student", "guid": "test-guid"},
+        "user": {
+            "username": "john.doe",
+            "fullname": "John Doe",
+            "email": "john.doe@test.com",
+            "role": "student",
+            "guid": "test-guid",
+        },
     }
 
     with (
@@ -556,9 +578,7 @@ async def test_reauth_flow_unexpected_error(hass: HomeAssistant, mock_config_ent
 async def test_auth_step_get_children_error(hass: HomeAssistant) -> None:
     """Test authentication step when getting children info fails."""
     # Start flow and get to auth step
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
 
     mock_school_info = {
         "enabled": True,
@@ -568,10 +588,13 @@ async def test_auth_step_get_children_error(hass: HomeAssistant) -> None:
         "device_id": "test-device-123",
     }
 
-    with patch(
-        "custom_components.firefly_cloud.config_flow.FireflyAPIClient.get_school_info",
-        return_value=mock_school_info,
-    ), patch("homeassistant.helpers.aiohttp_client.async_get_clientsession"):
+    with (
+        patch(
+            "custom_components.firefly_cloud.config_flow.FireflyAPIClient.get_school_info",
+            return_value=mock_school_info,
+        ),
+        patch("homeassistant.helpers.aiohttp_client.async_get_clientsession"),
+    ):
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"],
             {"school_code": "testschool"},
@@ -629,9 +652,7 @@ async def test_auth_step_get_children_error(hass: HomeAssistant) -> None:
 async def test_auth_step_unexpected_error(hass: HomeAssistant) -> None:
     """Test authentication step with unexpected error."""
     # Start flow and get to auth step
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
 
     mock_school_info = {
         "enabled": True,
@@ -641,10 +662,13 @@ async def test_auth_step_unexpected_error(hass: HomeAssistant) -> None:
         "device_id": "test-device-123",
     }
 
-    with patch(
-        "custom_components.firefly_cloud.config_flow.FireflyAPIClient.get_school_info",
-        return_value=mock_school_info,
-    ), patch("homeassistant.helpers.aiohttp_client.async_get_clientsession"):
+    with (
+        patch(
+            "custom_components.firefly_cloud.config_flow.FireflyAPIClient.get_school_info",
+            return_value=mock_school_info,
+        ),
+        patch("homeassistant.helpers.aiohttp_client.async_get_clientsession"),
+    ):
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"],
             {"school_code": "testschool"},
@@ -668,14 +692,15 @@ async def test_auth_step_unexpected_error(hass: HomeAssistant) -> None:
 @pytest.mark.asyncio
 async def test_user_step_unexpected_error(hass: HomeAssistant) -> None:
     """Test user step with unexpected error."""
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
 
-    with patch(
-        "custom_components.firefly_cloud.config_flow.FireflyAPIClient.get_school_info",
-        side_effect=Exception("Unexpected error"),
-    ), patch("homeassistant.helpers.aiohttp_client.async_get_clientsession"):
+    with (
+        patch(
+            "custom_components.firefly_cloud.config_flow.FireflyAPIClient.get_school_info",
+            side_effect=Exception("Unexpected error"),
+        ),
+        patch("homeassistant.helpers.aiohttp_client.async_get_clientsession"),
+    ):
         result2 = await hass.config_entries.flow.async_configure(
             result["flow_id"],
             {"school_code": "testschool"},
@@ -687,12 +712,12 @@ async def test_user_step_unexpected_error(hass: HomeAssistant) -> None:
 
 
 @pytest.mark.asyncio
-async def test_auth_step_multiple_children(hass: HomeAssistant, mock_setup_entry) -> None:  # pylint: disable=unused-argument
+async def test_auth_step_multiple_children(
+    hass: HomeAssistant, mock_setup_entry
+) -> None:  # pylint: disable=unused-argument
     """Test authentication step with parent having multiple children."""
     # Start flow and get to auth step
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
 
     mock_school_info = {
         "enabled": True,
@@ -702,10 +727,13 @@ async def test_auth_step_multiple_children(hass: HomeAssistant, mock_setup_entry
         "device_id": "test-device-123",
     }
 
-    with patch(
-        "custom_components.firefly_cloud.config_flow.FireflyAPIClient.get_school_info",
-        return_value=mock_school_info,
-    ), patch("homeassistant.helpers.aiohttp_client.async_get_clientsession"):
+    with (
+        patch(
+            "custom_components.firefly_cloud.config_flow.FireflyAPIClient.get_school_info",
+            return_value=mock_school_info,
+        ),
+        patch("homeassistant.helpers.aiohttp_client.async_get_clientsession"),
+    ):
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"],
             {"school_code": "testschool"},

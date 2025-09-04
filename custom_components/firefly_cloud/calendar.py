@@ -1,4 +1,5 @@
 """Calendar platform for Firefly Cloud integration."""
+
 from datetime import datetime
 import logging
 from typing import List, Optional
@@ -8,7 +9,6 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
 from .const import (
@@ -91,9 +91,7 @@ class FireflyCalendar(CalendarEntity):
         """When entity is added to hass."""
         await super().async_added_to_hass()
         # Subscribe to coordinator updates
-        self._unsub_coordinator = self.coordinator.async_add_listener(  # type: ignore
-            self._handle_coordinator_update
-        )
+        self._unsub_coordinator = self.coordinator.async_add_listener(self._handle_coordinator_update)  # type: ignore
 
     async def async_will_remove_from_hass(self) -> None:
         """When entity will be removed from hass."""
@@ -101,32 +99,28 @@ class FireflyCalendar(CalendarEntity):
             self._unsub_coordinator()
         await super().async_will_remove_from_hass()
 
-    def _update_availability(self) -> None:
-        """Update the entity availability based on coordinator data."""
-        self._attr_available = (
+    @property
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        return (
             self.coordinator.last_update_success
             and self.coordinator.data is not None
             and self._child_guid in self.coordinator.data.get("children_data", {})
         )
 
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator."""
-        self._update_name()
-        self._update_availability()
-        self.async_write_ha_state()
-
-    def _update_name(self) -> None:
-        """Update the entity name based on child data."""
+    @property
+    def name(self) -> str:
+        """Return the display name of the calendar."""
         if self.coordinator.data and self._child_guid in self.coordinator.data.get("children_data", {}):
             child_data = self.coordinator.data["children_data"][self._child_guid]
             child_name = child_data.get("name")
             if child_name:
-                self._attr_name = f"{self._base_name} ({child_name})"
-            else:
-                self._attr_name = f"{self._base_name} ({self._child_guid[:8]})"
-        else:
-            self._attr_name = f"{self._base_name} ({self._child_guid[:8]})"
+                return f"{self._base_name} ({child_name})"
+        return self._attr_name or f"{self._base_name} ({self._child_guid[:8]})"
 
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        self.async_write_ha_state()
 
     @property
     def event(self) -> Optional[CalendarEvent]:

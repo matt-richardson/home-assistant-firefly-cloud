@@ -1,4 +1,5 @@
 """Test the Firefly Cloud todo platform."""
+
 import pytest
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, Mock
@@ -37,7 +38,7 @@ def mock_coordinator():
                     "upcoming": [mock_task],
                     "due_today": [mock_task],
                     "overdue": [],
-                }
+                },
             }
         }
     }
@@ -176,11 +177,7 @@ class TestFireflyTodoListEntity:
     @pytest.mark.asyncio
     async def test_read_only_operations(self, todo_entity):
         """Test that all modification operations raise NotImplementedError."""
-        test_item = TodoItem(
-            uid="test",
-            summary="Test Task",
-            status=TodoItemStatus.NEEDS_ACTION
-        )
+        test_item = TodoItem(uid="test", summary="Test Task", status=TodoItemStatus.NEEDS_ACTION)
 
         with pytest.raises(NotImplementedError, match="read-only"):
             await todo_entity.async_create_todo_item(test_item)

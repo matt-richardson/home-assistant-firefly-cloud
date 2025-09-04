@@ -1,4 +1,5 @@
 """Test the Firefly Cloud init module."""
+
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 import pytest
 
@@ -139,9 +140,7 @@ async def test_async_unload_entry_success(
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][mock_config_entry.entry_id] = coordinator
 
-    with patch.object(
-        hass.config_entries, "async_unload_platforms"
-    ) as mock_unload_platforms:
+    with patch.object(hass.config_entries, "async_unload_platforms") as mock_unload_platforms:
         mock_unload_platforms.return_value = True
 
         result = await async_unload_entry(hass, mock_config_entry)
@@ -163,9 +162,7 @@ async def test_async_unload_entry_failure(
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][mock_config_entry.entry_id] = coordinator
 
-    with patch.object(
-        hass.config_entries, "async_unload_platforms"
-    ) as mock_unload_platforms:
+    with patch.object(hass.config_entries, "async_unload_platforms") as mock_unload_platforms:
         mock_unload_platforms.return_value = False
 
         result = await async_unload_entry(hass, mock_config_entry)
@@ -341,9 +338,7 @@ async def test_async_unload_entry_multiple_entries(
     hass.data[DOMAIN][mock_config_entry.entry_id] = coordinator1
     hass.data[DOMAIN][other_entry.entry_id] = coordinator2
 
-    with patch.object(
-        hass.config_entries, "async_unload_platforms"
-    ) as mock_unload_platforms:
+    with patch.object(hass.config_entries, "async_unload_platforms") as mock_unload_platforms:
         mock_unload_platforms.return_value = True
 
         result = await async_unload_entry(hass, mock_config_entry)
@@ -369,9 +364,7 @@ async def test_async_unload_entry_coordinator_shutdown_error(
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][mock_config_entry.entry_id] = coordinator
 
-    with patch.object(
-        hass.config_entries, "async_unload_platforms"
-    ) as mock_unload_platforms:
+    with patch.object(hass.config_entries, "async_unload_platforms") as mock_unload_platforms:
         mock_unload_platforms.return_value = True
 
         # Should still succeed even if coordinator shutdown fails

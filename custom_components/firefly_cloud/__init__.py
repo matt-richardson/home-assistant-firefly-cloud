@@ -1,4 +1,5 @@
 """The Firefly Cloud integration."""
+
 import logging
 
 from homeassistant.config_entries import ConfigEntry
@@ -43,9 +44,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Get task lookahead days from options or data
     task_lookahead_days = (
-        entry.options.get(CONF_TASK_LOOKAHEAD_DAYS) or
-        entry.data.get(CONF_TASK_LOOKAHEAD_DAYS) or
-        DEFAULT_TASK_LOOKAHEAD_DAYS
+        entry.options.get(CONF_TASK_LOOKAHEAD_DAYS)
+        or entry.data.get(CONF_TASK_LOOKAHEAD_DAYS)
+        or DEFAULT_TASK_LOOKAHEAD_DAYS
     )
 
     # Create HTTP session
@@ -63,8 +64,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     try:
         # Verify credentials are still valid
         if not await api.verify_credentials():
-            _LOGGER.warning(
-                "Firefly credentials are invalid, reauthentication required")
+            _LOGGER.warning("Firefly credentials are invalid, reauthentication required")
             raise ConfigEntryAuthFailed("Invalid credentials")
 
         # Test API connectivity
@@ -101,8 +101,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await coordinator.async_config_entry_first_refresh()
     except Exception as err:
         _LOGGER.error("Failed to fetch initial data from Firefly: %s", err)
-        raise ConfigEntryNotReady(
-            f"Failed to fetch initial data: {err}") from err
+        raise ConfigEntryNotReady(f"Failed to fetch initial data: {err}") from err
 
     # Store coordinator in hass.data
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
@@ -113,8 +112,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Set up options update listener
     entry.async_on_unload(entry.add_update_listener(async_update_options))
 
-    _LOGGER.info(
-        "Firefly Cloud integration setup completed for %s", entry.title)
+    _LOGGER.info("Firefly Cloud integration setup completed for %s", entry.title)
     return True
 
 
@@ -153,15 +151,13 @@ async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
 
 async def async_update_options(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Update options."""
-    _LOGGER.debug(
-        "Updating options for Firefly Cloud integration %s", entry.title)
+    _LOGGER.debug("Updating options for Firefly Cloud integration %s", entry.title)
     await hass.config_entries.async_reload(entry.entry_id)
 
 
 async def async_migrate_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
     """Migrate old entry."""
-    _LOGGER.debug("Migrating Firefly Cloud entry from version %s",
-                  config_entry.version)
+    _LOGGER.debug("Migrating Firefly Cloud entry from version %s", config_entry.version)
 
     if config_entry.version == 1:
         # No migration needed yet, we're at version 1

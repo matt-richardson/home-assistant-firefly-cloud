@@ -1,4 +1,5 @@
 """Sensor platform for Firefly Cloud integration."""
+
 from datetime import datetime
 import logging
 from typing import Any, Dict, List, Optional
@@ -188,11 +189,13 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
                 due_date_str = task["due_date"].strftime("%Y-%m-%d")
                 if due_date_str not in tasks_by_due_date:
                     tasks_by_due_date[due_date_str] = []
-                tasks_by_due_date[due_date_str].append({
-                    "title": task["title"],
-                    "subject": task["subject"],
-                    "task_type": task["task_type"],
-                })
+                tasks_by_due_date[due_date_str].append(
+                    {
+                        "title": task["title"],
+                        "subject": task["subject"],
+                        "task_type": task["task_type"],
+                    }
+                )
 
         return {
             "tasks": [
@@ -200,16 +203,10 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
                     "title": task["title"],
                     "subject": task["subject"],
                     "due_date": task["due_date"].isoformat() if task["due_date"] else None,
-                    "due_date_formatted": (
-                        task["due_date"].strftime("%A, %d %B %Y")
-                        if task["due_date"]
-                        else None
-                    ),
+                    "due_date_formatted": (task["due_date"].strftime("%A, %d %B %Y") if task["due_date"] else None),
                     "task_type": task["task_type"],
                     "days_until_due": (
-                        (task["due_date"].date() - datetime.now().date()).days
-                        if task["due_date"]
-                        else None
+                        (task["due_date"].date() - datetime.now().date()).days if task["due_date"] else None
                     ),
                     "setter": task["setter"],
                 }
@@ -220,9 +217,7 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
                     {
                         "title": task["title"],
                         "due_date_formatted": (
-                            task["due_date"].strftime("%A, %d %B")
-                            if task["due_date"]
-                            else "No due date"
+                            task["due_date"].strftime("%A, %d %B") if task["due_date"] else "No due date"
                         ),
                         "task_type": task["task_type"],
                     }
@@ -236,16 +231,8 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
                 {
                     "title": task["title"],
                     "subject": task["subject"],
-                    "due_date_formatted": (
-                        task["due_date"].strftime("%A, %d %B %Y")
-                        if task["due_date"]
-                        else None
-                    ),
-                    "days_overdue": (
-                        (datetime.now().date() - task["due_date"].date()).days
-                        if task["due_date"]
-                        else 0
-                    ),
+                    "due_date_formatted": (task["due_date"].strftime("%A, %d %B %Y") if task["due_date"] else None),
+                    "days_overdue": ((datetime.now().date() - task["due_date"].date()).days if task["due_date"] else 0),
                 }
                 for task in overdue_tasks
             ],
@@ -257,8 +244,7 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
 
         # Categorize by urgency/type
         urgent_tasks = [
-            task for task in tasks
-            if task["task_type"] in ["test", "project"] or "urgent" in task["title"].lower()
+            task for task in tasks if task["task_type"] in ["test", "project"] or "urgent" in task["title"].lower()
         ]
 
         return {
@@ -292,4 +278,3 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
             "project_count": len([t for t in tasks if t["task_type"] == "project"]),
             "test_count": len([t for t in tasks if t["task_type"] == "test"]),
         }
-

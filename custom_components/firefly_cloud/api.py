@@ -1,4 +1,5 @@
 """Firefly Cloud API client."""
+
 import asyncio
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -58,9 +59,7 @@ class FireflyAPIClient:
             self._user_info = {"guid": user_guid}
 
     @classmethod
-    async def get_school_info(
-        cls, session: aiohttp.ClientSession, school_code: str
-    ) -> Dict[str, Any]:
+    async def get_school_info(cls, session: aiohttp.ClientSession, school_code: str) -> Dict[str, Any]:
         """Get school information from school code."""
         if not school_code:
             raise FireflySchoolNotFoundError("Invalid school code")
@@ -73,18 +72,15 @@ class FireflyAPIClient:
                     response.raise_for_status()
                     content = await response.text()
         except asyncio.TimeoutError as err:
-            raise FireflyConnectionError(
-                "Timeout connecting to Firefly") from err
+            raise FireflyConnectionError("Timeout connecting to Firefly") from err
         except aiohttp.ClientError as err:
-            raise FireflyConnectionError(
-                f"Error connecting to Firefly: {err}") from err
+            raise FireflyConnectionError(f"Error connecting to Firefly: {err}") from err
 
         try:
             response_elem = etree.fromstring(content.encode())
 
             if response_elem is None or response_elem.get("exists") == "false":
-                raise FireflySchoolNotFoundError(
-                    f"School not found: {school_code}")
+                raise FireflySchoolNotFoundError(f"School not found: {school_code}")
 
             address_elem = response_elem.find("address")
             if address_elem is None:
@@ -131,11 +127,9 @@ class FireflyAPIClient:
                     response.raise_for_status()
                     content = await response.text()
         except asyncio.TimeoutError as err:
-            raise FireflyConnectionError(
-                "Timeout getting API version") from err
+            raise FireflyConnectionError("Timeout getting API version") from err
         except aiohttp.ClientError as err:
-            raise FireflyConnectionError(
-                f"Error getting API version: {err}") from err
+            raise FireflyConnectionError(f"Error getting API version: {err}") from err
 
         try:
             version_elem = etree.fromstring(content.encode())
@@ -178,16 +172,13 @@ class FireflyAPIClient:
                     data = await response.json()
                     return data.get("valid", False)
         except asyncio.TimeoutError as err:
-            raise FireflyConnectionError(
-                "Timeout verifying credentials") from err
+            raise FireflyConnectionError("Timeout verifying credentials") from err
         except aiohttp.ClientResponseError as err:
             if err.status == 401:
                 return False
-            raise FireflyAuthenticationError(
-                f"Authentication error: {err}") from err
+            raise FireflyAuthenticationError(f"Authentication error: {err}") from err
         except aiohttp.ClientError as err:
-            raise FireflyConnectionError(
-                f"Error verifying credentials: {err}") from err
+            raise FireflyConnectionError(f"Error verifying credentials: {err}") from err
 
     async def parse_authentication_response(self, xml_response: str) -> Dict[str, Any]:
         """Parse the authentication response and extract user info and secret."""
@@ -204,8 +195,7 @@ class FireflyAPIClient:
             token_elem = etree.fromstring(xml_response.encode())
 
             if token_elem is None:
-                raise FireflyAuthenticationError(
-                    "Invalid authentication response")
+                raise FireflyAuthenticationError("Invalid authentication response")
 
             secret_elem = token_elem.find("secret")
             user_elem = token_elem.find("user")
@@ -233,8 +223,7 @@ class FireflyAPIClient:
             }
 
         except etree.XMLSyntaxError as err:
-            raise FireflyAuthenticationError(
-                f"Invalid XML in auth response: {err}") from err
+            raise FireflyAuthenticationError(f"Invalid XML in auth response: {err}") from err
 
     async def _graphql_query(self, query: str) -> Dict[str, Any]:
         """Execute a GraphQL query."""
@@ -249,12 +238,9 @@ class FireflyAPIClient:
         for attempt in range(MAX_RETRIES):
             try:
                 async with async_timeout.timeout(TIMEOUT_SECONDS):
-                    async with self._session.post(
-                        url, params=params, data=data, headers=headers
-                    ) as response:
+                    async with self._session.post(url, params=params, data=data, headers=headers) as response:
                         if response.status == 401:
-                            raise FireflyTokenExpiredError(
-                                "Authentication token expired")
+                            raise FireflyTokenExpiredError("Authentication token expired")
                         if response.status == 429:
                             raise FireflyRateLimitError("Rate limit exceeded")
 
@@ -262,24 +248,21 @@ class FireflyAPIClient:
                         result = await response.json()
 
                         if "errors" in result:
-                            raise FireflyAPIError(
-                                f"GraphQL errors: {result['errors']}")
+                            raise FireflyAPIError(f"GraphQL errors: {result['errors']}")
 
                         return result.get("data", {})
 
             except asyncio.TimeoutError as exc:
                 if attempt == MAX_RETRIES - 1:
-                    raise FireflyConnectionError(
-                        "Timeout executing GraphQL query") from exc
-                await asyncio.sleep(RETRY_DELAY_BASE ** attempt)
+                    raise FireflyConnectionError("Timeout executing GraphQL query") from exc
+                await asyncio.sleep(RETRY_DELAY_BASE**attempt)
                 continue
             except (FireflyTokenExpiredError, FireflyRateLimitError):  # pylint: disable=try-except-raise
                 raise
             except aiohttp.ClientError as err:
                 if attempt == MAX_RETRIES - 1:
-                    raise FireflyConnectionError(
-                        f"Error executing query: {err}") from err
-                await asyncio.sleep(RETRY_DELAY_BASE ** attempt)
+                    raise FireflyConnectionError(f"Error executing query: {err}") from err
+                await asyncio.sleep(RETRY_DELAY_BASE**attempt)
                 continue
 
         # This should never be reached due to MAX_RETRIES logic, but satisfy type checker
@@ -324,9 +307,7 @@ class FireflyAPIClient:
 
         return users_data[0]["children"]
 
-    async def get_events(
-        self, start: datetime, end: datetime, user_guid: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+    async def get_events(self, start: datetime, end: datetime, user_guid: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get calendar events for a date range."""
         if not user_guid and self._user_info:
             user_guid = self._user_info["guid"]
@@ -339,9 +320,7 @@ class FireflyAPIClient:
         # Use the REST API for timetable data
         return await self._get_events_rest_api(start, end, user_guid)
 
-    async def _get_events_rest_api(
-        self, start: datetime, end: datetime, user_guid: str
-    ) -> List[Dict[str, Any]]:
+    async def _get_events_rest_api(self, start: datetime, end: datetime, user_guid: str) -> List[Dict[str, Any]]:
         """Get events using the REST API timetable endpoint."""
         # Determine the time period (week/day) based on date range
         days_diff = (end - start).days
@@ -354,7 +333,7 @@ class FireflyAPIClient:
         params = {
             "ffauth_device_id": self._device_id,
             "ffauth_secret": self._secret,
-            "datetime": start.strftime('%Y-%m-%dT%H:%M')
+            "datetime": start.strftime("%Y-%m-%dT%H:%M"),
         }
 
         for attempt in range(MAX_RETRIES):
@@ -362,8 +341,7 @@ class FireflyAPIClient:
                 async with async_timeout.timeout(TIMEOUT_SECONDS):
                     async with self._session.get(url, params=params) as response:
                         if response.status == 401:
-                            raise FireflyTokenExpiredError(
-                                "Authentication token expired")
+                            raise FireflyTokenExpiredError("Authentication token expired")
                         if response.status == 429:
                             raise FireflyRateLimitError("Rate limit exceeded")
 
@@ -385,11 +363,11 @@ class FireflyAPIClient:
                                         "role": str(attendee.get("role", "")),
                                         "principal": {
                                             "guid": attendee.get("guid", {}).get("value", ""),
-                                            "name": attendee.get("name", "")
-                                        }
+                                            "name": attendee.get("name", ""),
+                                        },
                                     }
                                     for attendee in event.get("attendees", [])
-                                ]
+                                ],
                             }
                             converted_events.append(converted_event)
 
@@ -397,17 +375,15 @@ class FireflyAPIClient:
 
             except asyncio.TimeoutError as exc:
                 if attempt == MAX_RETRIES - 1:
-                    raise FireflyConnectionError(
-                        "Timeout getting events via REST API") from exc
-                await asyncio.sleep(RETRY_DELAY_BASE ** attempt)
+                    raise FireflyConnectionError("Timeout getting events via REST API") from exc
+                await asyncio.sleep(RETRY_DELAY_BASE**attempt)
                 continue
             except (FireflyTokenExpiredError, FireflyRateLimitError):  # pylint: disable=try-except-raise
                 raise
             except aiohttp.ClientError as err:
                 if attempt == MAX_RETRIES - 1:
-                    raise FireflyConnectionError(
-                        f"Error getting events via REST API: {err}") from err
-                await asyncio.sleep(RETRY_DELAY_BASE ** attempt)
+                    raise FireflyConnectionError(f"Error getting events via REST API: {err}") from err
+                await asyncio.sleep(RETRY_DELAY_BASE**attempt)
                 continue
 
         # Should never reach here due to exception handling above
@@ -451,12 +427,9 @@ class FireflyAPIClient:
         for attempt in range(MAX_RETRIES):
             try:
                 async with async_timeout.timeout(TIMEOUT_SECONDS):
-                    async with self._session.post(
-                        url, params=params, json=payload
-                    ) as response:
+                    async with self._session.post(url, params=params, json=payload) as response:
                         if response.status == 401:
-                            raise FireflyTokenExpiredError(
-                                "Authentication token expired")
+                            raise FireflyTokenExpiredError("Authentication token expired")
                         if response.status == 429:
                             raise FireflyRateLimitError("Rate limit exceeded")
 
@@ -467,23 +440,20 @@ class FireflyAPIClient:
             except asyncio.TimeoutError as exc:
                 if attempt == MAX_RETRIES - 1:
                     raise FireflyConnectionError("Timeout getting tasks") from exc
-                await asyncio.sleep(RETRY_DELAY_BASE ** attempt)
+                await asyncio.sleep(RETRY_DELAY_BASE**attempt)
                 continue
             except (FireflyTokenExpiredError, FireflyRateLimitError):  # pylint: disable=try-except-raise
                 raise
             except aiohttp.ClientError as err:
                 if attempt == MAX_RETRIES - 1:
-                    raise FireflyConnectionError(
-                        f"Error getting tasks: {err}") from err
-                await asyncio.sleep(RETRY_DELAY_BASE ** attempt)
+                    raise FireflyConnectionError(f"Error getting tasks: {err}") from err
+                await asyncio.sleep(RETRY_DELAY_BASE**attempt)
                 continue
 
         # Should never reach here due to exception handling above
         return []
 
-    async def get_participating_groups(
-        self, user_guid: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+    async def get_participating_groups(self, user_guid: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get groups/classes the user participates in."""
         if not user_guid and self._user_info:
             user_guid = self._user_info["guid"]
