@@ -121,7 +121,7 @@ class TestFireflyTodoListEntity:
         # Test first item
         item = items[0]
         assert isinstance(item, TodoItem)
-        assert item.summary == "Math Homework"  # No subject prefix
+        assert item.summary == "Math Homework"
         assert item.status == TodoItemStatus.NEEDS_ACTION
         assert item.due is not None
         assert "Type: homework" in item.description
@@ -152,7 +152,7 @@ class TestFireflyTodoListEntity:
         
         item = todo_entity._create_todo_item(task_data, TodoItemStatus.NEEDS_ACTION)
         
-        assert item.summary == "Science Project"  # No subject prefix
+        assert item.summary == "Science Project"
         assert item.status == TodoItemStatus.NEEDS_ACTION
         assert item.due == datetime(2023, 12, 25, 9, 0, 0, tzinfo=timezone.utc)
         assert "Type: project" in item.description

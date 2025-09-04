@@ -180,7 +180,6 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
                         if set_date_str
                         else None
                     ),
-                    "subject": None,  # Subject data unreliable, removed from display
                     "task_type": self._determine_task_type(task),
                     "completion_status": task.get("completionStatus", "Unknown"),
                     "setter": (
