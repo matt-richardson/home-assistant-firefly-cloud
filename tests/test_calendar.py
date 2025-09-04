@@ -1,6 +1,6 @@
 """Test the Firefly Cloud calendar platform."""
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 from types import MappingProxyType
 from unittest.mock import MagicMock
 
@@ -74,7 +74,7 @@ def mock_coordinator():
                 },
             },
             "test-child-456": {
-                "name": "Jane Doe", 
+                "name": "Jane Doe",
                 "events": {
                     "week": []
                 },
@@ -157,7 +157,7 @@ async def test_calendar_current_event(mock_coordinator, mock_config_entry):
     assert event.location == "Room 101"
 
 
-@pytest.mark.asyncio 
+@pytest.mark.asyncio
 async def test_calendar_next_event(mock_coordinator, mock_config_entry):
     """Test calendar next event when no current event."""
     calendar = FireflyCalendar(mock_coordinator, mock_config_entry, "test-child-123")
@@ -186,7 +186,7 @@ async def test_calendar_no_events(mock_coordinator, mock_config_entry):
 
 
 @pytest.mark.asyncio
-async def test_calendar_get_events(mock_coordinator, mock_config_entry):
+async def test_calendar_get_events(hass, mock_coordinator, mock_config_entry):
     """Test calendar get_events method."""
     calendar = FireflyCalendar(mock_coordinator, mock_config_entry, "test-child-123")
 
@@ -194,7 +194,7 @@ async def test_calendar_get_events(mock_coordinator, mock_config_entry):
     start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
     end_date = start_date + timedelta(days=7)
 
-    events = await calendar.async_get_events(None, start_date, end_date)
+    events = await calendar.async_get_events(hass, start_date, end_date)
 
     assert len(events) == 2
     assert all(isinstance(event, CalendarEvent) for event in events)
@@ -203,7 +203,7 @@ async def test_calendar_get_events(mock_coordinator, mock_config_entry):
 
 
 @pytest.mark.asyncio
-async def test_calendar_get_events_filtered_by_date(mock_coordinator, mock_config_entry):
+async def test_calendar_get_events_filtered_by_date(hass, mock_coordinator, mock_config_entry):
     """Test calendar get_events with date filtering."""
     calendar = FireflyCalendar(mock_coordinator, mock_config_entry, "test-child-123")
 
@@ -215,8 +215,7 @@ async def test_calendar_get_events_filtered_by_date(mock_coordinator, mock_confi
     # Mock first event to be today, second to be tomorrow
     mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"][0]["start"] = now.replace(hour=9)
     mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"][0]["end"] = now.replace(hour=10)
-    
-    events = await calendar.async_get_events(None, start_date, end_date)
+    events = await calendar.async_get_events(hass, start_date, end_date)
 
     # Should only return today's event
     assert len(events) == 1
@@ -230,15 +229,14 @@ async def test_calendar_convert_event_with_description(mock_coordinator, mock_co
 
     # Get first event from coordinator data
     event_data = mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"][0]
-    
     calendar_event = calendar._convert_to_calendar_event(event_data)
 
     assert isinstance(calendar_event, CalendarEvent)
     assert calendar_event.summary == "Mathematics"
     assert calendar_event.location == "Room 101"
-    assert "Algebra lesson" in calendar_event.description
-    assert "Class: Year 10" in calendar_event.description
-    assert "Attendees: Mr. Smith" in calendar_event.description
+    assert calendar_event.description and "Algebra lesson" in calendar_event.description
+    assert calendar_event.description and "Class: Year 10" in calendar_event.description
+    assert calendar_event.description and "Attendees: Mr. Smith" in calendar_event.description
 
 
 @pytest.mark.asyncio
@@ -398,9 +396,9 @@ async def test_calendar_event_build_description_with_many_attendees(mock_coordin
 
     calendar_event = calendar._convert_to_calendar_event(event_data)
 
-    assert "Test description" in calendar_event.description
-    assert "Class: Year 10" in calendar_event.description
-    assert "and 5 more" in calendar_event.description  # Should truncate after first 5
+    assert calendar_event.description and "Test description" in calendar_event.description
+    assert calendar_event.description and "Class: Year 10" in calendar_event.description
+    assert calendar_event.description and "and 5 more" in calendar_event.description  # Should truncate after first 5
 
 
 @pytest.mark.asyncio
@@ -427,13 +425,13 @@ async def test_calendar_event_build_description_with_dict_attendees(mock_coordin
 
     assert calendar_event.summary == "Chemistry Lab"
     assert calendar_event.location == "Science Lab 1"
-    assert "Bring safety goggles" in calendar_event.description
-    assert "Class: Year 11" in calendar_event.description
-    assert "Attendees: Dr. Smith, Ms. Johnson, Mr. Brown" in calendar_event.description
+    assert calendar_event.description and "Bring safety goggles" in calendar_event.description
+    assert calendar_event.description and "Class: Year 11" in calendar_event.description
+    assert calendar_event.description and "Attendees: Dr. Smith, Ms. Johnson, Mr. Brown" in calendar_event.description
 
 
 @pytest.mark.asyncio
-async def test_calendar_no_coordinator_data(mock_config_entry):
+async def test_calendar_no_coordinator_data(hass, mock_config_entry):
     """Test calendar with no coordinator data."""
     coordinator = MagicMock()
     coordinator.data = None
@@ -445,12 +443,12 @@ async def test_calendar_no_coordinator_data(mock_config_entry):
     assert calendar.event is None
 
     # Should handle get_events gracefully
-    events = await calendar.async_get_events(None, dt_util.now(), dt_util.now() + timedelta(days=1))
+    events = await calendar.async_get_events(hass, dt_util.now(), dt_util.now() + timedelta(days=1))
     assert events == []
 
 
 @pytest.mark.asyncio
-async def test_calendar_get_events_no_data(mock_config_entry):
+async def test_calendar_get_events_no_data(hass, mock_config_entry):
     """Test calendar get_events with no coordinator data."""
     coordinator = MagicMock()
     coordinator.data = None
@@ -458,13 +456,13 @@ async def test_calendar_get_events_no_data(mock_config_entry):
     calendar = FireflyCalendar(coordinator, mock_config_entry, "test-child-123")
 
     now = dt_util.now()
-    events = await calendar.async_get_events(None, now, now + timedelta(days=1))
+    events = await calendar.async_get_events(hass, now, now + timedelta(days=1))
 
     assert events == []
 
 
 @pytest.mark.asyncio
-async def test_calendar_handles_missing_child_data_gracefully(mock_config_entry):
+async def test_calendar_handles_missing_child_data_gracefully(hass, mock_config_entry):
     """Test calendar handles missing child data gracefully."""
     coordinator = MagicMock()
     coordinator.last_update_success = True
@@ -481,5 +479,5 @@ async def test_calendar_handles_missing_child_data_gracefully(mock_config_entry)
 
     # get_events should return empty list
     now = dt_util.now()
-    events = await calendar.async_get_events(None, now, now + timedelta(days=1))
+    events = await calendar.async_get_events(hass, now, now + timedelta(days=1))
     assert events == []
