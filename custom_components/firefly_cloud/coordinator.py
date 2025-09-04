@@ -50,12 +50,12 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
             # Get user info if we don't have it
             if not self._user_info:
                 self._user_info = await self.api.get_user_info()
-            
+
             # Get children info if we don't have it and we have children GUIDs
             if not self._children_info and self.children_guids:
                 try:
                     self._children_info = await self.api.get_children_info()
-                except Exception as err:
+                except (FireflyConnectionError, FireflyAuthenticationError, FireflyTokenExpiredError) as err:
                     _LOGGER.warning("Failed to fetch children info: %s", err)
                     self._children_info = []
 
@@ -64,26 +64,24 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
             today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
             today_end = today_start + timedelta(days=1)
             week_start = today_start
-            week_end = today_start + timedelta(days=7)
             # Extended range for calendar view (30 days)
             calendar_end = today_start + timedelta(days=30)
             task_end = today_start + timedelta(days=self.task_lookahead_days)
 
             # Determine which users to fetch data for
             target_guids = self.children_guids if self.children_guids else [self._user_info["guid"]]
-            
+
             # Initialize data structure for multi-child support
             children_data = {}
-            
+
             # Fetch data for each child/user
             for child_guid in target_guids:
-                
+
                 # Fetch data in parallel for this child
                 events_today = await self.api.get_events(today_start, today_end, child_guid)
-                events_week = await self.api.get_events(week_start, week_end, child_guid)
                 events_calendar = await self.api.get_events(week_start, calendar_end, child_guid)
                 tasks = await self.api.get_tasks(student_guid=child_guid)
-                
+
                 children_data[child_guid] = {
                     "events": {
                         "today": self._process_events(events_today),
@@ -106,12 +104,22 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
                 "last_updated": now,
             }
 
-            total_events_today = sum(len(child_data["events"]["today"]) for child_data in children_data.values())
-            total_events_week = sum(len(child_data["events"]["week"]) for child_data in children_data.values()) 
-            total_tasks = sum(len(child_data["tasks"]["all"]) for child_data in children_data.values())
-            
+            total_events_today = 0
+            total_events_week = 0
+            total_tasks = 0
+            for child_data in children_data.values():
+                if isinstance(child_data, dict):
+                    events_data = child_data.get("events")
+                    tasks_data = child_data.get("tasks")
+                    if isinstance(events_data, dict):
+                        total_events_today += len(events_data.get("today", []))
+                        total_events_week += len(events_data.get("week", []))
+                    if isinstance(tasks_data, dict):
+                        total_tasks += len(tasks_data.get("all", []))
+
             _LOGGER.debug(
-                "Successfully updated Firefly data for %d children: %d events today, %d events this week, %d total tasks",
+                "Successfully updated Firefly data for %d children: "
+                "%d events today, %d events this week, %d total tasks",
                 len(target_guids),
                 total_events_today,
                 total_events_week,
@@ -136,7 +144,7 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
     def _process_events(self, events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Process and clean event data."""
         processed_events = []
-        
+
         for event in events:
             try:
                 processed_event = {
@@ -160,12 +168,12 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
     def _process_tasks(self, tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Process and clean task data."""
         processed_tasks = []
-        
+
         for task in tasks:
             try:
                 due_date_str = task.get("dueDate")
                 set_date_str = task.get("setDate")
-                
+
                 processed_task = {
                     "id": task.get("guid", task.get("id", "unknown")),
                     "title": task.get("title", "Untitled Task"),
@@ -200,35 +208,34 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
         """Determine task type from task data."""
         title = task.get("title", "").lower()
         description = task.get("description", "").lower()
-        
+
         # Simple classification based on keywords
         if any(keyword in title for keyword in ["test", "exam", "assessment"]):
             return "test"
-        elif any(keyword in title for keyword in ["project", "assignment"]):
+        if any(keyword in title for keyword in ["project", "assignment"]):
             return "project"
-        elif any(keyword in description for keyword in ["permission", "slip", "form"]):
+        if any(keyword in description for keyword in ["permission", "slip", "form"]):
             return "permission_slip"
-        else:
-            return "homework"
+        return "homework"
 
     def _filter_tasks_by_date(
         self, tasks: List[Dict[str, Any]], start: datetime, end: datetime
     ) -> List[Dict[str, Any]]:
         """Filter tasks by date range."""
         filtered_tasks = []
-        
-        
+
+
         # Ensure start and end are timezone-aware for comparison
         if start.tzinfo is None:
             start = start.replace(tzinfo=timezone.utc)
         if end.tzinfo is None:
             end = end.replace(tzinfo=timezone.utc)
-        
+
         for task in tasks:
             due_date_str = task.get("dueDate")
             if not due_date_str:
                 continue
-                
+
             try:
                 # Parse the due date and ensure it's timezone-aware
                 if due_date_str.endswith("Z"):
@@ -238,13 +245,13 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
                     due_date = datetime.fromisoformat(due_date_str)
                     if due_date.tzinfo is None:
                         due_date = due_date.replace(tzinfo=timezone.utc)
-                
-                    
+
+
                 if start <= due_date < end:
                     filtered_tasks.append(task)
             except ValueError:
                 continue
-                
+
         return self._process_tasks(filtered_tasks)
 
     def _filter_overdue_tasks(
@@ -252,14 +259,14 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
     ) -> List[Dict[str, Any]]:
         """Filter overdue tasks."""
         overdue_tasks = []
-        
+
         for task in tasks:
             due_date_str = task.get("dueDate")
             completion_status = task.get("completionStatus", "")
-            
+
             if not due_date_str or completion_status.lower() == "completed":
                 continue
-                
+
             try:
                 if due_date_str.endswith("Z"):
                     due_date = datetime.fromisoformat(due_date_str.replace("Z", "+00:00"))
@@ -268,16 +275,16 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
                     due_date = datetime.fromisoformat(due_date_str)
                     if due_date.tzinfo is None:
                         due_date = due_date.replace(tzinfo=timezone.utc)
-                        
+
                 # Ensure now is timezone-aware
                 if now.tzinfo is None:
                     now = now.replace(tzinfo=timezone.utc)
-                    
+
                 if due_date < now:
                     overdue_tasks.append(task)
             except ValueError:
                 continue
-                
+
         return self._process_tasks(overdue_tasks)
 
     def get_events_for_day(self, target_date: datetime) -> List[Dict[str, Any]]:
@@ -287,12 +294,12 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
 
         day_start = target_date.replace(hour=0, minute=0, second=0, microsecond=0)
         day_end = day_start + timedelta(days=1)
-        
+
         # For today, use the cached today events
         today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
         if day_start == today:
             return self.data["events"]["today"]
-        
+
         # For other days in the week, filter from week events
         week_events = self.data["events"]["week"]
         return [
@@ -305,7 +312,7 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
         if not self.data or "tasks" not in self.data:
             return {}
 
-        tasks_by_subject = {}
+        tasks_by_subject: Dict[str, List[Dict[str, Any]]] = {}
         for task in self.data["tasks"]["upcoming"]:
             subject = task["subject"]
             if subject not in tasks_by_subject:
@@ -318,35 +325,35 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
         """Get special requirements for today (sports kit, equipment, etc.)."""
         today_events = self.get_events_for_day(datetime.now())
         requirements = []
-        
+
         for event in today_events:
             subject = event["subject"].lower()
             description = (event["description"] or "").lower()
-            
+
             # Check for sports/PE requirements
             if any(keyword in subject for keyword in ["pe", "sport", "games", "physical"]):
                 requirements.append("Sports kit required")
-            
+
             # Check for equipment mentions in description
             if any(keyword in description for keyword in ["equipment", "kit", "uniform"]):
                 requirements.append(f"Special equipment for {event['subject']}")
-        
+
         return list(set(requirements))  # Remove duplicates
 
     def _extract_child_name(self, child_guid: str) -> Optional[str]:
         """Extract child name from user info or children info."""
         if not self._user_info:
             return None
-            
+
         # Check if this is the main user account
         if child_guid == self._user_info.get("guid"):
             return self._user_info.get("name") or self._user_info.get("fullname")
-        
+
         # For children, look up their names from children info
         if self._children_info:
             for child in self._children_info:
                 if child.get("guid") == child_guid:
                     return child.get("name") or child.get("fullname")
-        
+
         # If no match found, return None and let entity handle fallback
         return None
