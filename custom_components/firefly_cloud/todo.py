@@ -5,8 +5,10 @@ from typing import Any, Dict, List, Optional
 
 from homeassistant.components.todo import (
     TodoItem,
-    TodoItemStatus,
     TodoListEntity,
+)
+from homeassistant.components.todo.const import (
+    TodoItemStatus,
     TodoListEntityFeature,
 )
 from homeassistant.config_entries import ConfigEntry
@@ -33,15 +35,15 @@ async def async_setup_entry(
 ) -> None:
     """Set up Firefly Cloud todo platform."""
     coordinator: FireflyUpdateCoordinator = hass.data[DOMAIN][config_entry.entry_id]
-    
+
     # Get children GUIDs from config or use user GUID if no children
     children_guids = config_entry.data.get(CONF_CHILDREN_GUIDS, [])
     if not children_guids:
         children_guids = [config_entry.data[CONF_USER_GUID]]
-    
+
     # Create todo list for each child
     entities: List[TodoListEntity] = []
-    
+
     for child_guid in children_guids:
         entities.append(
             FireflyTodoListEntity(
@@ -50,11 +52,11 @@ async def async_setup_entry(
                 child_guid=child_guid,
             )
         )
-    
+
     async_add_entities(entities)
 
 
-class FireflyTodoListEntity(CoordinatorEntity, TodoListEntity):
+class FireflyTodoListEntity(CoordinatorEntity, TodoListEntity):  # pylint: disable=too-many-instance-attributes
     """Firefly todo list entity."""
 
     def __init__(
@@ -67,11 +69,11 @@ class FireflyTodoListEntity(CoordinatorEntity, TodoListEntity):
         super().__init__(coordinator)
         self._config_entry = config_entry
         self._child_guid = child_guid
-        
+
         # Generate unique entity ID
         school_name = config_entry.data.get(CONF_SCHOOL_NAME, "firefly")
         self._attr_unique_id = f"{config_entry.entry_id}_todo_{child_guid}"
-        
+
         # Set entity properties - will be updated with child name when data is available
         self._base_name = f"{school_name} Tasks"
         self._attr_name = f"{self._base_name} ({child_guid[:8]})"
@@ -87,7 +89,7 @@ class FireflyTodoListEntity(CoordinatorEntity, TodoListEntity):
             configuration_url=config_entry.data.get("host"),
         )
 
-        # Todo list features - Firefly is read-only, so we only support viewing
+        # Todo list features - Firefly is read-only, so we only support viewing  # pylint: disable=line-too-long
         self._attr_supported_features = TodoListEntityFeature(0)  # Read-only
 
     @property
@@ -98,7 +100,7 @@ class FireflyTodoListEntity(CoordinatorEntity, TodoListEntity):
             child_name = child_data.get("name")
             if child_name:
                 return f"{self._base_name} ({child_name})"
-        return self._attr_name
+        return self._attr_name or f"{self._base_name} ({self._child_guid[:8]})"
 
     @property
     def available(self) -> bool:
@@ -117,30 +119,30 @@ class FireflyTodoListEntity(CoordinatorEntity, TodoListEntity):
 
         # Get data for this specific child
         children_data = self.coordinator.data.get("children_data", {})
-        
+
         if self._child_guid not in children_data:
             return None
-            
+
         child_data = children_data[self._child_guid]
         tasks = child_data.get("tasks", {})
-        
+
         todo_items = []
-        
+
         # Add upcoming tasks
         upcoming_tasks = tasks.get("upcoming", [])
         for task in upcoming_tasks:
             todo_items.append(self._create_todo_item(task, TodoItemStatus.NEEDS_ACTION))
-        
+
         # Add overdue tasks
         overdue_tasks = tasks.get("overdue", [])
         for task in overdue_tasks:
             todo_items.append(self._create_todo_item(task, TodoItemStatus.NEEDS_ACTION))
-        
+
         # Add tasks due today
         due_today_tasks = tasks.get("due_today", [])
         for task in due_today_tasks:
             todo_items.append(self._create_todo_item(task, TodoItemStatus.NEEDS_ACTION))
-        
+
         return todo_items
 
     def _create_todo_item(self, task_data: Dict[str, Any], status: TodoItemStatus) -> TodoItem:
@@ -148,20 +150,21 @@ class FireflyTodoListEntity(CoordinatorEntity, TodoListEntity):
         # Create unique ID from task data
         uid = f"{task_data.get('id', '')}_{task_data.get('title', '')}"
         uid = uid.replace(" ", "_").replace("/", "_")[:50]  # Limit length and sanitize
-        
+
         # Use task title directly without subject prefix
         title = task_data.get("title", "Untitled Task")
         summary = title
-        
-        # Handle due date - can be date or datetime
+
+        # Handle due date - convert date to datetime if needed
         due = None
         if task_data.get("due_date"):
             due_date = task_data["due_date"]
             if isinstance(due_date, datetime):
                 due = due_date
             elif isinstance(due_date, date):
-                due = due_date
-        
+                # Convert date to datetime at midnight
+                due = datetime.combine(due_date, datetime.min.time())
+
         # Create description with additional details
         description_parts = []
         if task_data.get("task_type"):
@@ -170,9 +173,9 @@ class FireflyTodoListEntity(CoordinatorEntity, TodoListEntity):
             description_parts.append(f"Set by: {task_data['setter']}")
         if task_data.get("description"):
             description_parts.append(task_data["description"])
-        
+
         description = "\n".join(description_parts) if description_parts else None
-        
+
         return TodoItem(
             uid=uid,
             summary=summary,
@@ -181,22 +184,22 @@ class FireflyTodoListEntity(CoordinatorEntity, TodoListEntity):
             description=description,
         )
 
-    async def async_create_todo_item(self, item: TodoItem) -> None:
+    async def async_create_todo_item(self, item: TodoItem) -> None:  # pylint: disable=unused-argument
         """Create a new todo item."""
         raise NotImplementedError("Firefly Cloud integration is read-only")
 
-    async def async_delete_todo_items(self, uids: list[str]) -> None:
+    async def async_delete_todo_items(self, uids: list[str]) -> None:  # pylint: disable=unused-argument
         """Delete todo items."""
         raise NotImplementedError("Firefly Cloud integration is read-only")
 
-    async def async_update_todo_item(self, item: TodoItem) -> None:
+    async def async_update_todo_item(self, item: TodoItem) -> None:  # pylint: disable=unused-argument
         """Update a todo item."""
         raise NotImplementedError("Firefly Cloud integration is read-only")
 
     async def async_move_todo_item(
         self,
-        uid: str,
-        previous_uid: str | None = None
+        uid: str,  # pylint: disable=unused-argument
+        previous_uid: str | None = None  # pylint: disable=unused-argument
     ) -> None:
         """Move a todo item."""
         raise NotImplementedError("Firefly Cloud integration is read-only")

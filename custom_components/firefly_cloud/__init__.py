@@ -1,5 +1,4 @@
 """The Firefly Cloud integration."""
-import asyncio
 import logging
 
 from homeassistant.config_entries import ConfigEntry
@@ -18,7 +17,6 @@ from .const import (
     CONF_USER_GUID,
     DEFAULT_TASK_LOOKAHEAD_DAYS,
     DOMAIN,
-    PARALLEL_UPDATES,
 )
 from .coordinator import FireflyUpdateCoordinator
 from .exceptions import (
@@ -46,7 +44,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Get task lookahead days from options or data
     task_lookahead_days = (
         entry.options.get(CONF_TASK_LOOKAHEAD_DAYS) or
-        entry.data.get(CONF_TASK_LOOKAHEAD_DAYS, DEFAULT_TASK_LOOKAHEAD_DAYS)
+        entry.data.get(CONF_TASK_LOOKAHEAD_DAYS) or
+        DEFAULT_TASK_LOOKAHEAD_DAYS
     )
 
     # Create HTTP session
@@ -134,7 +133,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if coordinator:
             try:
                 await coordinator.async_shutdown()
-            except Exception as err:
+            except Exception as err:  # pylint: disable=broad-except
                 _LOGGER.warning("Error shutting down coordinator: %s", err)
 
         # Clean up hass.data if this was the last entry

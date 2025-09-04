@@ -1,6 +1,5 @@
 """Firefly Cloud API client."""
 import asyncio
-import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 from urllib.parse import quote
@@ -33,7 +32,6 @@ from .exceptions import (
     FireflyTokenExpiredError,
 )
 
-_LOGGER = logging.getLogger(__name__)
 
 
 class FireflyAPIClient:
@@ -104,10 +102,16 @@ class FireflyAPIClient:
                 f"&device_id={device_id}&app_id={DEFAULT_APP_ID}"
             )
 
+            name_elem = response_elem.find("name")
+            id_elem = response_elem.find("installationId")
+
+            if name_elem is None or id_elem is None:
+                raise FireflyDataError("Missing required school data")
+
             return {
                 "enabled": response_elem.get("enabled", "false") == "true",
-                "name": response_elem.find("name").text,
-                "id": response_elem.find("installationId").text,
+                "name": name_elem.text,
+                "id": id_elem.text,
                 "host": host,
                 "ssl": ssl,
                 "url": url,
@@ -140,10 +144,20 @@ class FireflyAPIClient:
             if version_elem is None:
                 raise FireflyDataError("Invalid version response")
 
+            major_elem = version_elem.find("majorVersion")
+            minor_elem = version_elem.find("minorVersion")
+            increment_elem = version_elem.find("incrementVersion")
+
+            if major_elem is None or minor_elem is None or increment_elem is None:
+                raise FireflyDataError("Missing version data")
+
+            if major_elem.text is None or minor_elem.text is None or increment_elem.text is None:
+                raise FireflyDataError("Empty version data")
+
             return {
-                "major": int(version_elem.find("majorVersion").text),
-                "minor": int(version_elem.find("minorVersion").text),
-                "increment": int(version_elem.find("incrementVersion").text),
+                "major": int(major_elem.text),
+                "minor": int(minor_elem.text),
+                "increment": int(increment_elem.text),
             }
         except (etree.XMLSyntaxError, ValueError, AttributeError) as err:
             raise FireflyDataError(f"Invalid version data: {err}") from err
@@ -199,6 +213,9 @@ class FireflyAPIClient:
 
             if secret_elem is None or user_elem is None:
                 raise FireflyAuthenticationError("Missing authentication data")
+
+            if secret_elem.text is None:
+                raise FireflyAuthenticationError("Empty secret in authentication response")
 
             user_info = {
                 "username": user_elem.get("username"),
@@ -257,7 +274,7 @@ class FireflyAPIClient:
                         "Timeout executing GraphQL query") from exc
                 await asyncio.sleep(RETRY_DELAY_BASE ** attempt)
                 continue
-            except (FireflyTokenExpiredError, FireflyRateLimitError):
+            except (FireflyTokenExpiredError, FireflyRateLimitError):  # pylint: disable=try-except-raise
                 raise
             except aiohttp.ClientError as err:
                 if attempt == MAX_RETRIES - 1:
@@ -265,7 +282,7 @@ class FireflyAPIClient:
                         f"Error executing query: {err}") from err
                 await asyncio.sleep(RETRY_DELAY_BASE ** attempt)
                 continue
-        
+
         # This should never be reached due to MAX_RETRIES logic, but satisfy type checker
         raise FireflyConnectionError("Failed to execute GraphQL query after all retries")
 
@@ -318,7 +335,7 @@ class FireflyAPIClient:
         if not user_guid:
             raise FireflyAuthenticationError("No user GUID available")
 
-        # struggling a bit with getting the events via graphql 
+        # struggling a bit with getting the events via graphql
         # query - 500 internal server error
         # Use the REST API for timetable data
         return await self._get_events_rest_api(start, end, user_guid)
@@ -386,7 +403,7 @@ class FireflyAPIClient:
                         "Timeout getting events via REST API") from exc
                 await asyncio.sleep(RETRY_DELAY_BASE ** attempt)
                 continue
-            except (FireflyTokenExpiredError, FireflyRateLimitError):
+            except (FireflyTokenExpiredError, FireflyRateLimitError):  # pylint: disable=try-except-raise
                 raise
             except aiohttp.ClientError as err:
                 if attempt == MAX_RETRIES - 1:
@@ -455,7 +472,7 @@ class FireflyAPIClient:
                     raise FireflyConnectionError("Timeout getting tasks") from exc
                 await asyncio.sleep(RETRY_DELAY_BASE ** attempt)
                 continue
-            except (FireflyTokenExpiredError, FireflyRateLimitError):
+            except (FireflyTokenExpiredError, FireflyRateLimitError):  # pylint: disable=try-except-raise
                 raise
             except aiohttp.ClientError as err:
                 if attempt == MAX_RETRIES - 1:

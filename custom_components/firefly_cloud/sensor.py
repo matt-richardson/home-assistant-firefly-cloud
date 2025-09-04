@@ -1,9 +1,9 @@
 """Sensor platform for Firefly Cloud integration."""
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 import logging
 from typing import Any, Dict, List, Optional
 
-from homeassistant.components.sensor import SensorEntity
+from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -31,15 +31,15 @@ async def async_setup_entry(
 ) -> None:
     """Set up Firefly Cloud sensor platform."""
     coordinator: FireflyUpdateCoordinator = hass.data[DOMAIN][config_entry.entry_id]
-    
+
     # Get children GUIDs from config or use user GUID if no children
     children_guids = config_entry.data.get(CONF_CHILDREN_GUIDS, [])
     if not children_guids:
         children_guids = [config_entry.data[CONF_USER_GUID]]
-    
+
     # Create sensors for each child and each sensor type
     entities: List[SensorEntity] = []
-    
+
     for child_guid in children_guids:
         for sensor_type in SENSOR_TYPES:
             entities.append(
@@ -50,7 +50,7 @@ async def async_setup_entry(
                     child_guid=child_guid,
                 )
             )
-    
+
     async_add_entities(entities)
 
 
@@ -70,17 +70,28 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
         self._sensor_type = sensor_type
         self._sensor_config = SENSOR_TYPES[sensor_type]
         self._child_guid = child_guid
-        
+
         # Generate unique entity ID
         school_name = config_entry.data.get(CONF_SCHOOL_NAME, "firefly")
         self._attr_unique_id = f"{config_entry.entry_id}_{sensor_type}_{child_guid}"
-        
+
         # Set entity properties - will be updated with child name when data is available
         self._base_name = f"{school_name} {self._sensor_config['name']}"
         self._attr_name = f"{self._base_name} ({child_guid[:8]})"
         self._attr_icon = self._sensor_config["icon"]
         self._attr_native_unit_of_measurement = self._sensor_config["unit"]
-        self._attr_device_class = self._sensor_config["device_class"]
+        # Only set device_class if it's not None and cast to proper type
+        device_class = self._sensor_config.get("device_class")
+        if device_class is not None:
+            # Cast to SensorDeviceClass if it's a string, otherwise use as-is
+            if isinstance(device_class, str):
+                try:
+                    self._attr_device_class = SensorDeviceClass(device_class)
+                except ValueError:
+                    # If the string doesn't match any SensorDeviceClass, skip setting it
+                    pass
+            else:
+                self._attr_device_class = device_class
 
         # Device info for grouping
         self._attr_device_info = DeviceInfo(
@@ -100,7 +111,7 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
             child_name = child_data.get("name")
             if child_name:
                 return f"{self._base_name} ({child_name})"
-        return self._attr_name
+        return self._attr_name or f"{self._base_name} ({self._child_guid[:8]})"
 
     @property
     def available(self) -> bool:
@@ -119,17 +130,17 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
 
         # Get data for this specific child
         children_data = self.coordinator.data.get("children_data", {})
-        
+
         # Return None if child doesn't exist
         if self._child_guid not in children_data:
             return None
-            
+
         child_data = children_data[self._child_guid]
-        
+
         try:
             if self._sensor_type == SENSOR_UPCOMING_TASKS:
                 return len(child_data.get("tasks", {}).get("upcoming", []))
-            elif self._sensor_type == SENSOR_TASKS_DUE_TODAY:
+            if self._sensor_type == SENSOR_TASKS_DUE_TODAY:
                 return len(child_data.get("tasks", {}).get("due_today", []))
         except (KeyError, TypeError, AttributeError):
             return 0
@@ -161,15 +172,17 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
         """Get attributes for upcoming tasks sensor."""
         tasks = child_data.get("tasks", {}).get("upcoming", [])
         overdue_tasks = child_data.get("tasks", {}).get("overdue", [])
-        
-        # Group tasks by subject
-        if hasattr(self.coordinator, 'get_tasks_by_subject'):
-            tasks_by_subject = self.coordinator.get_tasks_by_subject()
-        else:
-            tasks_by_subject = {}
-        
+
+        # Group tasks by subject - simplified since the method doesn't exist
+        tasks_by_subject: Dict[str, List[Dict[str, Any]]] = {}
+        for task in tasks:
+            subject = task.get("subject", "Unknown")
+            if subject not in tasks_by_subject:
+                tasks_by_subject[subject] = []
+            tasks_by_subject[subject].append(task)
+
         # Group tasks by due date
-        tasks_by_due_date = {}
+        tasks_by_due_date: Dict[str, List[Dict[str, Any]]] = {}
         for task in tasks:
             if task["due_date"]:
                 due_date_str = task["due_date"].strftime("%Y-%m-%d")
@@ -180,7 +193,7 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
                     "subject": task["subject"],
                     "task_type": task["task_type"],
                 })
-        
+
         return {
             "tasks": [
                 {
@@ -241,13 +254,13 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
     def _get_tasks_due_today_attributes(self, child_data: Dict[str, Any]) -> Dict[str, Any]:
         """Get attributes for tasks due today sensor."""
         tasks = child_data.get("tasks", {}).get("due_today", [])
-        
+
         # Categorize by urgency/type
         urgent_tasks = [
             task for task in tasks
             if task["task_type"] in ["test", "project"] or "urgent" in task["title"].lower()
         ]
-        
+
         return {
             "tasks": [
                 {
@@ -255,7 +268,11 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
                     "subject": task["subject"],
                     "task_type": task["task_type"],
                     "setter": task["setter"],
-                    "description": task["description"][:100] + "..." if len(task["description"]) > 100 else task["description"],
+                    "description": (
+                        task["description"][:100] + "..."
+                        if task["description"] and len(task["description"]) > 100
+                        else task["description"]
+                    ),
                 }
                 for task in tasks
             ],
@@ -275,3 +292,4 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
             "project_count": len([t for t in tasks if t["task_type"] == "project"]),
             "test_count": len([t for t in tasks if t["task_type"] == "test"]),
         }
+
