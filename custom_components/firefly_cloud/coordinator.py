@@ -42,6 +42,7 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
         self.task_lookahead_days = task_lookahead_days
         self.children_guids = children_guids or []
         self._user_info: Optional[Dict[str, Any]] = None
+        self._children_info: Optional[List[Dict[str, Any]]] = None
 
     async def _async_update_data(self) -> Dict[str, Any]:
         """Fetch data from Firefly API."""
@@ -49,6 +50,14 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
             # Get user info if we don't have it
             if not self._user_info:
                 self._user_info = await self.api.get_user_info()
+            
+            # Get children info if we don't have it and we have children GUIDs
+            if not self._children_info and self.children_guids:
+                try:
+                    self._children_info = await self.api.get_children_info()
+                except Exception as err:
+                    _LOGGER.warning("Failed to fetch children info: %s", err)
+                    self._children_info = []
 
             # Calculate date ranges (timezone-aware)
             now = datetime.now(timezone.utc)
@@ -330,11 +339,19 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
         return list(set(requirements))  # Remove duplicates
 
     def _extract_child_name(self, child_guid: str) -> Optional[str]:
-        """Extract child name from user info or return None if not available."""
-        if not self._user_info or child_guid == self._user_info.get("guid"):
-            # This is the main user account
-            return self._user_info.get("name") if self._user_info else None
+        """Extract child name from user info or children info."""
+        if not self._user_info:
+            return None
+            
+        # Check if this is the main user account
+        if child_guid == self._user_info.get("guid"):
+            return self._user_info.get("name") or self._user_info.get("fullname")
         
-        # For children, we would need additional API calls to get their names
-        # For now, return None and let the entity handle fallback display
+        # For children, look up their names from children info
+        if self._children_info:
+            for child in self._children_info:
+                if child.get("guid") == child_guid:
+                    return child.get("name") or child.get("fullname")
+        
+        # If no match found, return None and let entity handle fallback
         return None
