@@ -33,7 +33,6 @@ from .exceptions import (
 )
 
 
-
 class FireflyAPIClient:
     """Firefly Cloud API client."""
 
@@ -358,7 +357,6 @@ class FireflyAPIClient:
             "datetime": start.strftime('%Y-%m-%dT%H:%M')
         }
 
-
         for attempt in range(MAX_RETRIES):
             try:
                 async with async_timeout.timeout(TIMEOUT_SECONDS):
@@ -449,7 +447,6 @@ class FireflyAPIClient:
         # Add student GUID filter if provided (for parent accounts)
         if student_guid:
             payload["forStudentGuid"] = student_guid
-
 
         for attempt in range(MAX_RETRIES):
             try:

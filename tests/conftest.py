@@ -7,6 +7,7 @@ import pytest
 import pytest_asyncio
 from homeassistant.config_entries import ConfigEntry
 
+
 # Configure pytest for Home Assistant testing
 @pytest_asyncio.fixture
 async def hass():

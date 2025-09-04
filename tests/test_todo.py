@@ -17,7 +17,7 @@ def mock_coordinator():
     """Create a mock coordinator."""
     coordinator = Mock(spec=FireflyUpdateCoordinator)
     coordinator.last_update_success = True
-    
+
     # Mock data structure matching the coordinator
     mock_task = {
         "id": "task123",
@@ -28,7 +28,7 @@ def mock_coordinator():
         "setter": "Mr. Smith",
         "description": "Complete exercises 1-10",
     }
-    
+
     coordinator.data = {
         "children_data": {
             "child123": {
@@ -41,7 +41,7 @@ def mock_coordinator():
             }
         }
     }
-    
+
     return coordinator
 
 
@@ -78,12 +78,12 @@ class TestFireflyTodoListEntity:
         assert todo_entity.unique_id == "test_entry_todo_child123"
         assert "Test School Tasks" in todo_entity._base_name
         assert todo_entity.icon == "mdi:clipboard-check"
-        
+
         # Test device info
         device_info = todo_entity.device_info
         assert device_info["name"] == "Firefly Cloud - Test School"
         assert device_info["manufacturer"] == "Firefly Learning"
-        
+
         # Test supported features (read-only)
         assert todo_entity.supported_features == 0
 
@@ -117,7 +117,7 @@ class TestFireflyTodoListEntity:
         """Test todo items property."""
         items = todo_entity.todo_items
         assert len(items) == 2  # upcoming + due_today (same task appears twice)
-        
+
         # Test first item
         item = items[0]
         assert isinstance(item, TodoItem)
@@ -142,16 +142,16 @@ class TestFireflyTodoListEntity:
         """Test creating todo item from task data."""
         task_data = {
             "id": "test123",
-            "title": "Science Project", 
+            "title": "Science Project",
             "subject": "Science",
             "due_date": datetime(2023, 12, 25, 9, 0, 0, tzinfo=timezone.utc),
             "task_type": "project",
             "setter": "Ms. Johnson",
             "description": "Build a volcano model",
         }
-        
+
         item = todo_entity._create_todo_item(task_data, TodoItemStatus.NEEDS_ACTION)
-        
+
         assert item.summary == "Science Project"
         assert item.status == TodoItemStatus.NEEDS_ACTION
         assert item.due == datetime(2023, 12, 25, 9, 0, 0, tzinfo=timezone.utc)
@@ -165,9 +165,9 @@ class TestFireflyTodoListEntity:
         task_data = {
             "title": "Basic Task",
         }
-        
+
         item = todo_entity._create_todo_item(task_data, TodoItemStatus.NEEDS_ACTION)
-        
+
         assert item.summary == "Basic Task"
         assert item.status == TodoItemStatus.NEEDS_ACTION
         assert item.due is None
@@ -181,16 +181,16 @@ class TestFireflyTodoListEntity:
             summary="Test Task",
             status=TodoItemStatus.NEEDS_ACTION
         )
-        
+
         with pytest.raises(NotImplementedError, match="read-only"):
             await todo_entity.async_create_todo_item(test_item)
-        
+
         with pytest.raises(NotImplementedError, match="read-only"):
             await todo_entity.async_delete_todo_items(["test"])
-        
+
         with pytest.raises(NotImplementedError, match="read-only"):
             await todo_entity.async_update_todo_item(test_item)
-        
+
         with pytest.raises(NotImplementedError, match="read-only"):
             await todo_entity.async_move_todo_item("test", "prev")
 
@@ -199,7 +199,7 @@ class TestFireflyTodoListEntity:
 async def test_async_setup_entry():
     """Test the async_setup_entry function."""
     from custom_components.firefly_cloud.todo import async_setup_entry
-    
+
     hass = Mock(spec=HomeAssistant)
     config_entry = Mock(spec=ConfigEntry)
     config_entry.entry_id = "test_entry"
@@ -207,14 +207,14 @@ async def test_async_setup_entry():
         CONF_SCHOOL_NAME: "Test School",
         CONF_USER_GUID: "user123",
     }
-    
+
     coordinator = Mock(spec=FireflyUpdateCoordinator)
     hass.data = {DOMAIN: {"test_entry": coordinator}}
-    
+
     async_add_entities = AsyncMock()
-    
+
     await async_setup_entry(hass, config_entry, async_add_entities)
-    
+
     # Verify entity was created and added
     async_add_entities.assert_called_once()
     entities = async_add_entities.call_args[0][0]

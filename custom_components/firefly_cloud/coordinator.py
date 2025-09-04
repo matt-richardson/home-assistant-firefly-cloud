@@ -224,7 +224,6 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
         """Filter tasks by date range."""
         filtered_tasks = []
 
-
         # Ensure start and end are timezone-aware for comparison
         if start.tzinfo is None:
             start = start.replace(tzinfo=timezone.utc)

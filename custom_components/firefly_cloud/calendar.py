@@ -83,21 +83,29 @@ class FireflyCalendar(CoordinatorEntity, CalendarEntity):
             configuration_url=config_entry.data.get("host"),
         )
 
-    @property
-    def name(self) -> str:
-        """Return the display name of the calendar."""
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        self._update_name()
+        super()._handle_coordinator_update()
+
+    def _update_name(self) -> None:
+        """Update the entity name based on child data."""
         if self.coordinator.data and self._child_guid in self.coordinator.data.get("children_data", {}):
             child_data = self.coordinator.data["children_data"][self._child_guid]
             child_name = child_data.get("name")
             if child_name:
-                return f"{self._base_name} ({child_name})"
-        return self._attr_name or f"{self._base_name} ({self._child_guid[:8]})"
+                self._attr_name = f"{self._base_name} ({child_name})"
+            else:
+                self._attr_name = f"{self._base_name} ({self._child_guid[:8]})"
+        else:
+            self._attr_name = f"{self._base_name} ({self._child_guid[:8]})"
 
     @property
     def available(self) -> bool:
         """Return True if entity is available."""
+        # Use coordinator's availability check AND verify child data exists
         return (
-            self.coordinator.last_update_success
+            super().available
             and self.coordinator.data is not None
             and self._child_guid in self.coordinator.data.get("children_data", {})
         )
