@@ -8,7 +8,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
 from .const import (
@@ -50,7 +50,7 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class FireflyCalendar(CoordinatorEntity, CalendarEntity):
+class FireflyCalendar(CalendarEntity):
     """Firefly Cloud calendar entity."""
 
     def __init__(
@@ -60,9 +60,11 @@ class FireflyCalendar(CoordinatorEntity, CalendarEntity):
         child_guid: str,
     ) -> None:
         """Initialize the calendar."""
-        super().__init__(coordinator)
+        super().__init__()
+        self.coordinator = coordinator
         self._config_entry = config_entry
         self._child_guid = child_guid
+        self._unsub_coordinator = None
 
         # Generate unique entity ID
         school_name = config_entry.data.get(CONF_SCHOOL_NAME, "firefly")
@@ -72,6 +74,8 @@ class FireflyCalendar(CoordinatorEntity, CalendarEntity):
         self._base_name = f"{school_name} Schedule"
         self._attr_name = f"{self._base_name} ({child_guid[:8]})"
         self._attr_icon = "mdi:calendar-month"
+        self._attr_should_poll = False
+        self._attr_available = False  # Will be updated by coordinator
 
         # Device info for grouping
         self._attr_device_info = DeviceInfo(
@@ -83,10 +87,33 @@ class FireflyCalendar(CoordinatorEntity, CalendarEntity):
             configuration_url=config_entry.data.get("host"),
         )
 
+    async def async_added_to_hass(self) -> None:
+        """When entity is added to hass."""
+        await super().async_added_to_hass()
+        # Subscribe to coordinator updates
+        self._unsub_coordinator = self.coordinator.async_add_listener(  # type: ignore
+            self._handle_coordinator_update
+        )
+
+    async def async_will_remove_from_hass(self) -> None:
+        """When entity will be removed from hass."""
+        if self._unsub_coordinator:
+            self._unsub_coordinator()
+        await super().async_will_remove_from_hass()
+
+    def _update_availability(self) -> None:
+        """Update the entity availability based on coordinator data."""
+        self._attr_available = (
+            self.coordinator.last_update_success
+            and self.coordinator.data is not None
+            and self._child_guid in self.coordinator.data.get("children_data", {})
+        )
+
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
         self._update_name()
-        super()._handle_coordinator_update()
+        self._update_availability()
+        self.async_write_ha_state()
 
     def _update_name(self) -> None:
         """Update the entity name based on child data."""
@@ -100,15 +127,6 @@ class FireflyCalendar(CoordinatorEntity, CalendarEntity):
         else:
             self._attr_name = f"{self._base_name} ({self._child_guid[:8]})"
 
-    @property
-    def available(self) -> bool:
-        """Return True if entity is available."""
-        # Use coordinator's availability check AND verify child data exists
-        return (
-            super().available
-            and self.coordinator.data is not None
-            and self._child_guid in self.coordinator.data.get("children_data", {})
-        )
 
     @property
     def event(self) -> Optional[CalendarEvent]:
@@ -116,8 +134,12 @@ class FireflyCalendar(CoordinatorEntity, CalendarEntity):
         if not self.coordinator.data:
             return None
 
+        # Check if child data exists
+        if self._child_guid not in self.coordinator.data.get("children_data", {}):
+            return None
+
         # Get events for this child
-        child_data = self.coordinator.data.get("children_data", {}).get(self._child_guid, {})
+        child_data = self.coordinator.data["children_data"][self._child_guid]
         events = child_data.get("events", {}).get("week", [])
 
         if not events:
@@ -148,8 +170,12 @@ class FireflyCalendar(CoordinatorEntity, CalendarEntity):
         if not self.coordinator.data:
             return []
 
+        # Check if child data exists
+        if self._child_guid not in self.coordinator.data.get("children_data", {}):
+            return []
+
         # Get events for this child
-        child_data = self.coordinator.data.get("children_data", {}).get(self._child_guid, {})
+        child_data = self.coordinator.data["children_data"][self._child_guid]
         events = child_data.get("events", {}).get("week", [])
 
         # Filter events within the requested date range
