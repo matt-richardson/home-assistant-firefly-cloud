@@ -404,6 +404,35 @@ async def test_calendar_event_build_description_with_many_attendees(mock_coordin
 
 
 @pytest.mark.asyncio
+async def test_calendar_event_build_description_with_dict_attendees(mock_coordinator, mock_config_entry):
+    """Test calendar event description with dictionary attendees (real API format)."""
+    calendar = FireflyCalendar(mock_coordinator, mock_config_entry, "test-child-123")
+
+    # Event with dictionary attendees (how they come from the real API)
+    event_data = {
+        "start": dt_util.now(),
+        "end": dt_util.now() + timedelta(hours=1),
+        "subject": "Chemistry Lab",
+        "location": "Science Lab 1",
+        "description": "Bring safety goggles",
+        "guild": "Year 11",
+        "attendees": [
+            {"name": "Dr. Smith", "role": "teacher"},
+            {"name": "Ms. Johnson", "role": "assistant"},
+            {"name": "Mr. Brown"},  # Missing role
+        ],
+    }
+
+    calendar_event = calendar._convert_to_calendar_event(event_data)
+
+    assert calendar_event.summary == "Chemistry Lab"
+    assert calendar_event.location == "Science Lab 1"
+    assert "Bring safety goggles" in calendar_event.description
+    assert "Class: Year 11" in calendar_event.description
+    assert "Attendees: Dr. Smith, Ms. Johnson, Mr. Brown" in calendar_event.description
+
+
+@pytest.mark.asyncio
 async def test_calendar_no_coordinator_data(mock_config_entry):
     """Test calendar with no coordinator data."""
     coordinator = MagicMock()

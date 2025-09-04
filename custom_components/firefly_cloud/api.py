@@ -342,15 +342,10 @@ class FireflyAPIClient:
         }}
         """
 
-        try:
-            data = await self._graphql_query(query)
-            return data.get("events", [])
-        # except aiohttp.ClientResponseError as err:
-        except FireflyConnectionError as err:
-            _LOGGER.warning(
-                "GraphQL events query failed, trying REST API: %s", err)
-            # Fallback to REST API for timetable data
-            return await self._get_events_rest_api(start, end, user_guid)
+        # struggling a bit with getting the events via graphql 
+        # query - 500 internal server error
+        # Use the REST API for timetable data
+        return await self._get_events_rest_api(start, end, user_guid)
 
     async def _get_events_rest_api(
         self, start: datetime, end: datetime, user_guid: str

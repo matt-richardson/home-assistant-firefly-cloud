@@ -177,7 +177,18 @@ class FireflyCalendar(CoordinatorEntity, CalendarEntity):
             description_parts.append(f"Class: {event['guild']}")
         
         if event.get("attendees"):
-            attendees_str = ", ".join(event["attendees"][:5])  # Limit to first 5
+            attendees = event["attendees"][:5]  # Limit to first 5
+            # Handle both string and dict attendees
+            attendee_names = []
+            for attendee in attendees:
+                if isinstance(attendee, dict):
+                    # Extract name from dict
+                    attendee_names.append(attendee.get("name", "Unknown"))
+                else:
+                    # Already a string
+                    attendee_names.append(str(attendee))
+            
+            attendees_str = ", ".join(attendee_names)
             if len(event["attendees"]) > 5:
                 attendees_str += f" and {len(event['attendees']) - 5} more"
             description_parts.append(f"Attendees: {attendees_str}")
