@@ -154,9 +154,14 @@ Test integration behavior with:
 If not using the dev container, you'll need:
 
 1. **Python 3.11+** with pip
-2. **Dependencies**: `pip install homeassistant aiohttp lxml python-dateutil voluptuous`
-3. **Development Tools**: `pip install pytest pytest-asyncio pytest-cov black flake8 mypy pylint`
-4. **Testing**: Run `pytest tests/` from the project root
+2. **Virtual Environment**: 
+   ```bash
+   python -m venv venv
+   source venv/bin/activate
+   ```
+3. **Dependencies**: `pip install homeassistant aiohttp lxml python-dateutil voluptuous`
+4. **Development Tools**: `pip install pytest pytest-asyncio pytest-cov black flake8 mypy pylint`
+5. **Testing**: Run `pytest tests/` from the project root
 
 ### Additional Resources
 
