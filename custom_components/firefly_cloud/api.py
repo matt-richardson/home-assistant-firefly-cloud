@@ -318,30 +318,6 @@ class FireflyAPIClient:
         if not user_guid:
             raise FireflyAuthenticationError("No user GUID available")
 
-        query = f"""
-        query GetEvents {{
-            events(
-                start: "{start.strftime('%Y-%m-%dT%H:%M:%S')}Z",
-                end: "{end.strftime('%Y-%m-%dT%H:%M:%S')}Z",
-                for_guid: "{user_guid}"
-            ) {{
-                guid,
-                end,
-                location,
-                start,
-                subject,
-                description,
-                attendees {{
-                    role,
-                    principal {{
-                        guid,
-                        name
-                    }}
-                }}
-            }}
-        }}
-        """
-
         # struggling a bit with getting the events via graphql 
         # query - 500 internal server error
         # Use the REST API for timetable data

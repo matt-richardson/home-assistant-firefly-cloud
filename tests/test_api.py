@@ -215,23 +215,6 @@ async def test_graphql_query_api_errors(api_client, mock_aiohttp_session):
 
 
 @pytest.mark.asyncio
-async def test_get_events_success(api_client, mock_events):
-    """Test successful event retrieval."""
-    api_client._user_info = {"guid": "test-user-123"}
-
-    with patch.object(api_client, "_graphql_query") as mock_query:
-        mock_query.return_value = {"events": mock_events}
-
-        start = datetime(2023, 1, 1, 9, 0)
-        end = datetime(2023, 1, 1, 17, 0)
-
-        result = await api_client.get_events(start, end)
-
-        assert len(result) == len(mock_events)
-        assert result == mock_events
-
-
-@pytest.mark.asyncio
 async def test_get_tasks_success(api_client, mock_aiohttp_session, mock_tasks):
     """Test successful task retrieval."""
     from tests.conftest import mock_http_response
@@ -361,23 +344,6 @@ async def test_get_children_info_no_user(api_client):
 
 
 @pytest.mark.asyncio
-async def test_get_events_with_user_guid(api_client, mock_events):
-    """Test getting events with specific user GUID."""
-    with patch.object(api_client, "_graphql_query") as mock_query:
-        mock_query.return_value = {"events": mock_events}
-
-        start = datetime(2023, 1, 1, 9, 0)
-        end = datetime(2023, 1, 1, 17, 0)
-
-        result = await api_client.get_events(start, end, "custom-user-123")
-
-        assert result == mock_events
-        mock_query.assert_called_once()
-        query = mock_query.call_args[0][0]
-        assert "custom-user-123" in query
-
-
-@pytest.mark.asyncio
 async def test_get_events_no_user_guid(api_client):
     """Test getting events without user GUID."""
     start = datetime(2023, 1, 1, 9, 0)
@@ -400,9 +366,6 @@ async def test_get_tasks_rate_limit(api_client, mock_aiohttp_session):
 
     with pytest.raises(FireflyRateLimitError):
         await api_client.get_tasks()
-
-
-# Remove this test since get_tasks doesn't accept user_guid parameter
 
 
 @pytest.mark.asyncio
