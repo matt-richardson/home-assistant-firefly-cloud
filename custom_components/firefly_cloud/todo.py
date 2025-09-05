@@ -1,7 +1,6 @@
 """Todo platform for Firefly Cloud integration."""
 
 from datetime import datetime, date
-import logging
 from typing import Any, Dict, List, Optional
 
 from homeassistant.components.todo import (
@@ -26,7 +25,6 @@ from .const import (
 )
 from .coordinator import FireflyUpdateCoordinator
 
-_LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(
