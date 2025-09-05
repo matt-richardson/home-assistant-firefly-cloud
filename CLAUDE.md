@@ -56,8 +56,9 @@ Target test structure in `tests/` with fixtures in `tests/fixtures/`.
 
 ## Development Workflow
 
+Use `venv` when running tests
 Always run tests before saying that a change is complete.
-Always commit to git after a change is complete.
+Always ask the user if they want commit to git after a change is complete.
 
 ## Manual Testing Approach
 
