@@ -1,13 +1,13 @@
 """Test the Firefly Cloud config flow."""
 
-from unittest.mock import AsyncMock, patch
+from types import MappingProxyType
+from unittest.mock import patch
 
 import pytest
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 
-from custom_components.firefly_cloud.config_flow import FireflyCloudConfigFlow
 from custom_components.firefly_cloud.const import DOMAIN
 from custom_components.firefly_cloud.exceptions import (
     FireflyAuthenticationError,
@@ -336,7 +336,7 @@ async def test_abort_if_already_configured(hass: HomeAssistant) -> None:
         entry_id="existing-entry-id",
         unique_id="testschool",
         source="user",
-        discovery_keys={},
+        discovery_keys=MappingProxyType({}),
         subentries_data={},
     )
     # Add to the config entries registry

@@ -53,7 +53,7 @@ class FireflyCloudConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._school_info: Optional[Dict[str, Any]] = None
         self._api_client: Optional[FireflyAPIClient] = None
 
-    async def async_step_user(self, user_input: Optional[Dict[str, Any]] = None) -> FlowResult:  # type: ignore[override]
+    async def async_step_user(self, user_input: Optional[Dict[str, Any]] = None):  # type: ignore[override]
         """Handle the initial step."""
         errors: Dict[str, str] = {}
 

@@ -8,6 +8,19 @@ import pytest
 import pytest_asyncio
 from homeassistant.config_entries import ConfigEntry
 
+from custom_components.firefly_cloud.const import (
+    CONF_CHILDREN_GUIDS,
+    CONF_DEVICE_ID,
+    CONF_HOST,
+    CONF_SCHOOL_CODE,
+    CONF_SCHOOL_NAME,
+    CONF_SECRET,
+    CONF_TASK_LOOKAHEAD_DAYS,
+    CONF_USER_GUID,
+    DEFAULT_TASK_LOOKAHEAD_DAYS,
+    DOMAIN,
+)
+
 
 # Configure pytest for Home Assistant testing
 @pytest_asyncio.fixture
@@ -47,28 +60,20 @@ async def hass():
         mock_integration.config_flow = True
         mock_integration.file_path = temp_dir + "/custom_components/firefly_cloud"
 
-        # Setup required Home Assistant components
+        # Setup required Home Assistant components and register config flow
         with patch("homeassistant.loader.async_get_integration", return_value=mock_integration):
             with patch("homeassistant.helpers.integration_platform.async_process_integration_platforms"):
-                await hass.async_start()
-                try:
-                    yield hass
-                finally:
-                    await hass.async_stop()
-
-
-from custom_components.firefly_cloud.const import (
-    CONF_CHILDREN_GUIDS,
-    CONF_DEVICE_ID,
-    CONF_HOST,
-    CONF_SCHOOL_CODE,
-    CONF_SCHOOL_NAME,
-    CONF_SECRET,
-    CONF_TASK_LOOKAHEAD_DAYS,
-    CONF_USER_GUID,
-    DEFAULT_TASK_LOOKAHEAD_DAYS,
-    DOMAIN,
-)
+                with patch("homeassistant.helpers.frame.report_usage"):
+                    # Import and register the config flow handler manually
+                    from custom_components.firefly_cloud.config_flow import FireflyCloudConfigFlow
+                    from homeassistant.config_entries import HANDLERS
+                    HANDLERS["firefly_cloud"] = FireflyCloudConfigFlow
+                    
+                    await hass.async_start()
+                    try:
+                        yield hass
+                    finally:
+                        await hass.async_stop()
 
 
 @pytest.fixture

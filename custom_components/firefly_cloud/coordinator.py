@@ -178,7 +178,7 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
             try:
                 due_date_str = task.get("dueDate")
                 set_date_str = task.get("setDate")
-                
+
                 # Handle due date parsing with fallback for invalid dates
                 due_date = None
                 if due_date_str:
@@ -187,7 +187,7 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
                     except (ValueError, TypeError):
                         _LOGGER.debug("Invalid due date format: %s", due_date_str)
                         due_date = None
-                        
+
                 # Handle set date parsing with fallback
                 set_date = None
                 if set_date_str:
@@ -205,7 +205,7 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
                         subject = subject_data.get("name", "Unknown Subject")
                     elif isinstance(subject_data, str):
                         subject = subject_data
-                        
+
                 processed_task = {
                     "id": task.get("guid", task.get("id", "unknown")),
                     "title": task.get("title", "Untitled Task"),
@@ -362,11 +362,7 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
         """Extract child name from user info or children info."""
         # Check if this is the main user account
         if self._user_info and child_guid == self._user_info.get("guid"):
-            return (
-                self._user_info.get("name") 
-                or self._user_info.get("fullname")
-                or self._user_info.get("username")
-            )
+            return self._user_info.get("name") or self._user_info.get("fullname") or self._user_info.get("username")
 
         # For children, look up their names from children info
         if self._children_info:

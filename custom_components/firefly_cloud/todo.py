@@ -153,8 +153,7 @@ class FireflyTodoListEntity(CoordinatorEntity, TodoListEntity):  # pylint: disab
         """Map Firefly completion status to TodoItemStatus."""
         if completion_status == "Done":
             return TodoItemStatus.COMPLETED
-        else:
-            return TodoItemStatus.NEEDS_ACTION
+        return TodoItemStatus.NEEDS_ACTION
 
     def _create_todo_item(self, task_data: Dict[str, Any], status: TodoItemStatus) -> TodoItem:
         """Create a TodoItem from task data."""

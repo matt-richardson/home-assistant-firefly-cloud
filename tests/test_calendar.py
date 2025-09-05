@@ -1,6 +1,6 @@
 """Test the Firefly Cloud calendar platform."""
 
-from datetime import timedelta
+from datetime import datetime, timezone, timedelta
 from types import MappingProxyType
 from unittest.mock import MagicMock
 
@@ -484,7 +484,7 @@ async def test_calendar_handles_missing_child_data_gracefully(hass, mock_config_
 @pytest.mark.asyncio
 async def test_calendar_convert_event_missing_start_time(hass, mock_config_entry):
     """Test calendar convert_event with missing start time."""
-    from datetime import datetime, timezone, timedelta
+
     coordinator = MagicMock()
     calendar = FireflyCalendar(coordinator, mock_config_entry, "test-child-123")
 
@@ -492,7 +492,7 @@ async def test_calendar_convert_event_missing_start_time(hass, mock_config_entry
     incomplete_event = {
         "end": datetime.now(timezone.utc) + timedelta(hours=1),
         "subject": "Test Event",
-        "location": "Room 101"
+        "location": "Room 101",
     }
 
     with pytest.raises(KeyError):
@@ -502,16 +502,12 @@ async def test_calendar_convert_event_missing_start_time(hass, mock_config_entry
 @pytest.mark.asyncio
 async def test_calendar_convert_event_missing_end_time(hass, mock_config_entry):
     """Test calendar convert_event with missing end time."""
-    from datetime import datetime, timezone, timedelta
+
     coordinator = MagicMock()
     calendar = FireflyCalendar(coordinator, mock_config_entry, "test-child-123")
 
     # Event missing end time
-    incomplete_event = {
-        "start": datetime.now(timezone.utc),
-        "subject": "Test Event",
-        "location": "Room 101"
-    }
+    incomplete_event = {"start": datetime.now(timezone.utc), "subject": "Test Event", "location": "Room 101"}
 
     with pytest.raises(KeyError):
         calendar._convert_to_calendar_event(incomplete_event)
@@ -528,7 +524,7 @@ async def test_calendar_get_events_no_week_events_data(hass, mock_config_entry):
                 "events": {
                     "week": []
                     # Missing "week" key
-                }
+                },
             }
         }
     }
@@ -546,7 +542,7 @@ async def test_calendar_get_events_no_week_events_data(hass, mock_config_entry):
 async def test_calendar_current_event_with_multiple_overlapping(hass, mock_config_entry):
     """Test calendar current event selection with multiple overlapping events."""
     now = dt_util.now()
-    
+
     coordinator = MagicMock()
     coordinator.data = {
         "children_data": {
@@ -564,16 +560,16 @@ async def test_calendar_current_event_with_multiple_overlapping(hass, mock_confi
                             "guild": None,
                         },
                         {
-                            "start": now - timedelta(minutes=15),  
+                            "start": now - timedelta(minutes=15),
                             "end": now + timedelta(minutes=45),
-                            "subject": "Study Hall", 
+                            "subject": "Study Hall",
                             "location": "Library",
                             "description": "Second class",
                             "attendees": [],
                             "guild": None,
-                        }
+                        },
                     ]
-                }
+                },
             }
         }
     }
@@ -593,12 +589,7 @@ async def test_calendar_build_description_none_values(hass, mock_config_entry):
     coordinator = MagicMock()
     calendar = FireflyCalendar(coordinator, mock_config_entry, "test-child-123")
 
-    event_data = {
-        "description": None,
-        "location": None,
-        "attendees": None,
-        "guild": None
-    }
+    event_data = {"description": None, "location": None, "attendees": None, "guild": None}
 
     description = calendar._build_event_description(event_data)
 

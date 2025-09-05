@@ -409,7 +409,7 @@ async def test_sensor_error_handling_malformed_data(mock_coordinator, mock_confi
                 "tasks": {
                     "upcoming": "not-a-list",  # Should be a list - len() will raise TypeError
                 }
-                # Missing other required keys  
+                # Missing other required keys
             }
         }
     }
@@ -426,77 +426,12 @@ async def test_sensor_no_coordinator_last_update_success(mock_coordinator, mock_
     """Test sensor when coordinator has no last_update_success attribute."""
     # Configure mock to properly return the attribute
     mock_coordinator.last_update_success = True
-    
+
     sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_UPCOMING_TASKS, "test-child-123")
 
     # Should be available if data exists and coordinator says so
     assert sensor.available is True
 
-
-@pytest.mark.asyncio 
-async def test_sensor_missing_child_tasks_returns_zero():
-    """Test sensor behavior with missing child tasks data."""
-    # Removed - sensor doesn't have _get_data method
-    pass
-
-
-@pytest.mark.asyncio
-async def test_sensor_get_data_with_missing_task_category(mock_coordinator, mock_config_entry):
-    """Test sensor _get_data method with missing task category."""
-    # Set up coordinator data without specific task category
-    mock_coordinator.data = {
-        "children_data": {
-            "test-child-123": {
-                "tasks": {
-                    "all": [{"title": "Test Task"}]
-                    # Missing "upcoming" key
-                }
-            }
-        }
-    }
-    
-    sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_UPCOMING_TASKS, "test-child-123")
-    
-    # _get_data should return empty list for missing category
-    # Removed - sensor doesn't have _get_data method
-    pass
-
-
-@pytest.mark.asyncio
-async def test_sensor_process_task_data_with_invalid_tasks(mock_coordinator, mock_config_entry):
-    """Test sensor _process_task_data with invalid task structure."""
-    sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_UPCOMING_TASKS, "test-child-123")
-    
-    # Tasks that are not dictionaries
-    invalid_tasks = ["not-a-dict", 123, None, {"title": "Valid Task"}]
-    
-    # Removed - sensor doesn't have _process_task_data method
-    pass
-
-
-@pytest.mark.asyncio
-async def test_sensor_get_task_counts_with_empty_tasks(mock_coordinator, mock_config_entry):
-    """Test sensor _get_task_counts with empty or missing task data."""
-    sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_UPCOMING_TASKS, "test-child-123")
-    
-    empty_tasks = []
-    # Removed - sensor doesn't have _get_task_counts method
-    pass
-
-
-@pytest.mark.asyncio
-async def test_sensor_get_task_counts_with_missing_type_field(mock_coordinator, mock_config_entry):
-    """Test sensor _get_task_counts with tasks missing type field."""
-    sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_UPCOMING_TASKS, "test-child-123")
-    
-    tasks_without_type = [
-        {"title": "Task 1", "subject": "Math"},
-        {"title": "Task 2", "subject": "English", "taskType": "Project"},
-        {"title": "Task 3"}  # No subject or taskType
-    ]
-    
-    # Removed - sensor doesn't have _get_task_counts method
-    pass
 
 
 @pytest.mark.asyncio
