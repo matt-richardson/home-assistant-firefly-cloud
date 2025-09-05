@@ -209,7 +209,7 @@ async def test_async_setup_entry():
     coordinator = Mock(spec=FireflyUpdateCoordinator)
     hass.data = {DOMAIN: {"test_entry": coordinator}}
 
-    async_add_entities = AsyncMock()
+    async_add_entities = Mock()
 
     await async_setup_entry(hass, config_entry, async_add_entities)
 

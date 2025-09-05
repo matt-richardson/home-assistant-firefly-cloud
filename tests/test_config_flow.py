@@ -425,25 +425,29 @@ async def test_reauth_flow_success(
     mock_update_entry.assert_called_once()
 
 
-@pytest.mark.skip(reason="Reauth flow requires complex Home Assistant internals mocking")
 @pytest.mark.asyncio
 async def test_reauth_flow_invalid_auth(hass: HomeAssistant, mock_config_entry) -> None:
     """Test reauthentication flow with invalid auth."""
     # Add existing entry to hass properly
     hass.config_entries._entries[mock_config_entry.entry_id] = mock_config_entry
 
-    # Start reauth flow
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN,
-        context={"source": config_entries.SOURCE_REAUTH, "entry_id": mock_config_entry.entry_id},
-        data=mock_config_entry.data,
-    )
-
-    # Mock invalid authentication
-    with patch(
-        "custom_components.firefly_cloud.config_flow.FireflyAPIClient.parse_authentication_response",
-        side_effect=FireflyAuthenticationError("Invalid response"),
+    with (
+        patch("homeassistant.helpers.aiohttp_client.async_get_clientsession"),
+        patch.object(hass.config_entries, "async_get_entry", return_value=mock_config_entry),
+        patch.object(hass.config_entries, "async_update_entry"),
+        patch.object(hass.config_entries, "async_reload"),
+        patch(
+            "custom_components.firefly_cloud.config_flow.FireflyAPIClient.parse_authentication_response",
+            side_effect=FireflyAuthenticationError("Invalid response"),
+        ),
     ):
+        # Start reauth flow
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN,
+            context={"source": config_entries.SOURCE_REAUTH, "entry_id": mock_config_entry.entry_id},
+            data=mock_config_entry.data,
+        )
+
         result2 = await hass.config_entries.flow.async_configure(
             result["flow_id"],
             {"auth_response": "invalid_response"},
@@ -454,19 +458,11 @@ async def test_reauth_flow_invalid_auth(hass: HomeAssistant, mock_config_entry) 
     assert result2["errors"] == {"base": "invalid_auth"}
 
 
-@pytest.mark.skip(reason="Reauth flow requires complex Home Assistant internals mocking")
 @pytest.mark.asyncio
 async def test_reauth_flow_connection_error(hass: HomeAssistant, mock_config_entry) -> None:
     """Test reauthentication flow with connection error."""
     # Add existing entry to hass properly
     hass.config_entries._entries[mock_config_entry.entry_id] = mock_config_entry
-
-    # Start reauth flow
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN,
-        context={"source": config_entries.SOURCE_REAUTH, "entry_id": mock_config_entry.entry_id},
-        data=mock_config_entry.data,
-    )
 
     # Mock connection error
     mock_auth_response = {
@@ -481,6 +477,10 @@ async def test_reauth_flow_connection_error(hass: HomeAssistant, mock_config_ent
     }
 
     with (
+        patch("homeassistant.helpers.aiohttp_client.async_get_clientsession"),
+        patch.object(hass.config_entries, "async_get_entry", return_value=mock_config_entry),
+        patch.object(hass.config_entries, "async_update_entry"),
+        patch.object(hass.config_entries, "async_reload"),
         patch(
             "custom_components.firefly_cloud.config_flow.FireflyAPIClient.parse_authentication_response",
             return_value=mock_auth_response,
@@ -490,6 +490,13 @@ async def test_reauth_flow_connection_error(hass: HomeAssistant, mock_config_ent
             side_effect=FireflyConnectionError("Connection failed"),
         ),
     ):
+        # Start reauth flow
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN,
+            context={"source": config_entries.SOURCE_REAUTH, "entry_id": mock_config_entry.entry_id},
+            data=mock_config_entry.data,
+        )
+
         result2 = await hass.config_entries.flow.async_configure(
             result["flow_id"],
             {"auth_response": "mock_auth_response"},
@@ -500,19 +507,11 @@ async def test_reauth_flow_connection_error(hass: HomeAssistant, mock_config_ent
     assert result2["errors"] == {"base": "cannot_connect"}
 
 
-@pytest.mark.skip(reason="Reauth flow requires complex Home Assistant internals mocking")
 @pytest.mark.asyncio
 async def test_reauth_flow_credentials_failed(hass: HomeAssistant, mock_config_entry) -> None:
     """Test reauthentication flow with credential verification failure."""
     # Add existing entry to hass properly
     hass.config_entries._entries[mock_config_entry.entry_id] = mock_config_entry
-
-    # Start reauth flow
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN,
-        context={"source": config_entries.SOURCE_REAUTH, "entry_id": mock_config_entry.entry_id},
-        data=mock_config_entry.data,
-    )
 
     # Mock failed credential verification
     mock_auth_response = {
@@ -527,6 +526,10 @@ async def test_reauth_flow_credentials_failed(hass: HomeAssistant, mock_config_e
     }
 
     with (
+        patch("homeassistant.helpers.aiohttp_client.async_get_clientsession"),
+        patch.object(hass.config_entries, "async_get_entry", return_value=mock_config_entry),
+        patch.object(hass.config_entries, "async_update_entry"),
+        patch.object(hass.config_entries, "async_reload"),
         patch(
             "custom_components.firefly_cloud.config_flow.FireflyAPIClient.parse_authentication_response",
             return_value=mock_auth_response,
@@ -536,6 +539,13 @@ async def test_reauth_flow_credentials_failed(hass: HomeAssistant, mock_config_e
             return_value=False,
         ),
     ):
+        # Start reauth flow
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN,
+            context={"source": config_entries.SOURCE_REAUTH, "entry_id": mock_config_entry.entry_id},
+            data=mock_config_entry.data,
+        )
+
         result2 = await hass.config_entries.flow.async_configure(
             result["flow_id"],
             {"auth_response": "mock_auth_response"},
@@ -546,25 +556,30 @@ async def test_reauth_flow_credentials_failed(hass: HomeAssistant, mock_config_e
     assert result2["errors"] == {"base": "invalid_auth"}
 
 
-@pytest.mark.skip(reason="Reauth flow requires complex Home Assistant internals mocking")
 @pytest.mark.asyncio
 async def test_reauth_flow_unexpected_error(hass: HomeAssistant, mock_config_entry) -> None:
     """Test reauthentication flow with unexpected error."""
     # Add existing entry to hass properly
     hass.config_entries._entries[mock_config_entry.entry_id] = mock_config_entry
 
-    # Start reauth flow
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN,
-        context={"source": config_entries.SOURCE_REAUTH, "entry_id": mock_config_entry.entry_id},
-        data=mock_config_entry.data,
-    )
-
     # Mock unexpected error
-    with patch(
-        "custom_components.firefly_cloud.config_flow.FireflyAPIClient.parse_authentication_response",
-        side_effect=Exception("Unexpected error"),
+    with (
+        patch("homeassistant.helpers.aiohttp_client.async_get_clientsession"),
+        patch.object(hass.config_entries, "async_get_entry", return_value=mock_config_entry),
+        patch.object(hass.config_entries, "async_update_entry"),
+        patch.object(hass.config_entries, "async_reload"),
+        patch(
+            "custom_components.firefly_cloud.config_flow.FireflyAPIClient.parse_authentication_response",
+            side_effect=Exception("Unexpected error"),
+        ),
     ):
+        # Start reauth flow
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN,
+            context={"source": config_entries.SOURCE_REAUTH, "entry_id": mock_config_entry.entry_id},
+            data=mock_config_entry.data,
+        )
+
         result2 = await hass.config_entries.flow.async_configure(
             result["flow_id"],
             {"auth_response": "mock_auth_response"},
