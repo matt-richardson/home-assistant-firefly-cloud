@@ -1,7 +1,7 @@
 """Todo platform for Firefly Cloud integration."""
 
 from datetime import datetime, date
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from homeassistant.components.todo import (
     TodoItem,
@@ -111,7 +111,7 @@ class FireflyTodoListEntity(CoordinatorEntity, TodoListEntity):  # pylint: disab
         )
 
     @property
-    def todo_items(self) -> Optional[List[TodoItem]]:
+    def todo_items(self) -> list[TodoItem] | None:
         """Return the todo items."""
         if not self.coordinator.data:
             return None
@@ -125,27 +125,24 @@ class FireflyTodoListEntity(CoordinatorEntity, TodoListEntity):  # pylint: disab
         child_data = children_data[self._child_guid]
         tasks = child_data.get("tasks", {})
 
-        todo_items = []
+        # Use a dict to deduplicate tasks by their unique ID
+        unique_tasks = {}
 
-        # Add upcoming tasks
-        upcoming_tasks = tasks.get("upcoming", [])
-        for task in upcoming_tasks:
-            status = self._map_completion_status(task.get("completionStatus", "Todo"))
-            todo_items.append(self._create_todo_item(task, status))
+        # Add tasks from all categories, but deduplicate by task ID
+        all_task_lists = [
+            tasks.get("upcoming", []),
+            tasks.get("overdue", []),
+            tasks.get("due_today", []),
+        ]
 
-        # Add overdue tasks
-        overdue_tasks = tasks.get("overdue", [])
-        for task in overdue_tasks:
-            status = self._map_completion_status(task.get("completionStatus", "Todo"))
-            todo_items.append(self._create_todo_item(task, status))
+        for task_list in all_task_lists:
+            for task in task_list:
+                task_id = task.get("id")
+                if task_id and task_id not in unique_tasks:
+                    status = self._map_completion_status(task.get("completionStatus", "Todo"))
+                    unique_tasks[task_id] = self._create_todo_item(task, status)
 
-        # Add tasks due today
-        due_today_tasks = tasks.get("due_today", [])
-        for task in due_today_tasks:
-            status = self._map_completion_status(task.get("completionStatus", "Todo"))
-            todo_items.append(self._create_todo_item(task, status))
-
-        return todo_items
+        return list(unique_tasks.values())
 
     def _map_completion_status(self, completion_status: str) -> TodoItemStatus:
         """Map Firefly completion status to TodoItemStatus."""

@@ -48,6 +48,13 @@ class FireflyCloudConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
+    def is_matching(self, other_flow: config_entries.ConfigFlow) -> bool:
+        """Return True if other_flow is matching this flow."""
+        # Check if the flows have the same unique ID (school code)
+        if hasattr(self, "unique_id") and hasattr(other_flow, "unique_id"):
+            return self.unique_id == other_flow.unique_id and self.unique_id is not None
+        return False
+
     def __init__(self) -> None:
         """Initialize the config flow."""
         self._school_info: Optional[Dict[str, Any]] = None
@@ -212,19 +219,22 @@ class FireflyCloudConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         errors["base"] = "invalid_auth"
                     else:
                         # Update the existing config entry
-                        entry_id = self.context["entry_id"]
-                        entry = self.hass.config_entries.async_get_entry(entry_id)
+                        entry_id = self.context.get("entry_id")
+                        if not entry_id:
+                            errors["base"] = "invalid_auth"
+                        else:
+                            entry = self.hass.config_entries.async_get_entry(entry_id)
 
-                        if entry:
-                            new_data = entry.data.copy()
-                            new_data[CONF_SECRET] = auth_data["secret"]
+                            if entry:
+                                new_data = entry.data.copy()
+                                new_data[CONF_SECRET] = auth_data["secret"]
 
-                            self.hass.config_entries.async_update_entry(entry, data=new_data)
+                                self.hass.config_entries.async_update_entry(entry, data=new_data)
 
-                            # Reload the integration
-                            await self.hass.config_entries.async_reload(entry_id)
+                                # Reload the integration
+                                await self.hass.config_entries.async_reload(entry_id)
 
-                            return self.async_abort(reason="reauth_successful")  # type: ignore[return-value]
+                                return self.async_abort(reason="reauth_successful")  # type: ignore[return-value]
 
                 except FireflyAuthenticationError:
                     errors["base"] = "invalid_auth"
