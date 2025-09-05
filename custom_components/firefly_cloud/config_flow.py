@@ -246,15 +246,6 @@ class FireflyCloudConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             description_placeholders={
                 "auth_url": auth_url,
                 "device_id": self._school_info["device_id"],
-                "instructions": (
-                    "Your Firefly authentication has expired. Please log in again:\n\n"
-                    "1. Click the link above to open Firefly in your browser\n"
-                    "2. Log in with your Firefly credentials\n"
-                    "3. After successful login, open browser developer tools (F12)\n"
-                    "4. Go to Console tab and type: document.documentElement.outerHTML\n"
-                    "5. Copy the entire response (it should contain <token>...</token>)\n"
-                    "6. Paste it in the field below"
-                ),
             },
         )
 

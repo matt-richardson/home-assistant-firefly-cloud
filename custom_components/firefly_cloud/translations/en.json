@@ -10,7 +10,14 @@
       },
       "auth": {
         "title": "Authenticate with Firefly",
-        "description": "Complete authentication by logging into Firefly:\n\n1. Click this URL to open Firefly: {auth_url}\n2. Log in with your Firefly credentials\n3. After successful login, open browser developer tools (F12)\n4. Go to Console tab and type: document.documentElement.outerHTML\n5. Copy the entire response (should contain &lt;token&gt;...&lt;/token&gt;)\n6. Paste it in the field below\n\nDevice ID: {device_id}",
+        "description": "Complete authentication by logging into Firefly:\n\n1. [Click here to open Firefly]({auth_url}) (link opens in a new tab)\n2. Log in with your Firefly credentials\n3. After successful login, you should end up at a page with xml\n4. Copy the entire response (should start with &lt;token&gt; and end with &lt;/token&gt;)\n5. Paste it in the field below\n\nDevice ID: {device_id}",
+        "data": {
+          "auth_response": "Authentication Response"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Reauthenticate with Firefly",
+        "description": "Your Firefly authentication has expired. Please log in again:\n\n1. [Click here to open Firefly]({auth_url})\n2. Log in with your Firefly credentials\n3. After successful login, you should end up at a page with xml\n4. Copy the entire response (should start with &lt;token&gt; and end with &lt;/token&gt;)\n5. Paste it in the field below\n\nDevice ID: {device_id}",
         "data": {
           "auth_response": "Authentication Response"
         }
@@ -25,6 +32,7 @@
     },
     "abort": {
       "already_configured": "This Firefly Cloud school is already configured.",
+      "already_in_progress": "Configuration of this Firefly Cloud school is already in progress.",
       "reauth_successful": "Reauthentication successful! Your Firefly Cloud integration is now working again."
     }
   }
