@@ -67,8 +67,9 @@ async def hass():
                     # Import and register the config flow handler manually
                     from custom_components.firefly_cloud.config_flow import FireflyCloudConfigFlow
                     from homeassistant.config_entries import HANDLERS
+
                     HANDLERS["firefly_cloud"] = FireflyCloudConfigFlow
-                    
+
                     await hass.async_start()
                     try:
                         yield hass

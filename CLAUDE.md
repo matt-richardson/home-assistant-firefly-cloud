@@ -20,7 +20,7 @@ The integration follows Home Assistant's modern async architecture pattern:
 
 The Node.js reference implementation is located at `~/dev/public-repo-forks/FireflyAPI/Driver/firefly-api.js`. This contains the working authentication flow and API endpoints. Key elements to translate to Python async:
 - School lookup via `appgateway.fireflysolutions.co.uk`
-- Device registration and token extraction from XML responses  
+- Device registration and token extraction from XML responses
 - GraphQL queries for events and tasks
 - REST API for task filtering
 
@@ -105,7 +105,7 @@ Test the following error conditions:
 
 After successful setup, verify these sensors are created for each child:
 - `sensor.firefly_today_schedule_*` - Today's classes with times/locations
-- `sensor.firefly_week_schedule_*` - Weekly view with equipment requirements  
+- `sensor.firefly_week_schedule_*` - Weekly view with equipment requirements
 - `sensor.firefly_upcoming_tasks_*` - Homework and assignments
 - `sensor.firefly_tasks_due_today_*` - Today's due tasks
 

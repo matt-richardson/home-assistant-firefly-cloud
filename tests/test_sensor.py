@@ -433,7 +433,6 @@ async def test_sensor_no_coordinator_last_update_success(mock_coordinator, mock_
     assert sensor.available is True
 
 
-
 @pytest.mark.asyncio
 async def test_sensor_name_includes_child_name(mock_config_entry):
     """Test sensor name includes child name when available."""
