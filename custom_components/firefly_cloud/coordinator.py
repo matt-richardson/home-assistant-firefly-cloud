@@ -16,6 +16,7 @@ from .const import (
 from .exceptions import (
     FireflyAuthenticationError,
     FireflyConnectionError,
+    FireflyRateLimitError,
     FireflyTokenExpiredError,
 )
 
@@ -138,6 +139,9 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
         except FireflyConnectionError as err:
             _LOGGER.warning("Connection error while updating Firefly data: %s", err)
             raise UpdateFailed(f"Connection error: {err}") from err
+        except FireflyRateLimitError as err:
+            _LOGGER.warning("Rate limit error while updating Firefly data: %s", err)
+            raise UpdateFailed("Rate limit exceeded") from err
         except Exception as err:
             _LOGGER.exception("Unexpected error updating Firefly data")
             raise UpdateFailed(f"Unexpected error: {err}") from err
@@ -174,13 +178,41 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
             try:
                 due_date_str = task.get("dueDate")
                 set_date_str = task.get("setDate")
+                
+                # Handle due date parsing with fallback for invalid dates
+                due_date = None
+                if due_date_str:
+                    try:
+                        due_date = datetime.fromisoformat(due_date_str.replace("Z", "+00:00"))
+                    except (ValueError, TypeError):
+                        _LOGGER.debug("Invalid due date format: %s", due_date_str)
+                        due_date = None
+                        
+                # Handle set date parsing with fallback
+                set_date = None
+                if set_date_str:
+                    try:
+                        set_date = datetime.fromisoformat(set_date_str.replace("Z", "+00:00"))
+                    except (ValueError, TypeError):
+                        _LOGGER.debug("Invalid set date format: %s", set_date_str)
+                        set_date = None
 
+                # Extract subject information
+                subject = "Unknown Subject"
+                if "subject" in task:
+                    subject_data = task["subject"]
+                    if isinstance(subject_data, dict):
+                        subject = subject_data.get("name", "Unknown Subject")
+                    elif isinstance(subject_data, str):
+                        subject = subject_data
+                        
                 processed_task = {
                     "id": task.get("guid", task.get("id", "unknown")),
                     "title": task.get("title", "Untitled Task"),
                     "description": task.get("description", ""),
-                    "due_date": (datetime.fromisoformat(due_date_str.replace("Z", "+00:00")) if due_date_str else None),
-                    "set_date": (datetime.fromisoformat(set_date_str.replace("Z", "+00:00")) if set_date_str else None),
+                    "due_date": due_date,
+                    "set_date": set_date,
+                    "subject": subject,
                     "task_type": self._determine_task_type(task),
                     "completion_status": task.get("completionStatus", "Unknown"),
                     "setter": (
@@ -191,7 +223,7 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
                     "raw_data": task,  # Keep raw data for debugging
                 }
                 processed_tasks.append(processed_task)
-            except (ValueError, KeyError, TypeError) as err:
+            except (KeyError, TypeError) as err:
                 _LOGGER.warning("Error processing task data: %s", err)
                 continue
 
@@ -328,12 +360,13 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
 
     def _extract_child_name(self, child_guid: str) -> Optional[str]:
         """Extract child name from user info or children info."""
-        if not self._user_info:
-            return None
-
         # Check if this is the main user account
-        if child_guid == self._user_info.get("guid"):
-            return self._user_info.get("name") or self._user_info.get("fullname")
+        if self._user_info and child_guid == self._user_info.get("guid"):
+            return (
+                self._user_info.get("name") 
+                or self._user_info.get("fullname")
+                or self._user_info.get("username")
+            )
 
         # For children, look up their names from children info
         if self._children_info:
@@ -341,5 +374,9 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
                 if child.get("guid") == child_guid:
                     return child.get("name") or child.get("fullname")
 
-        # If no match found, return None and let entity handle fallback
-        return None
+        # If this is the user GUID, try username fallback
+        if self._user_info and child_guid == self._user_info.get("guid"):
+            return self._user_info.get("username")
+
+        # Final fallback to GUID
+        return child_guid

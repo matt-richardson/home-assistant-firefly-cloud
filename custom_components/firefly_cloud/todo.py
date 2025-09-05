@@ -132,19 +132,29 @@ class FireflyTodoListEntity(CoordinatorEntity, TodoListEntity):  # pylint: disab
         # Add upcoming tasks
         upcoming_tasks = tasks.get("upcoming", [])
         for task in upcoming_tasks:
-            todo_items.append(self._create_todo_item(task, TodoItemStatus.NEEDS_ACTION))
+            status = self._map_completion_status(task.get("completionStatus", "Todo"))
+            todo_items.append(self._create_todo_item(task, status))
 
         # Add overdue tasks
         overdue_tasks = tasks.get("overdue", [])
         for task in overdue_tasks:
-            todo_items.append(self._create_todo_item(task, TodoItemStatus.NEEDS_ACTION))
+            status = self._map_completion_status(task.get("completionStatus", "Todo"))
+            todo_items.append(self._create_todo_item(task, status))
 
         # Add tasks due today
         due_today_tasks = tasks.get("due_today", [])
         for task in due_today_tasks:
-            todo_items.append(self._create_todo_item(task, TodoItemStatus.NEEDS_ACTION))
+            status = self._map_completion_status(task.get("completionStatus", "Todo"))
+            todo_items.append(self._create_todo_item(task, status))
 
         return todo_items
+
+    def _map_completion_status(self, completion_status: str) -> TodoItemStatus:
+        """Map Firefly completion status to TodoItemStatus."""
+        if completion_status == "Done":
+            return TodoItemStatus.COMPLETED
+        else:
+            return TodoItemStatus.NEEDS_ACTION
 
     def _create_todo_item(self, task_data: Dict[str, Any], status: TodoItemStatus) -> TodoItem:
         """Create a TodoItem from task data."""

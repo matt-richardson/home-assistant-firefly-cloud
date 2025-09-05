@@ -479,3 +479,128 @@ async def test_calendar_handles_missing_child_data_gracefully(hass, mock_config_
     now = dt_util.now()
     events = await calendar.async_get_events(hass, now, now + timedelta(days=1))
     assert events == []
+
+
+@pytest.mark.asyncio
+async def test_calendar_convert_event_missing_start_time(hass, mock_config_entry):
+    """Test calendar convert_event with missing start time."""
+    from datetime import datetime, timezone, timedelta
+    coordinator = MagicMock()
+    calendar = FireflyCalendar(coordinator, mock_config_entry, "test-child-123")
+
+    # Event missing start time
+    incomplete_event = {
+        "end": datetime.now(timezone.utc) + timedelta(hours=1),
+        "subject": "Test Event",
+        "location": "Room 101"
+    }
+
+    with pytest.raises(KeyError):
+        calendar._convert_to_calendar_event(incomplete_event)
+
+
+@pytest.mark.asyncio
+async def test_calendar_convert_event_missing_end_time(hass, mock_config_entry):
+    """Test calendar convert_event with missing end time."""
+    from datetime import datetime, timezone, timedelta
+    coordinator = MagicMock()
+    calendar = FireflyCalendar(coordinator, mock_config_entry, "test-child-123")
+
+    # Event missing end time
+    incomplete_event = {
+        "start": datetime.now(timezone.utc),
+        "subject": "Test Event",
+        "location": "Room 101"
+    }
+
+    with pytest.raises(KeyError):
+        calendar._convert_to_calendar_event(incomplete_event)
+
+
+@pytest.mark.asyncio
+async def test_calendar_get_events_no_week_events_data(hass, mock_config_entry):
+    """Test calendar get_events when week events data is missing."""
+    coordinator = MagicMock()
+    coordinator.data = {
+        "children_data": {
+            "test-child-123": {
+                "name": "Test Child",
+                "events": {
+                    "week": []
+                    # Missing "week" key
+                }
+            }
+        }
+    }
+
+    calendar = FireflyCalendar(coordinator, mock_config_entry, "test-child-123")
+
+    now = dt_util.now()
+    events = await calendar.async_get_events(hass, now, now + timedelta(days=7))
+
+    # Should handle missing week data gracefully
+    assert events == []
+
+
+@pytest.mark.asyncio
+async def test_calendar_current_event_with_multiple_overlapping(hass, mock_config_entry):
+    """Test calendar current event selection with multiple overlapping events."""
+    now = dt_util.now()
+    
+    coordinator = MagicMock()
+    coordinator.data = {
+        "children_data": {
+            "test-child-123": {
+                "name": "Test Child",
+                "events": {
+                    "week": [
+                        {
+                            "start": now - timedelta(minutes=30),
+                            "end": now + timedelta(minutes=30),
+                            "subject": "Math Class",
+                            "location": "Room 101",
+                            "description": "First class",
+                            "attendees": [],
+                            "guild": None,
+                        },
+                        {
+                            "start": now - timedelta(minutes=15),  
+                            "end": now + timedelta(minutes=45),
+                            "subject": "Study Hall", 
+                            "location": "Library",
+                            "description": "Second class",
+                            "attendees": [],
+                            "guild": None,
+                        }
+                    ]
+                }
+            }
+        }
+    }
+    coordinator.last_update_success = True
+
+    calendar = FireflyCalendar(coordinator, mock_config_entry, "test-child-123")
+
+    # Should return the first overlapping event
+    current_event = calendar.event
+    assert current_event is not None
+    assert current_event.summary == "Math Class"
+
+
+@pytest.mark.asyncio
+async def test_calendar_build_description_none_values(hass, mock_config_entry):
+    """Test calendar build_description with None values."""
+    coordinator = MagicMock()
+    calendar = FireflyCalendar(coordinator, mock_config_entry, "test-child-123")
+
+    event_data = {
+        "description": None,
+        "location": None,
+        "attendees": None,
+        "guild": None
+    }
+
+    description = calendar._build_event_description(event_data)
+
+    # Should handle None values gracefully and return None when no description parts exist
+    assert description is None

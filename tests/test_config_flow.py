@@ -374,7 +374,6 @@ async def test_abort_if_already_configured(hass: HomeAssistant) -> None:
     assert result2["reason"] == "single_instance_allowed"
 
 
-@pytest.mark.skip(reason="Reauth flow requires complex Home Assistant internals mocking")
 @pytest.mark.asyncio
 async def test_reauth_flow_success(
     hass: HomeAssistant, mock_config_entry, mock_setup_entry
@@ -414,6 +413,7 @@ async def test_reauth_flow_success(
             "custom_components.firefly_cloud.config_flow.FireflyAPIClient.verify_credentials",
             return_value=True,
         ),
+        patch.object(hass.config_entries, "async_update_entry") as mock_update_entry,
     ):
         result2 = await hass.config_entries.flow.async_configure(
             result["flow_id"],
@@ -422,6 +422,7 @@ async def test_reauth_flow_success(
 
     assert result2["type"] == FlowResultType.ABORT
     assert result2["reason"] == "reauth_successful"
+    mock_update_entry.assert_called_once()
 
 
 @pytest.mark.skip(reason="Reauth flow requires complex Home Assistant internals mocking")

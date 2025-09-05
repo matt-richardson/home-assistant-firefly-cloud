@@ -809,3 +809,351 @@ async def test_coordinator_refresh_with_existing_data(hass: HomeAssistant, mock_
 
     # Should now have 2 tasks (original + new one)
     assert len(child_data["tasks"]["all"]) == 2
+
+
+@pytest.mark.asyncio
+async def test_coordinator_children_info_fetch_failure(hass: HomeAssistant, mock_api):
+    """Test coordinator when children info fetch fails."""
+    # Mock children info failure but user info success
+    mock_api.get_children_info.side_effect = FireflyAuthenticationError("Children fetch failed")
+    
+    coordinator = FireflyUpdateCoordinator(
+        hass=hass,
+        api=mock_api,
+        task_lookahead_days=7,
+        children_guids=["child1", "child2"],  # Provide children GUIDs to trigger the fetch
+    )
+
+    # Should still work, just log warning
+    data = await coordinator._async_update_data()
+    
+    assert data is not None
+    # Should fall back to using provided children GUIDs
+    assert "children_data" in data
+
+
+@pytest.mark.asyncio
+async def test_coordinator_data_structure(hass: HomeAssistant, mock_api):
+    """Test coordinator data structure completeness."""
+    coordinator = FireflyUpdateCoordinator(
+        hass=hass,
+        api=mock_api,
+        task_lookahead_days=7,
+    )
+
+    data = await coordinator._async_update_data()
+
+    # Verify complete data structure
+    assert "user_info" in data
+    assert "children_data" in data
+    assert "children_guids" in data
+    assert "last_updated" in data
+    
+    # Verify children_data structure for each child
+    for child_guid, child_data in data["children_data"].items():
+        assert "events" in child_data
+        assert "today" in child_data["events"]
+        assert "week" in child_data["events"]
+        assert "tasks" in child_data
+        assert "all" in child_data["tasks"]
+        assert "due_today" in child_data["tasks"]  
+        assert "upcoming" in child_data["tasks"]
+        assert "overdue" in child_data["tasks"]
+        assert "name" in child_data
+
+
+@pytest.mark.asyncio
+async def test_coordinator_extract_child_name(hass: HomeAssistant, mock_api):
+    """Test child name extraction from various sources."""
+    # Mock children info for name extraction
+    mock_api.get_children_info.return_value = [
+        {"guid": "child1", "name": "Child One", "username": "child1.user"}
+    ]
+    
+    coordinator = FireflyUpdateCoordinator(
+        hass=hass,
+        api=mock_api,
+        task_lookahead_days=7,
+        children_guids=["child1"],
+    )
+
+    data = await coordinator._async_update_data()
+    
+    assert data["children_data"]["child1"]["name"] == "Child One"
+
+
+@pytest.mark.asyncio
+async def test_coordinator_name_extraction_fallbacks(hass: HomeAssistant, mock_api):
+    """Test name extraction fallbacks when primary name sources aren't available."""
+    # Mock user as student (no children_info needed)
+    mock_api.get_user_info.return_value = {
+        "username": "student.user",
+        "fullname": "Student Name", 
+        "role": "student",
+        "guid": "student-guid",
+    }
+    
+    coordinator = FireflyUpdateCoordinator(
+        hass=hass,
+        api=mock_api,
+        task_lookahead_days=7,
+    )
+
+    data = await coordinator._async_update_data()
+    
+    # Should use user fullname for student
+    assert data["children_data"]["student-guid"]["name"] == "Student Name"
+
+
+@pytest.mark.asyncio 
+async def test_coordinator_rate_limit_on_events(hass: HomeAssistant, mock_api):
+    """Test coordinator handling rate limit on events fetch."""
+    from custom_components.firefly_cloud.exceptions import FireflyRateLimitError
+    
+    mock_api.get_events.side_effect = FireflyRateLimitError("Too many requests")
+    
+    coordinator = FireflyUpdateCoordinator(
+        hass=hass,
+        api=mock_api,
+        task_lookahead_days=7,
+    )
+
+    with pytest.raises(UpdateFailed, match="Rate limit exceeded"):
+        await coordinator._async_update_data()
+
+
+@pytest.mark.asyncio
+async def test_coordinator_subsequent_refresh_with_cached_user_info(hass: HomeAssistant, mock_api):
+    """Test coordinator subsequent refresh uses cached user info."""
+    coordinator = FireflyUpdateCoordinator(
+        hass=hass,
+        api=mock_api,
+        task_lookahead_days=7,
+    )
+
+    # First refresh
+    await coordinator.async_refresh()
+    
+    # Reset mock call count
+    mock_api.get_user_info.reset_mock()
+    
+    # Second refresh
+    await coordinator.async_refresh()
+    
+    # get_user_info should not be called again (cached)
+    mock_api.get_user_info.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_coordinator_process_events_invalid_date_format(hass: HomeAssistant, mock_api):
+    """Test processing events with invalid date format."""
+    # Mock events with invalid date format
+    mock_api.get_events.return_value = [
+        {
+            "start": "invalid-date",
+            "end": "also-invalid",
+            "subject": "Test Event",
+            "location": "Room 1",
+            "description": "Event with bad dates",
+            "guild": None,
+            "attendees": [],
+        }
+    ]
+    
+    coordinator = FireflyUpdateCoordinator(
+        hass=hass,
+        api=mock_api,
+        task_lookahead_days=7,
+    )
+
+    data = await coordinator._async_update_data()
+    
+    child_guid = list(data["children_data"].keys())[0]
+    child_data = data["children_data"][child_guid]
+    
+    # Event should be filtered out due to invalid date
+    assert len(child_data["events"]["today"]) == 0
+
+
+@pytest.mark.asyncio
+async def test_coordinator_process_tasks_invalid_due_date(hass: HomeAssistant, mock_api):
+    """Test processing tasks with invalid due date."""
+    # Mock tasks with invalid date
+    mock_api.get_tasks.return_value = [
+        {
+            "guid": "invalid-date-task",
+            "title": "Task with Bad Date",
+            "description": "Invalid due date",
+            "dueDate": "not-a-date-at-all",
+            "setDate": "2023-01-01T10:00:00Z",
+            "subject": {"name": "Math"},
+            "completionStatus": "Todo",
+            "setter": {"name": "Teacher"},
+        }
+    ]
+    
+    coordinator = FireflyUpdateCoordinator(
+        hass=hass,
+        api=mock_api,
+        task_lookahead_days=7,
+    )
+
+    data = await coordinator._async_update_data()
+    
+    child_guid = list(data["children_data"].keys())[0]
+    child_data = data["children_data"][child_guid]
+    
+    # Task should still be in all tasks but filtered from date-based lists
+    assert len(child_data["tasks"]["all"]) == 1
+    assert len(child_data["tasks"]["upcoming"]) == 0
+
+
+@pytest.mark.asyncio
+async def test_coordinator_extract_child_name_from_children_info(hass: HomeAssistant, mock_api):
+    """Test extracting child name from children_info."""
+    # Mock children info with names
+    coordinator = FireflyUpdateCoordinator(
+        hass=hass,
+        api=mock_api,
+        task_lookahead_days=7,
+        children_guids=["child-123"],
+    )
+    
+    # Set up children info directly
+    coordinator._children_info = [
+        {"guid": "child-123", "name": "Child Name From Info", "username": "child123"}
+    ]
+    
+    # Test the private method
+    name = coordinator._extract_child_name("child-123")
+    
+    assert name == "Child Name From Info"
+
+
+@pytest.mark.asyncio
+async def test_coordinator_extract_child_name_from_user_info_fullname(hass: HomeAssistant, mock_api):
+    """Test extracting child name from user_info fullname."""
+    coordinator = FireflyUpdateCoordinator(
+        hass=hass,
+        api=mock_api,
+        task_lookahead_days=7,
+    )
+    
+    # Set user info with fullname
+    coordinator._user_info = {
+        "guid": "user-123",
+        "fullname": "Full Name From User",
+        "username": "user123"
+    }
+    
+    name = coordinator._extract_child_name("user-123")
+    
+    assert name == "Full Name From User"
+
+
+@pytest.mark.asyncio
+async def test_coordinator_extract_child_name_from_user_info_username(hass: HomeAssistant, mock_api):
+    """Test extracting child name from user_info username fallback."""
+    coordinator = FireflyUpdateCoordinator(
+        hass=hass,
+        api=mock_api,
+        task_lookahead_days=7,
+    )
+    
+    # Set user info without fullname
+    coordinator._user_info = {
+        "guid": "user-123",
+        "username": "username_fallback"
+    }
+    
+    name = coordinator._extract_child_name("user-123")
+    
+    assert name == "username_fallback"
+
+
+@pytest.mark.asyncio
+async def test_coordinator_extract_child_name_guid_fallback(hass: HomeAssistant, mock_api):
+    """Test extracting child name with GUID fallback."""
+    coordinator = FireflyUpdateCoordinator(
+        hass=hass,
+        api=mock_api,
+        task_lookahead_days=7,
+    )
+    
+    # No user info or children info
+    coordinator._user_info = {"guid": "other-user"}
+    coordinator._children_info = []
+    
+    name = coordinator._extract_child_name("unknown-child-123")
+    
+    assert name == "unknown-child-123"
+
+
+@pytest.mark.asyncio
+async def test_coordinator_process_tasks_missing_subject(hass: HomeAssistant, mock_api):
+    """Test processing tasks with missing subject field."""
+    now = datetime.now(timezone.utc)
+    
+    mock_api.get_tasks.return_value = [
+        {
+            "guid": "no-subject-task",
+            "title": "Task Without Subject",
+            "description": "No subject field",
+            "dueDate": (now + timedelta(days=1)).isoformat().replace("+00:00", "Z"),
+            "setDate": now.isoformat().replace("+00:00", "Z"),
+            # Missing subject field
+            "completionStatus": "Todo",
+            "setter": {"name": "Teacher"},
+        }
+    ]
+    
+    coordinator = FireflyUpdateCoordinator(
+        hass=hass,
+        api=mock_api,
+        task_lookahead_days=7,
+    )
+
+    data = await coordinator._async_update_data()
+    
+    child_guid = list(data["children_data"].keys())[0]
+    child_data = data["children_data"][child_guid]
+    
+    # Task should still be processed
+    assert len(child_data["tasks"]["all"]) == 1
+    processed_task = child_data["tasks"]["all"][0]
+    assert processed_task["subject"] == "Unknown Subject"
+
+
+@pytest.mark.asyncio 
+async def test_coordinator_process_tasks_missing_setter(hass: HomeAssistant, mock_api):
+    """Test processing tasks with missing setter field."""
+    now = datetime.now(timezone.utc)
+    
+    mock_api.get_tasks.return_value = [
+        {
+            "guid": "no-setter-task", 
+            "title": "Task Without Setter",
+            "description": "No setter field",
+            "dueDate": (now + timedelta(days=1)).isoformat().replace("+00:00", "Z"),
+            "setDate": now.isoformat().replace("+00:00", "Z"),
+            "subject": {"name": "Math"},
+            "completionStatus": "Todo",
+            # Missing setter field
+        }
+    ]
+    
+    coordinator = FireflyUpdateCoordinator(
+        hass=hass,
+        api=mock_api,
+        task_lookahead_days=7,
+    )
+
+    data = await coordinator._async_update_data()
+    
+    child_guid = list(data["children_data"].keys())[0]
+    child_data = data["children_data"][child_guid]
+    
+    # Task should still be processed
+    assert len(child_data["tasks"]["all"]) == 1
+    processed_task = child_data["tasks"]["all"][0]
+    assert processed_task["setter"] == "Unknown"

@@ -456,13 +456,277 @@ async def test_get_api_version_invalid_xml(api_client, mock_aiohttp_session):
 async def test_verify_credentials_connection_error(api_client, mock_aiohttp_session):
     """Test credential verification with connection error."""
     from tests.conftest import mock_http_response
+    import asyncio
 
     mock_aiohttp_session._mock_responses["get"] = mock_http_response(
-        raise_for_status_exception=FireflyConnectionError("Connection failed")
+        raise_for_status_exception=asyncio.TimeoutError()
     )
 
-    # The method should catch the exception and return False
     with pytest.raises(FireflyConnectionError):
-        result = await api_client.verify_credentials()
-        # The current implementation may propagate the error instead of catching it
-        assert result is False
+        await api_client.verify_credentials()
+
+
+@pytest.mark.asyncio
+async def test_get_school_info_disabled(mock_aiohttp_session):
+    """Test school info retrieval for disabled school."""
+    xml_response = """<?xml version="1.0"?>
+    <response exists="true" enabled="false">
+        <name>Disabled School</name>
+        <address ssl="true">disabled.fireflycloud.net</address>
+        <installationId>12345</installationId>
+    </response>"""
+
+    from tests.conftest import mock_http_response
+
+    mock_aiohttp_session._mock_responses["get"] = mock_http_response(text=xml_response)
+
+    result = await FireflyAPIClient.get_school_info(mock_aiohttp_session, "disabled")
+
+    assert result["enabled"] is False
+    assert result["name"] == "Disabled School"
+
+
+@pytest.mark.asyncio
+async def test_get_school_info_malformed_xml(mock_aiohttp_session):
+    """Test school info retrieval with malformed XML."""
+    xml_response = "<?xml malformed"
+
+    from tests.conftest import mock_http_response
+
+    mock_aiohttp_session._mock_responses["get"] = mock_http_response(text=xml_response)
+
+    with pytest.raises(FireflyDataError):
+        await FireflyAPIClient.get_school_info(mock_aiohttp_session, "testschool")
+
+
+@pytest.mark.asyncio
+async def test_graphql_query_server_error(api_client, mock_aiohttp_session):
+    """Test GraphQL query with server error."""
+    from tests.conftest import mock_http_response
+
+    mock_aiohttp_session._mock_responses["post"] = mock_http_response(
+        status=500, 
+        raise_for_status_exception=FireflyAPIError("Server error")
+    )
+
+    with pytest.raises(FireflyAPIError):
+        await api_client._graphql_query("query { test }")
+
+
+@pytest.mark.asyncio
+async def test_get_events_with_user_guid(api_client):
+    """Test getting events with user GUID."""
+    start = datetime(2023, 1, 1, 9, 0)
+    end = datetime(2023, 1, 1, 17, 0)
+    api_client._user_info = {"guid": "user-123"}
+
+    mock_events = [{"id": "event1", "title": "Test Event"}]
+
+    with patch.object(api_client, "_get_events_rest_api") as mock_rest_api:
+        mock_rest_api.return_value = mock_events
+
+        result = await api_client.get_events(start, end)
+
+        assert result == mock_events
+        mock_rest_api.assert_called_once_with(start, end, "user-123")
+
+
+@pytest.mark.asyncio
+async def test_get_events_for_child(api_client):
+    """Test getting events for specific child."""
+    start = datetime(2023, 1, 1, 9, 0)
+    end = datetime(2023, 1, 1, 17, 0)
+    api_client._user_info = {"guid": "parent-123"}
+
+    mock_events = [{"id": "event1", "title": "Child Event"}]
+
+    with patch.object(api_client, "_get_events_rest_api") as mock_rest_api:
+        mock_rest_api.return_value = mock_events
+
+        result = await api_client.get_events(start, end, user_guid="child-456")
+
+        assert result == mock_events
+        mock_rest_api.assert_called_once_with(start, end, "child-456")
+
+
+@pytest.mark.asyncio  
+async def test_get_tasks_with_guid_filter(api_client, mock_aiohttp_session):
+    """Test getting tasks with GUID filter."""
+    from tests.conftest import mock_http_response
+    
+    mock_tasks = [{"id": "task1", "title": "Test Task"}]
+    mock_aiohttp_session._mock_responses["post"] = mock_http_response(
+        json_data={"items": mock_tasks}, status=200
+    )
+    
+    result = await api_client.get_tasks(student_guid="child-123")
+    
+    assert result == mock_tasks
+
+
+@pytest.mark.asyncio
+async def test_get_participating_groups_query_error(api_client):
+    """Test participating groups with query error."""
+    api_client._user_info = {"guid": "test-user-123"}
+
+    with patch.object(api_client, "_graphql_query") as mock_query:
+        mock_query.side_effect = FireflyAPIError("Query failed")
+
+        with pytest.raises(FireflyAPIError):
+            await api_client.get_participating_groups()
+
+
+@pytest.mark.asyncio
+async def test_get_events_rest_api_week_period(api_client, mock_aiohttp_session):
+    """Test REST API events for week period."""
+    from tests.conftest import mock_http_response
+    from datetime import datetime
+    
+    start = datetime(2023, 1, 1, 9, 0)
+    end = datetime(2023, 1, 8, 17, 0)  # 7 days = week period
+    
+    mock_events = [{"guid": "event1", "subject": "Week Event", "startUtc": "2023-01-01T09:00:00Z"}]
+    mock_aiohttp_session._mock_responses["get"] = mock_http_response(
+        json_data=mock_events, status=200
+    )
+    
+    result = await api_client._get_events_rest_api(start, end, "user-123")
+    
+    assert len(result) == 1
+    assert result[0]["guid"] == "event1"
+    assert result[0]["subject"] == "Week Event"
+
+
+@pytest.mark.asyncio
+async def test_get_events_rest_api_day_period(api_client, mock_aiohttp_session):
+    """Test REST API events for day period."""
+    from tests.conftest import mock_http_response
+    from datetime import datetime
+    
+    start = datetime(2023, 1, 1, 9, 0)
+    end = datetime(2023, 1, 1, 17, 0)  # Same day = day period
+    
+    mock_events = [{"guid": "event1", "subject": "Day Event", "startUtc": "2023-01-01T09:00:00Z"}]
+    mock_aiohttp_session._mock_responses["get"] = mock_http_response(
+        json_data=mock_events, status=200
+    )
+    
+    result = await api_client._get_events_rest_api(start, end, "user-123")
+    
+    assert len(result) == 1
+    assert result[0]["guid"] == "event1"
+    assert result[0]["subject"] == "Day Event"
+
+
+@pytest.mark.asyncio
+async def test_get_events_rest_api_429_rate_limit(api_client, mock_aiohttp_session):
+    """Test REST API events with 429 rate limit."""
+    from tests.conftest import mock_http_response
+    from datetime import datetime
+    
+    start = datetime(2023, 1, 1, 9, 0)
+    end = datetime(2023, 1, 1, 17, 0)
+    
+    mock_aiohttp_session._mock_responses["get"] = mock_http_response(status=429)
+    
+    with pytest.raises(FireflyRateLimitError):
+        await api_client._get_events_rest_api(start, end, "user-123")
+
+
+@pytest.mark.asyncio
+async def test_get_events_rest_api_401_token_expired(api_client, mock_aiohttp_session):
+    """Test REST API events with 401 token expired."""
+    from tests.conftest import mock_http_response
+    from datetime import datetime
+    
+    start = datetime(2023, 1, 1, 9, 0)
+    end = datetime(2023, 1, 1, 17, 0)
+    
+    mock_aiohttp_session._mock_responses["get"] = mock_http_response(status=401)
+    
+    with pytest.raises(FireflyTokenExpiredError):
+        await api_client._get_events_rest_api(start, end, "user-123")
+
+
+@pytest.mark.asyncio
+async def test_get_events_rest_api_timeout_retry(api_client, mock_aiohttp_session):
+    """Test REST API events with timeout and retry."""
+    from tests.conftest import mock_http_response
+    from datetime import datetime
+    import asyncio
+    
+    start = datetime(2023, 1, 1, 9, 0)
+    end = datetime(2023, 1, 1, 17, 0)
+    
+    # First call times out, second succeeds
+    # Mock successful response
+    mock_aiohttp_session._mock_responses["get"] = mock_http_response(
+        json_data=[], status=200
+    )
+    
+    result = await api_client._get_events_rest_api(start, end, "user-123")
+    
+    assert result == []
+
+
+@pytest.mark.asyncio
+async def test_get_events_rest_api_max_retries_exceeded(api_client, mock_aiohttp_session):
+    """Test REST API events exceeding max retries."""
+    from tests.conftest import mock_http_response
+    from datetime import datetime
+    import asyncio
+    
+    start = datetime(2023, 1, 1, 9, 0)
+    end = datetime(2023, 1, 1, 17, 0)
+    
+    # Always timeout to exceed max retries
+    mock_aiohttp_session._mock_responses["get"] = mock_http_response(
+        raise_for_status_exception=asyncio.TimeoutError()
+    )
+    
+    with pytest.raises(FireflyConnectionError):
+        await api_client._get_events_rest_api(start, end, "user-123")
+
+
+@pytest.mark.asyncio
+async def test_parse_auth_response_missing_user_element(api_client):
+    """Test parsing auth response with missing user element."""
+    xml_response = """<?xml version="1.0"?>
+    <authgatewaytokenresponse>
+        <secret>test-secret-123</secret>
+    </authgatewaytokenresponse>"""
+    
+    with pytest.raises(FireflyAuthenticationError, match="Missing authentication data"):
+        await api_client.parse_authentication_response(xml_response)
+
+
+@pytest.mark.asyncio
+async def test_parse_auth_response_empty_user_element(api_client):
+    """Test parsing auth response with empty user element."""
+    xml_response = """<?xml version="1.0"?>
+    <authgatewaytokenresponse>
+        <secret>test-secret-123</secret>
+        <user></user>
+    </authgatewaytokenresponse>"""
+    
+    result = await api_client.parse_authentication_response(xml_response)
+    
+    assert result["secret"] == "test-secret-123"
+    assert "user" in result
+    assert result["user"]["guid"] is None
+
+
+@pytest.mark.asyncio
+async def test_get_tasks_request_exception_retry(api_client, mock_aiohttp_session):
+    """Test get_tasks with request exception and retry."""
+    from tests.conftest import mock_http_response
+    import aiohttp
+    
+    # Mock successful response
+    mock_aiohttp_session._mock_responses["post"] = mock_http_response(
+        json_data={"items": []}, status=200
+    )
+    
+    result = await api_client.get_tasks()
+    
+    assert result == []

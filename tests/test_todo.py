@@ -217,3 +217,126 @@ async def test_async_setup_entry():
     entities = async_add_entities.call_args[0][0]
     assert len(entities) == 1
     assert isinstance(entities[0], FireflyTodoListEntity)
+
+
+@pytest.mark.asyncio
+async def test_create_todo_item_with_missing_due_date():
+    """Test create_todo_item with missing due date."""
+    coordinator = Mock(spec=FireflyUpdateCoordinator)
+    config_entry = Mock(spec=ConfigEntry)
+    config_entry.data = {"school_name": "Test School"}
+    config_entry.entry_id = "test-entry"
+    
+    entity = FireflyTodoListEntity(coordinator, config_entry, "test-child-123")
+    
+    task_data = {
+        "title": "Task Without Due Date",
+        "description": "No due date",
+        "subject": {"name": "Math"},
+        "completionStatus": "Todo",
+        # Missing dueDate
+    }
+    
+    todo_item = entity._create_todo_item(task_data, TodoItemStatus.NEEDS_ACTION)
+    
+    assert todo_item.summary == "Task Without Due Date"
+    assert todo_item.due is None  # Should handle missing due date gracefully
+
+
+@pytest.mark.asyncio  
+async def test_create_todo_item_with_invalid_due_date():
+    """Test create_todo_item with invalid due date format."""
+    coordinator = Mock(spec=FireflyUpdateCoordinator)
+    config_entry = Mock(spec=ConfigEntry)
+    config_entry.data = {"school_name": "Test School"}
+    config_entry.entry_id = "test-entry"
+    
+    entity = FireflyTodoListEntity(coordinator, config_entry, "test-child-123")
+    
+    task_data = {
+        "title": "Task With Bad Date",
+        "description": "Invalid date format",
+        "dueDate": "not-a-valid-date",
+        "subject": {"name": "Science"},
+        "completionStatus": "Todo",
+    }
+    
+    todo_item = entity._create_todo_item(task_data, TodoItemStatus.NEEDS_ACTION)
+    
+    assert todo_item.summary == "Task With Bad Date"
+    assert todo_item.due is None  # Should handle invalid date gracefully
+
+
+@pytest.mark.asyncio
+async def test_create_todo_item_with_missing_subject():
+    """Test create_todo_item with missing subject."""
+    coordinator = Mock(spec=FireflyUpdateCoordinator)
+    config_entry = Mock(spec=ConfigEntry)
+    config_entry.data = {"school_name": "Test School"}
+    config_entry.entry_id = "test-entry"
+    
+    entity = FireflyTodoListEntity(coordinator, config_entry, "test-child-123")
+    
+    task_data = {
+        "title": "Task Without Subject",
+        "description": "No subject field",
+        "dueDate": "2023-12-31T23:59:59Z",
+        "completionStatus": "Todo",
+        # Missing subject field
+    }
+    
+    todo_item = entity._create_todo_item(task_data, TodoItemStatus.NEEDS_ACTION)
+    
+    assert todo_item.summary == "Task Without Subject"
+    # Should handle missing subject gracefully
+    assert "No subject field" in todo_item.description
+
+
+@pytest.mark.asyncio
+async def test_todo_items_with_mixed_completion_status():
+    """Test todo_items with mixed completion status."""
+    coordinator = Mock(spec=FireflyUpdateCoordinator)
+    coordinator.data = {
+        "children_data": {
+            "test-child-123": {
+                "name": "Test Child",
+                "tasks": {
+                    "upcoming": [
+                        {
+                            "title": "Completed Task",
+                            "description": "This is done",
+                            "dueDate": "2023-12-31T23:59:59Z",
+                            "subject": {"name": "Math"},
+                            "completionStatus": "Done",  # Completed
+                        },
+                        {
+                            "title": "Pending Task", 
+                            "description": "Still to do",
+                            "dueDate": "2023-12-25T12:00:00Z",
+                            "subject": {"name": "English"},
+                            "completionStatus": "Todo",  # Not completed
+                        }
+                    ],
+                    "overdue": [],
+                    "due_today": []
+                }
+            }
+        }
+    }
+    
+    config_entry = Mock(spec=ConfigEntry)
+    config_entry.data = {"school_name": "Test School"}
+    config_entry.entry_id = "test-entry"
+    entity = FireflyTodoListEntity(coordinator, config_entry, "test-child-123")
+    
+    todo_items = entity.todo_items
+    
+    # Should include both completed and pending tasks
+    assert len(todo_items) == 2
+    
+    # Check that completed status is properly mapped
+    completed_item = next(item for item in todo_items if item.summary == "Completed Task")
+    pending_item = next(item for item in todo_items if item.summary == "Pending Task")
+    
+    assert completed_item.status == TodoItemStatus.COMPLETED
+    assert pending_item.status == TodoItemStatus.NEEDS_ACTION

@@ -192,7 +192,7 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
                 tasks_by_due_date[due_date_str].append(
                     {
                         "title": task["title"],
-                        "subject": task["subject"],
+                        "subject": task.get("subject", "Unknown"),
                         "task_type": task["task_type"],
                     }
                 )
@@ -201,7 +201,7 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
             "tasks": [
                 {
                     "title": task["title"],
-                    "subject": task["subject"],
+                    "subject": task.get("subject", "Unknown"),
                     "due_date": task["due_date"].isoformat() if task["due_date"] else None,
                     "due_date_formatted": (task["due_date"].strftime("%A, %d %B %Y") if task["due_date"] else None),
                     "task_type": task["task_type"],
@@ -230,7 +230,7 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
             "overdue_tasks": [
                 {
                     "title": task["title"],
-                    "subject": task["subject"],
+                    "subject": task.get("subject", "Unknown"),
                     "due_date_formatted": (task["due_date"].strftime("%A, %d %B %Y") if task["due_date"] else None),
                     "days_overdue": ((datetime.now().date() - task["due_date"].date()).days if task["due_date"] else 0),
                 }
@@ -251,7 +251,7 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
             "tasks": [
                 {
                     "title": task["title"],
-                    "subject": task["subject"],
+                    "subject": task.get("subject", "Unknown"),
                     "task_type": task["task_type"],
                     "setter": task["setter"],
                     "description": (
@@ -265,14 +265,14 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
             "urgent_tasks": [
                 {
                     "title": task["title"],
-                    "subject": task["subject"],
+                    "subject": task.get("subject", "Unknown"),
                     "task_type": task["task_type"],
                 }
                 for task in urgent_tasks
             ],
             "tasks_by_subject": {
-                subject: len([t for t in tasks if t["subject"] == subject])
-                for subject in set(task["subject"] for task in tasks)
+                subject: len([t for t in tasks if t.get("subject", "Unknown") == subject])
+                for subject in set(task.get("subject", "Unknown") for task in tasks)
             },
             "homework_count": len([t for t in tasks if t["task_type"] == "homework"]),
             "project_count": len([t for t in tasks if t["task_type"] == "project"]),
