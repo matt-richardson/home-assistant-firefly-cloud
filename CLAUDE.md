@@ -13,7 +13,9 @@ The integration follows Home Assistant's modern async architecture pattern:
 - **API Layer** (`api.py`): Async HTTP client wrapping Firefly's GraphQL API and REST endpoints
 - **Data Coordinator** (`coordinator.py`): Centralized data fetching with 15-minute polling interval
 - **Config Flow** (`config_flow.py`): Multi-step authentication via browser redirect to Firefly login
-- **Sensor Platform** (`sensor.py`): Four sensor types (today's schedule, weekly schedule, upcoming tasks, tasks due today)
+- **Sensor Platform** (`sensor.py`): Two sensor types (upcoming tasks, tasks due today)
+- **Calendar Platform** (`calendar.py`): School events and tasks in Home Assistant calendar format
+- **Todo Platform** (`todo.py`): Interactive todo list for managing school tasks
 - **Authentication Flow**: Device-based authentication using UUID device ID and secret token
 
 ## Reference Implementation
@@ -38,10 +40,10 @@ See `firefly-cloud-technical-spec.md` for complete Bronze + Silver tier checklis
 ## Data Models
 
 Key entities the integration handles:
-- **Events**: School classes with start/end times, subjects, locations
 - **Tasks**: Homework/assignments with due dates, subjects, and types
+- **Events**: School calendar events (via calendar platform)
+- **Todo Items**: Interactive task management (via todo platform)
 - **Multi-child support**: Family dashboard + individual child views
-- **Time-aware display**: Different information priorities for morning/afternoon/evening usage
 
 ## Testing Strategy
 
@@ -104,10 +106,10 @@ Test the following error conditions:
 
 ### Sensor Validation
 
-After successful setup, verify these sensors are created for each child:
-- `sensor.firefly_today_schedule_*` - Today's classes with times/locations
-- `sensor.firefly_week_schedule_*` - Weekly view with equipment requirements
+After successful setup, verify these entities are created for each child:
 - `sensor.firefly_upcoming_tasks_*` - Homework and assignments
 - `sensor.firefly_tasks_due_today_*` - Today's due tasks
+- `calendar.firefly_*` - School events and tasks in calendar format
+- `todo.firefly_*` - Interactive todo list for school tasks
 
-Check sensor attributes contain structured data suitable for dashboard cards.
+Check entity attributes contain structured data suitable for dashboard cards.

@@ -4,11 +4,11 @@ A Home Assistant custom integration that connects to Firefly Cloud (school learn
 
 ## Features
 
-- **Today's Schedule**: View current day's classes with times, subjects, and locations
-- **Weekly Schedule**: See upcoming classes for the week with special requirements (sports kit, equipment)
 - **Upcoming Tasks**: Monitor homework, projects, and assignments with due dates
+- **Tasks Due Today**: Quick view of today's due assignments
+- **Calendar Integration**: School events and tasks displayed in Home Assistant calendar
+- **Todo Integration**: Interactive todo list for managing school tasks
 - **Multi-Child Support**: Family dashboard view or individual child dashboards
-- **Time-Aware Display**: Different information priorities for morning prep, afternoon homework, and evening check-ins
 
 ## Installation
 
@@ -31,21 +31,21 @@ A Home Assistant custom integration that connects to Firefly Cloud (school learn
 4. Follow the browser authentication flow to log into Firefly
 5. The integration will automatically discover your children and create sensors
 
-## Sensors Created
+## Entities Created
 
 For each child, the integration creates:
-- `sensor.firefly_today_schedule_[child_name]` - Today's classes
-- `sensor.firefly_week_schedule_[child_name]` - This week's schedule  
 - `sensor.firefly_upcoming_tasks_[child_name]` - Tasks due in configured timeframe
 - `sensor.firefly_tasks_due_today_[child_name]` - Tasks due today
+- `calendar.firefly_[child_name]` - School events and tasks in calendar format
+- `todo.firefly_[child_name]` - Interactive todo list for school tasks
 
 ## Dashboard Usage
 
-The sensors provide rich attributes perfect for Home Assistant dashboard cards:
-- Class schedules with times and special requirements
-- Task lists grouped by subject and due date
-- Overdue task notifications
-- Sports uniform and equipment reminders
+The entities provide rich data perfect for Home Assistant dashboard cards:
+- Task lists grouped by subject and due date with sensor attributes
+- Overdue task notifications and counts
+- Calendar view of school events and deadlines
+- Interactive todo lists for task management
 
 ## Target Quality
 
@@ -122,12 +122,12 @@ The dev container provides multiple approaches for manual testing:
 - **Port Forwarding**: Home Assistant automatically accessible at localhost:8123
 - **Auto-formatting**: Code formatted on save with black/isort
 
-**4. Manual Sensor Validation**
-After adding integration, verify sensors show:
-- `sensor.firefly_today_schedule_*` - Current day's classes
-- `sensor.firefly_week_schedule_*` - Weekly view with equipment requirements
+**4. Manual Entity Validation**
+After adding integration, verify entities are created:
 - `sensor.firefly_upcoming_tasks_*` - Homework and assignments
 - `sensor.firefly_tasks_due_today_*` - Today's due tasks
+- `calendar.firefly_*` - School events and tasks in calendar
+- `todo.firefly_*` - Interactive todo list for tasks
 
 **5. Error Scenario Testing**
 Test integration behavior with:
