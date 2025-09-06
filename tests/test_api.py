@@ -712,3 +712,310 @@ async def test_get_tasks_request_exception_retry(api_client, mock_aiohttp_sessio
     result = await api_client.get_tasks()
 
     assert result == []
+
+
+@pytest.mark.asyncio
+async def test_api_client_init_with_user_guid(mock_aiohttp_session):
+    """Test API client initialization with user GUID."""
+    client = FireflyAPIClient(
+        session=mock_aiohttp_session,
+        host="https://test.com",
+        device_id="test-device",
+        secret="test-secret",
+        user_guid="test-user-guid"
+    )
+    
+    assert client._user_info is not None
+    assert client._user_info["guid"] == "test-user-guid"
+
+
+@pytest.mark.asyncio
+async def test_get_school_info_timeout(mock_aiohttp_session):
+    """Test school info retrieval with timeout."""
+    import asyncio
+    from tests.conftest import mock_http_response
+
+    mock_aiohttp_session._mock_responses["get"] = mock_http_response(
+        raise_for_status_exception=asyncio.TimeoutError()
+    )
+
+    with pytest.raises(FireflyConnectionError, match="Timeout connecting to Firefly"):
+        await FireflyAPIClient.get_school_info(mock_aiohttp_session, "testschool")
+
+
+@pytest.mark.asyncio
+async def test_get_school_info_aiohttp_client_error(mock_aiohttp_session):
+    """Test school info retrieval with aiohttp client error."""
+    import aiohttp
+    from tests.conftest import mock_http_response
+
+    mock_aiohttp_session._mock_responses["get"] = mock_http_response(
+        raise_for_status_exception=aiohttp.ClientError("Client error")
+    )
+
+    with pytest.raises(FireflyConnectionError, match="Error connecting to Firefly"):
+        await FireflyAPIClient.get_school_info(mock_aiohttp_session, "testschool")
+
+
+@pytest.mark.asyncio
+async def test_get_school_info_missing_address_element(mock_aiohttp_session):
+    """Test school info retrieval with missing address element."""
+    xml_response = """<?xml version="1.0"?>
+    <response exists="true" enabled="true">
+        <name>Test School</name>
+        <installationId>test-installation-id</installationId>
+    </response>"""
+
+    from tests.conftest import mock_http_response
+
+    mock_aiohttp_session._mock_responses["get"] = mock_http_response(text=xml_response)
+
+    with pytest.raises(FireflyDataError, match="Invalid school data received"):
+        await FireflyAPIClient.get_school_info(mock_aiohttp_session, "testschool")
+
+
+@pytest.mark.asyncio
+async def test_get_school_info_missing_name_or_id(mock_aiohttp_session):
+    """Test school info retrieval with missing name or installationId."""
+    xml_response = """<?xml version="1.0"?>
+    <response exists="true" enabled="true">
+        <address ssl="true">testschool.fireflycloud.net</address>
+    </response>"""
+
+    from tests.conftest import mock_http_response
+
+    mock_aiohttp_session._mock_responses["get"] = mock_http_response(text=xml_response)
+
+    with pytest.raises(FireflyDataError, match="Missing required school data"):
+        await FireflyAPIClient.get_school_info(mock_aiohttp_session, "testschool")
+
+
+@pytest.mark.asyncio
+async def test_get_api_version_timeout(api_client, mock_aiohttp_session):
+    """Test API version retrieval with timeout."""
+    import asyncio
+    from tests.conftest import mock_http_response
+
+    mock_aiohttp_session._mock_responses["get"] = mock_http_response(
+        raise_for_status_exception=asyncio.TimeoutError()
+    )
+
+    with pytest.raises(FireflyConnectionError, match="Timeout getting API version"):
+        await api_client.get_api_version()
+
+
+@pytest.mark.asyncio
+async def test_get_api_version_client_error(api_client, mock_aiohttp_session):
+    """Test API version retrieval with client error."""
+    import aiohttp
+    from tests.conftest import mock_http_response
+
+    mock_aiohttp_session._mock_responses["get"] = mock_http_response(
+        raise_for_status_exception=aiohttp.ClientError("Client error")
+    )
+
+    with pytest.raises(FireflyConnectionError, match="Error getting API version"):
+        await api_client.get_api_version()
+
+
+@pytest.mark.asyncio
+async def test_get_api_version_invalid_xml_structure(api_client, mock_aiohttp_session):
+    """Test API version retrieval with invalid XML structure."""
+    xml_response = """<?xml version="1.0"?>
+    <version>
+        <majorVersion>1</majorVersion>
+        <!-- Missing minorVersion and incrementVersion -->
+    </version>"""
+
+    from tests.conftest import mock_http_response
+
+    mock_aiohttp_session._mock_responses["get"] = mock_http_response(text=xml_response)
+
+    with pytest.raises(FireflyDataError, match="Missing version data"):
+        await api_client.get_api_version()
+
+
+@pytest.mark.asyncio
+async def test_get_api_version_empty_version_data(api_client, mock_aiohttp_session):
+    """Test API version retrieval with empty version data."""
+    xml_response = """<?xml version="1.0"?>
+    <version>
+        <majorVersion></majorVersion>
+        <minorVersion>2</minorVersion>
+        <incrementVersion>3</incrementVersion>
+    </version>"""
+
+    from tests.conftest import mock_http_response
+
+    mock_aiohttp_session._mock_responses["get"] = mock_http_response(text=xml_response)
+
+    with pytest.raises(FireflyDataError, match="Empty version data"):
+        await api_client.get_api_version()
+
+
+@pytest.mark.asyncio
+async def test_verify_credentials_client_response_error_401(api_client, mock_aiohttp_session):
+    """Test credential verification with 401 client response error."""
+    import aiohttp
+    from tests.conftest import mock_http_response
+
+    mock_aiohttp_session._mock_responses["get"] = mock_http_response(
+        raise_for_status_exception=aiohttp.ClientResponseError(
+            request_info=AsyncMock(), 
+            history=(), 
+            status=401,
+            message="Unauthorized"
+        )
+    )
+
+    result = await api_client.verify_credentials()
+    assert result is False
+
+
+@pytest.mark.asyncio
+async def test_verify_credentials_client_response_error_other(api_client, mock_aiohttp_session):
+    """Test credential verification with non-401 client response error."""
+    import aiohttp
+    from tests.conftest import mock_http_response
+
+    mock_aiohttp_session._mock_responses["get"] = mock_http_response(
+        raise_for_status_exception=aiohttp.ClientResponseError(
+            request_info=AsyncMock(), 
+            history=(), 
+            status=500,
+            message="Server Error"
+        )
+    )
+
+    with pytest.raises(FireflyAuthenticationError, match="Authentication error"):
+        await api_client.verify_credentials()
+
+
+@pytest.mark.asyncio
+async def test_verify_credentials_generic_client_error(api_client, mock_aiohttp_session):
+    """Test credential verification with generic client error."""
+    import aiohttp
+    from tests.conftest import mock_http_response
+
+    mock_aiohttp_session._mock_responses["get"] = mock_http_response(
+        raise_for_status_exception=aiohttp.ClientError("Generic client error")
+    )
+
+    with pytest.raises(FireflyConnectionError, match="Error verifying credentials"):
+        await api_client.verify_credentials()
+
+
+@pytest.mark.asyncio
+async def test_parse_authentication_response_invalid_xml_syntax(api_client):
+    """Test parsing authentication response with invalid XML syntax."""
+    xml_response = """<token>
+        <secret>test-secret-789</secret>
+        <user username="john.doe" fullname="John Doe" -- invalid comment structure
+    </token>"""
+
+    with pytest.raises(FireflyAuthenticationError, match="Invalid XML in auth response"):
+        await api_client.parse_authentication_response(xml_response)
+
+
+@pytest.mark.asyncio
+async def test_parse_authentication_response_empty_secret(api_client):
+    """Test parsing authentication response with empty secret."""
+    xml_response = """<token>
+        <secret></secret>
+        <user username="john.doe" fullname="John Doe" email="john.doe@test.com" role="student" guid="test-user-123"/>
+    </token>"""
+
+    with pytest.raises(FireflyAuthenticationError, match="Empty secret in authentication response"):
+        await api_client.parse_authentication_response(xml_response)
+
+
+@pytest.mark.asyncio
+async def test_graphql_query_retry_logic(api_client, mock_aiohttp_session):
+    """Test GraphQL query retry logic on timeout."""
+    import asyncio
+    from tests.conftest import mock_http_response
+
+    # Mock timeout error that exhausts retries
+    mock_aiohttp_session._mock_responses["post"] = mock_http_response(
+        raise_for_status_exception=asyncio.TimeoutError()
+    )
+
+    with pytest.raises(FireflyConnectionError, match="Timeout executing GraphQL query"):
+        await api_client._graphql_query("query { test }")
+
+
+@pytest.mark.asyncio
+async def test_graphql_query_client_error_retry(api_client, mock_aiohttp_session):
+    """Test GraphQL query retry logic on client error."""
+    import aiohttp
+    from tests.conftest import mock_http_response
+
+    # Mock client error that exhausts retries
+    mock_aiohttp_session._mock_responses["post"] = mock_http_response(
+        raise_for_status_exception=aiohttp.ClientError("Network error")
+    )
+
+    with pytest.raises(FireflyConnectionError, match="Error executing query"):
+        await api_client._graphql_query("query { test }")
+
+
+@pytest.mark.asyncio
+async def test_get_participating_groups_no_users_data(api_client):
+    """Test get_participating_groups with no users data."""
+    api_client._user_info = {"guid": "test-user-123"}
+
+    with patch.object(api_client, "_graphql_query") as mock_query:
+        mock_query.return_value = {"users": []}
+
+        result = await api_client.get_participating_groups()
+
+        assert result == []
+
+
+@pytest.mark.asyncio  
+async def test_get_events_rest_api_connection_error_retry(api_client, mock_aiohttp_session):
+    """Test REST API events with connection error retry logic."""
+    import aiohttp
+    from tests.conftest import mock_http_response
+    from datetime import datetime
+
+    start = datetime(2023, 1, 1, 9, 0)
+    end = datetime(2023, 1, 1, 17, 0)
+
+    # Mock connection error that exhausts retries
+    mock_aiohttp_session._mock_responses["get"] = mock_http_response(
+        raise_for_status_exception=aiohttp.ClientError("Connection error")
+    )
+
+    with pytest.raises(FireflyConnectionError, match="Error getting events via REST API"):
+        await api_client._get_events_rest_api(start, end, "user-123")
+
+
+@pytest.mark.asyncio
+async def test_get_tasks_connection_error_retry(api_client, mock_aiohttp_session):
+    """Test get_tasks with connection error retry logic."""
+    import aiohttp
+    from tests.conftest import mock_http_response
+
+    # Mock connection error that exhausts retries
+    mock_aiohttp_session._mock_responses["post"] = mock_http_response(
+        raise_for_status_exception=aiohttp.ClientError("Connection error")
+    )
+
+    with pytest.raises(FireflyConnectionError, match="Error getting tasks"):
+        await api_client.get_tasks()
+
+
+@pytest.mark.asyncio
+async def test_get_tasks_timeout_retry(api_client, mock_aiohttp_session):
+    """Test get_tasks with timeout retry logic."""
+    import asyncio
+    from tests.conftest import mock_http_response
+
+    # Mock timeout error that exhausts retries
+    mock_aiohttp_session._mock_responses["post"] = mock_http_response(
+        raise_for_status_exception=asyncio.TimeoutError()
+    )
+
+    with pytest.raises(FireflyConnectionError, match="Timeout getting tasks"):
+        await api_client.get_tasks()
