@@ -1,6 +1,6 @@
 """Test the Firefly Cloud sensor platform."""
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 from types import MappingProxyType
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -33,6 +33,7 @@ def mock_coordinator():
     """Return a mock coordinator with data."""
     coordinator = MagicMock()
     from custom_components.firefly_cloud.const import get_offset_time
+
     now = get_offset_time().replace(tzinfo=None)  # Remove timezone for test format
 
     # Mock coordinator data
@@ -187,6 +188,7 @@ async def test_tasks_due_today_sensor(mock_coordinator, mock_config_entry):
 async def test_tasks_due_today_sensor_with_tasks(mock_coordinator, mock_config_entry):
     """Test tasks due today sensor with tasks."""
     from custom_components.firefly_cloud.const import get_offset_time
+
     now = get_offset_time().replace(tzinfo=None)
     mock_coordinator.data["children_data"]["test-child-123"]["tasks"]["due_today"] = [
         {
@@ -270,6 +272,7 @@ async def test_sensor_extra_state_attributes(mock_coordinator, mock_config_entry
 async def test_sensor_handles_missing_data_gracefully(mock_coordinator, mock_config_entry):
     """Test sensor handles missing data gracefully."""
     from custom_components.firefly_cloud.const import get_offset_time
+
     # Remove specific data that sensor needs
     mock_coordinator.data = {
         "user_info": {"username": "test", "fullname": "Test User", "guid": "test-123"},
@@ -332,6 +335,7 @@ async def test_sensor_attributes_upcoming_tasks(mock_coordinator, mock_config_en
 async def test_sensor_attributes_tasks_due_today(mock_coordinator, mock_config_entry):
     """Test tasks due today sensor attributes."""
     from custom_components.firefly_cloud.const import get_offset_time
+
     now = get_offset_time().replace(tzinfo=None)
 
     # Add task due today to coordinator data
@@ -492,6 +496,7 @@ async def test_sensor_coordinator_data_update(mock_coordinator, mock_config_entr
 
     # Update coordinator data - add a new task for UPCOMING_TASKS sensor
     from custom_components.firefly_cloud.const import get_offset_time
+
     now = get_offset_time().replace(tzinfo=None)
     mock_coordinator.data["children_data"]["test-child-123"]["tasks"]["upcoming"].append(
         {
@@ -719,9 +724,7 @@ async def test_current_class_sensor_no_class(mock_coordinator, mock_config_entry
 @pytest.mark.asyncio
 async def test_current_class_sensor_with_class(mock_coordinator, mock_config_entry):
     """Test current class sensor when a class is currently active."""
-    from datetime import datetime, timezone
 
-    from homeassistant.util import dt as dt_util
     from custom_components.firefly_cloud.const import get_offset_time
 
     # Mock current time to be during the Math class (9-10am)
@@ -740,7 +743,6 @@ async def test_current_class_sensor_with_class(mock_coordinator, mock_config_ent
 @pytest.mark.asyncio
 async def test_next_class_sensor(mock_coordinator, mock_config_entry):
     """Test next class sensor."""
-    from datetime import datetime, timezone
     from custom_components.firefly_cloud.const import get_offset_time
 
     # Mock current time to be after today's Math class (e.g., 2pm)
@@ -770,7 +772,6 @@ async def test_next_class_sensor_no_upcoming(mock_coordinator, mock_config_entry
 @pytest.mark.asyncio
 async def test_current_class_attributes(mock_coordinator, mock_config_entry):
     """Test current class sensor attributes."""
-    from datetime import datetime, timezone
     from custom_components.firefly_cloud.const import get_offset_time
 
     # Mock current time to be during the Math class
@@ -807,7 +808,6 @@ async def test_current_class_attributes_no_class(mock_coordinator, mock_config_e
 @pytest.mark.asyncio
 async def test_next_class_attributes(mock_coordinator, mock_config_entry):
     """Test next class sensor attributes."""
-    from datetime import datetime, timezone
     from custom_components.firefly_cloud.const import get_offset_time
 
     # Mock current time to be after today's Math class so Science is next
@@ -856,7 +856,7 @@ async def test_class_sensors_with_no_events(mock_coordinator, mock_config_entry)
 @pytest.mark.asyncio
 async def test_next_class_during_last_class_of_day(mock_coordinator, mock_config_entry):
     """Test next class sensor shows None when in the last class of the day."""
-    from datetime import datetime, timezone, timedelta
+    from datetime import timedelta
     from custom_components.firefly_cloud.const import get_offset_time
 
     # Mock current time to be in the last class (Science 11am-12pm)
@@ -907,7 +907,7 @@ async def test_next_class_during_last_class_of_day(mock_coordinator, mock_config
 @pytest.mark.asyncio
 async def test_next_class_after_school_hours_shows_tomorrow(mock_coordinator, mock_config_entry):
     """Test next class sensor shows tomorrow's first class after school hours."""
-    from datetime import datetime, timezone, timedelta
+    from datetime import timedelta
     from custom_components.firefly_cloud.const import get_offset_time
 
     # Mock current time to be after school (6pm)
@@ -952,7 +952,6 @@ async def test_next_class_after_school_hours_shows_tomorrow(mock_coordinator, mo
 @pytest.mark.asyncio
 async def test_next_class_during_middle_class_shows_next_today(mock_coordinator, mock_config_entry):
     """Test next class sensor shows next class today when in a middle class."""
-    from datetime import datetime, timezone
     from custom_components.firefly_cloud.const import get_offset_time
 
     # Mock current time to be in the middle class (Math 9:30am)

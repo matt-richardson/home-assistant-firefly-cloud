@@ -1,7 +1,7 @@
 """Test the Firefly Cloud todo platform."""
 
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import Mock
 
 import pytest
 from homeassistant.components.todo import TodoItem, TodoItemStatus

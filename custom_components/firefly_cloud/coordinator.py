@@ -63,6 +63,7 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
 
             # Calculate date ranges (timezone-aware)
             from .const import get_offset_time
+
             now = get_offset_time()
             today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
             today_end = today_start + timedelta(days=1)

@@ -1,5 +1,6 @@
 """Constants for the Firefly Cloud integration."""
 
+import datetime
 from datetime import timedelta
 
 DOMAIN = "firefly_cloud"
@@ -93,13 +94,13 @@ TIME_OFFSET_DAYS = 0  # Days offset for testing (0 for normal operation)
 TIME_OFFSET_HOURS = 0  # Additional hour offset (can be fractional)
 
 
-def get_offset_time() -> "datetime":
+def get_offset_time() -> "datetime.datetime":
     """Get current time with configured offset applied.
 
     Returns:
         datetime: Current UTC time with TIME_OFFSET_DAYS and TIME_OFFSET_HOURS applied.
     """
-    from datetime import datetime, timezone, timedelta
+    from datetime import timedelta
     from homeassistant.util import dt as dt_util
 
     base_time = dt_util.now()
@@ -109,6 +110,8 @@ def get_offset_time() -> "datetime":
 
     offset = timedelta(days=TIME_OFFSET_DAYS, hours=TIME_OFFSET_HOURS)
     return base_time + offset
+
+
 RETRY_DELAY_BASE = 2  # Exponential backoff base in seconds
 TIMEOUT_SECONDS = 30
 

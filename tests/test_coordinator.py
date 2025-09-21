@@ -32,6 +32,7 @@ def mock_api():
 
     # Mock events - use offset time for consistency with coordinator
     from custom_components.firefly_cloud.const import get_offset_time
+
     now = get_offset_time().replace(tzinfo=None)  # Match test expectation format
     api.get_events.return_value = [
         {
@@ -176,6 +177,7 @@ async def test_coordinator_filter_tasks_due_today(hass: HomeAssistant, mock_api)
     """Test filtering tasks due today."""
     # Mock task due today - use offset time to match coordinator behavior
     from custom_components.firefly_cloud.const import get_offset_time
+
     now_utc = get_offset_time()
     today_end_utc = now_utc.replace(hour=23, minute=59, second=59, microsecond=0)
     task_due_today = {
@@ -211,6 +213,7 @@ async def test_coordinator_filter_overdue_tasks(hass: HomeAssistant, mock_api):
     """Test filtering overdue tasks."""
     # Mock overdue task - use offset time to match coordinator behavior
     from custom_components.firefly_cloud.const import get_offset_time
+
     now_utc = get_offset_time()
     overdue_task = {
         "guid": "overdue-task",
@@ -322,6 +325,7 @@ async def test_coordinator_task_lookahead_filtering(hass: HomeAssistant, mock_ap
     """Test task filtering based on lookahead days."""
     # Use offset time to match coordinator behavior
     from custom_components.firefly_cloud.const import get_offset_time
+
     now_utc = get_offset_time()
 
     # Mock tasks: one within lookahead, one beyond
@@ -387,6 +391,7 @@ async def test_coordinator_multiple_event_days(hass: HomeAssistant, mock_api):
     """Test coordinator with events spanning multiple days."""
     # Use offset time to match coordinator behavior
     from custom_components.firefly_cloud.const import get_offset_time
+
     now_utc = get_offset_time()
 
     # Mock events for different days
@@ -710,6 +715,7 @@ async def test_coordinator_task_lookahead_zero_days(hass: HomeAssistant, mock_ap
 async def test_coordinator_completed_tasks_filtering(hass: HomeAssistant, mock_api):
     """Test coordinator filtering completed tasks."""
     from custom_components.firefly_cloud.const import get_offset_time
+
     now = get_offset_time().replace(tzinfo=None)  # Match test format
 
     # Mock mix of completed and incomplete tasks

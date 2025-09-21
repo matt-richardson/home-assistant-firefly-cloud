@@ -1,6 +1,6 @@
 """Sensor platform for Firefly Cloud integration."""
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
@@ -296,6 +296,7 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
             return None
 
         from .const import get_offset_time
+
         now = get_offset_time()
 
         # Find current event (class currently happening)
@@ -322,6 +323,7 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
             return "None"
 
         from .const import get_offset_time
+
         now = get_offset_time()
         current_date = now.date()
 
@@ -368,6 +370,7 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
         """Get attributes for current class sensor."""
         events = child_data.get("events", {}).get("week", [])
         from .const import get_offset_time
+
         now = get_offset_time()
 
         if not events:
@@ -419,8 +422,8 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
         """Get attributes for next class sensor."""
         events = child_data.get("events", {}).get("week", [])
         from .const import get_offset_time
+
         now = get_offset_time()
-        current_date = now.date()
 
         if not events:
             return {
