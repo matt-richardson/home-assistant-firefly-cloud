@@ -1,6 +1,6 @@
 """Todo platform for Firefly Cloud integration."""
 
-from datetime import datetime, date
+from datetime import date, datetime
 from typing import Any, Dict, List
 
 from homeassistant.components.todo import (
@@ -24,7 +24,6 @@ from .const import (
     DOMAIN,
 )
 from .coordinator import FireflyUpdateCoordinator
-
 
 
 async def async_setup_entry(
@@ -172,10 +171,10 @@ class FireflyTodoListEntity(CoordinatorEntity, TodoListEntity):  # pylint: disab
 
         # Create description with additional details
         description_parts = []
-        if task_data.get("task_type"):
-            description_parts.append(f"Type: {task_data['task_type']}")
         if task_data.get("setter"):
             description_parts.append(f"Set by: {task_data['setter']}")
+        if task_data.get("task_type"):
+            description_parts.append(f"Type: {task_data['task_type']}")
         if task_data.get("description"):
             description_parts.append(task_data["description"])
 

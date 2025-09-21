@@ -1,8 +1,8 @@
 """Test configuration for Firefly Cloud integration."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime, timedelta
 from types import MappingProxyType
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import pytest_asyncio
@@ -26,9 +26,10 @@ from custom_components.firefly_cloud.const import (
 @pytest_asyncio.fixture
 async def hass():
     """Return a Home Assistant instance for testing."""
-    from homeassistant.core import HomeAssistant
-    from homeassistant.config_entries import ConfigEntries
     import tempfile
+
+    from homeassistant.config_entries import ConfigEntries
+    from homeassistant.core import HomeAssistant
 
     with tempfile.TemporaryDirectory() as temp_dir:
         hass = HomeAssistant(temp_dir)
@@ -65,8 +66,9 @@ async def hass():
             with patch("homeassistant.helpers.integration_platform.async_process_integration_platforms"):
                 with patch("homeassistant.helpers.frame.report_usage"):
                     # Import and register the config flow handler manually
-                    from custom_components.firefly_cloud.config_flow import FireflyCloudConfigFlow
                     from homeassistant.config_entries import HANDLERS
+
+                    from custom_components.firefly_cloud.config_flow import FireflyCloudConfigFlow
 
                     HANDLERS["firefly_cloud"] = FireflyCloudConfigFlow
 

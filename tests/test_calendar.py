@@ -1,6 +1,6 @@
 """Test the Firefly Cloud calendar platform."""
 
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from types import MappingProxyType
 from unittest.mock import MagicMock
 

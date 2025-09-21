@@ -1177,13 +1177,8 @@ async def test_coordinator_get_events_for_day_with_data(hass: HomeAssistant, moc
     # Mock data structure
     coordinator.data = {
         "events": {
-            "today": [
-                {"start": now, "subject": "Today's Event"}
-            ],
-            "week": [
-                {"start": now, "subject": "Today's Event"},
-                {"start": tomorrow, "subject": "Tomorrow's Event"}
-            ]
+            "today": [{"start": now, "subject": "Today's Event"}],
+            "week": [{"start": now, "subject": "Today's Event"}, {"start": tomorrow, "subject": "Tomorrow's Event"}],
         }
     }
 
@@ -1227,7 +1222,7 @@ async def test_coordinator_get_tasks_by_subject_with_data(hass: HomeAssistant, m
             "upcoming": [
                 {"subject": "Math", "title": "Math Homework"},
                 {"subject": "Science", "title": "Lab Report"},
-                {"subject": "Math", "title": "Math Test"}
+                {"subject": "Math", "title": "Math Test"},
             ]
         }
     }
@@ -1256,25 +1251,13 @@ async def test_coordinator_get_special_requirements_today(hass: HomeAssistant, m
 
     # Mock today's events with special requirements
     events_with_requirements = [
-        {
-            "start": now,
-            "subject": "PE",
-            "description": None
-        },
-        {
-            "start": now,
-            "subject": "Art",
-            "description": "Bring special equipment for painting"
-        },
-        {
-            "start": now,
-            "subject": "Games",
-            "description": "Sports kit required for outdoor activities"
-        }
+        {"start": now, "subject": "PE", "description": None},
+        {"start": now, "subject": "Art", "description": "Bring special equipment for painting"},
+        {"start": now, "subject": "Games", "description": "Sports kit required for outdoor activities"},
     ]
 
     # Patch get_events_for_day to return our mock events
-    with patch.object(coordinator, 'get_events_for_day', return_value=events_with_requirements):
+    with patch.object(coordinator, "get_events_for_day", return_value=events_with_requirements):
         requirements = coordinator.get_special_requirements_today()
 
         assert "Sports kit required" in requirements

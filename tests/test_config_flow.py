@@ -302,21 +302,21 @@ async def test_options_flow(hass: HomeAssistant, mock_config_entry) -> None:
 @pytest.mark.asyncio
 async def test_abort_if_already_configured(hass: HomeAssistant) -> None:
     """Test abort if already configured."""
-    from custom_components.firefly_cloud.const import (
-        DOMAIN,
-        CONF_SCHOOL_CODE,
-        CONF_SCHOOL_NAME,
-        CONF_HOST,
-        CONF_DEVICE_ID,
-        CONF_SECRET,
-        CONF_USER_GUID,
-        CONF_TASK_LOOKAHEAD_DAYS,
-        DEFAULT_TASK_LOOKAHEAD_DAYS,
-    )
-
     # Create an existing config entry with the same unique_id as the school code we'll test
     # and add it manually to Home Assistant's registry
     from homeassistant.config_entries import ConfigEntry
+
+    from custom_components.firefly_cloud.const import (
+        CONF_DEVICE_ID,
+        CONF_HOST,
+        CONF_SCHOOL_CODE,
+        CONF_SCHOOL_NAME,
+        CONF_SECRET,
+        CONF_TASK_LOOKAHEAD_DAYS,
+        CONF_USER_GUID,
+        DEFAULT_TASK_LOOKAHEAD_DAYS,
+        DOMAIN,
+    )
 
     existing_entry = ConfigEntry(
         version=1,

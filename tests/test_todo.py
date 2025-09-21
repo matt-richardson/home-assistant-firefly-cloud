@@ -1,16 +1,16 @@
 """Test the Firefly Cloud todo platform."""
 
-import pytest
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, Mock
 
+import pytest
 from homeassistant.components.todo import TodoItem, TodoItemStatus
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
-from custom_components.firefly_cloud.const import DOMAIN, CONF_SCHOOL_NAME, CONF_USER_GUID
-from custom_components.firefly_cloud.todo import FireflyTodoListEntity
+from custom_components.firefly_cloud.const import CONF_SCHOOL_NAME, CONF_USER_GUID, DOMAIN
 from custom_components.firefly_cloud.coordinator import FireflyUpdateCoordinator
+from custom_components.firefly_cloud.todo import FireflyTodoListEntity
 
 
 @pytest.fixture
