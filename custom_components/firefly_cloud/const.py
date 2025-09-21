@@ -77,6 +77,38 @@ TASK_SORT_DUE_DATE_ASC = {"column": "DueDate", "order": "Ascending"}
 
 # Error retry configuration
 MAX_RETRIES = 3
+
+# Time offset parameters for testing/debugging
+# Set both to 0 for normal operation
+# Negative values go back in time (useful for testing with historical data)
+#
+# Usage examples:
+# TIME_OFFSET_DAYS = 0, TIME_OFFSET_HOURS = 0     # Normal operation
+# TIME_OFFSET_DAYS = -6, TIME_OFFSET_HOURS = 0    # 6 days ago (testing with historical data)
+# TIME_OFFSET_DAYS = -1, TIME_OFFSET_HOURS = -2   # Yesterday, 2 hours earlier
+# TIME_OFFSET_DAYS = 0, TIME_OFFSET_HOURS = 3     # Today, 3 hours later
+# TIME_OFFSET_DAYS = 1, TIME_OFFSET_HOURS = 0     # Tomorrow (same time)
+#
+TIME_OFFSET_DAYS = 0  # Days offset for testing (0 for normal operation)
+TIME_OFFSET_HOURS = 0  # Additional hour offset (can be fractional)
+
+
+def get_offset_time() -> "datetime":
+    """Get current time with configured offset applied.
+
+    Returns:
+        datetime: Current UTC time with TIME_OFFSET_DAYS and TIME_OFFSET_HOURS applied.
+    """
+    from datetime import datetime, timezone, timedelta
+    from homeassistant.util import dt as dt_util
+
+    base_time = dt_util.now()
+
+    if TIME_OFFSET_DAYS == 0 and TIME_OFFSET_HOURS == 0:
+        return base_time
+
+    offset = timedelta(days=TIME_OFFSET_DAYS, hours=TIME_OFFSET_HOURS)
+    return base_time + offset
 RETRY_DELAY_BASE = 2  # Exponential backoff base in seconds
 TIMEOUT_SECONDS = 30
 

@@ -32,7 +32,8 @@ from custom_components.firefly_cloud.sensor import (
 def mock_coordinator():
     """Return a mock coordinator with data."""
     coordinator = MagicMock()
-    now = datetime.now()
+    from custom_components.firefly_cloud.const import get_offset_time
+    now = get_offset_time().replace(tzinfo=None)  # Remove timezone for test format
 
     # Mock coordinator data
     coordinator.data = {
@@ -127,7 +128,7 @@ def mock_coordinator():
                 },
             },
         },
-        "last_updated": now,
+        "last_updated": get_offset_time(),
     }
 
     coordinator.last_update_success = True
@@ -185,7 +186,8 @@ async def test_tasks_due_today_sensor(mock_coordinator, mock_config_entry):
 @pytest.mark.asyncio
 async def test_tasks_due_today_sensor_with_tasks(mock_coordinator, mock_config_entry):
     """Test tasks due today sensor with tasks."""
-    now = datetime.now()
+    from custom_components.firefly_cloud.const import get_offset_time
+    now = get_offset_time().replace(tzinfo=None)
     mock_coordinator.data["children_data"]["test-child-123"]["tasks"]["due_today"] = [
         {
             "id": "urgent-task",
@@ -267,6 +269,7 @@ async def test_sensor_extra_state_attributes(mock_coordinator, mock_config_entry
 @pytest.mark.asyncio
 async def test_sensor_handles_missing_data_gracefully(mock_coordinator, mock_config_entry):
     """Test sensor handles missing data gracefully."""
+    from custom_components.firefly_cloud.const import get_offset_time
     # Remove specific data that sensor needs
     mock_coordinator.data = {
         "user_info": {"username": "test", "fullname": "Test User", "guid": "test-123"},
@@ -276,7 +279,7 @@ async def test_sensor_handles_missing_data_gracefully(mock_coordinator, mock_con
                 "tasks": {},  # Missing task type keys
             }
         },
-        "last_updated": datetime.now(),
+        "last_updated": get_offset_time(),
     }
 
     sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_UPCOMING_TASKS, "test-child-123")
@@ -328,7 +331,8 @@ async def test_sensor_attributes_upcoming_tasks(mock_coordinator, mock_config_en
 @pytest.mark.asyncio
 async def test_sensor_attributes_tasks_due_today(mock_coordinator, mock_config_entry):
     """Test tasks due today sensor attributes."""
-    now = datetime.now()
+    from custom_components.firefly_cloud.const import get_offset_time
+    now = get_offset_time().replace(tzinfo=None)
 
     # Add task due today to coordinator data
     mock_coordinator.data["children_data"]["test-child-123"]["tasks"]["due_today"] = [
@@ -487,7 +491,8 @@ async def test_sensor_coordinator_data_update(mock_coordinator, mock_config_entr
     assert initial_value == 1
 
     # Update coordinator data - add a new task for UPCOMING_TASKS sensor
-    now = datetime.now()
+    from custom_components.firefly_cloud.const import get_offset_time
+    now = get_offset_time().replace(tzinfo=None)
     mock_coordinator.data["children_data"]["test-child-123"]["tasks"]["upcoming"].append(
         {
             "id": "task-2",
@@ -717,16 +722,17 @@ async def test_current_class_sensor_with_class(mock_coordinator, mock_config_ent
     from datetime import datetime, timezone
 
     from homeassistant.util import dt as dt_util
+    from custom_components.firefly_cloud.const import get_offset_time
 
     # Mock current time to be during the Math class (9-10am)
-    now = datetime.now(timezone.utc).replace(hour=9, minute=30, second=0, microsecond=0)
+    now = get_offset_time().replace(hour=9, minute=30, second=0, microsecond=0)
 
     # Update event times to match current time
     math_event = mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"][0]
     math_event["start"] = now.replace(minute=0)
     math_event["end"] = now.replace(hour=10, minute=0)
 
-    with patch("homeassistant.util.dt.now", return_value=now):
+    with patch("custom_components.firefly_cloud.const.get_offset_time", return_value=now):
         sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_CURRENT_CLASS, "test-child-123")
         assert sensor.native_value == "Mathematics"
 
@@ -735,11 +741,12 @@ async def test_current_class_sensor_with_class(mock_coordinator, mock_config_ent
 async def test_next_class_sensor(mock_coordinator, mock_config_entry):
     """Test next class sensor."""
     from datetime import datetime, timezone
+    from custom_components.firefly_cloud.const import get_offset_time
 
     # Mock current time to be after today's Math class (e.g., 2pm)
-    now = datetime.now(timezone.utc).replace(hour=14, minute=0, second=0, microsecond=0)
+    now = get_offset_time().replace(hour=14, minute=0, second=0, microsecond=0)
 
-    with patch("homeassistant.util.dt.now", return_value=now):
+    with patch("custom_components.firefly_cloud.const.get_offset_time", return_value=now):
         sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_NEXT_CLASS, "test-child-123")
 
         assert "Next Class" in sensor.name
@@ -757,23 +764,24 @@ async def test_next_class_sensor_no_upcoming(mock_coordinator, mock_config_entry
     mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"] = []
 
     sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_NEXT_CLASS, "test-child-123")
-    assert sensor.native_value is None
+    assert sensor.native_value == "None"
 
 
 @pytest.mark.asyncio
 async def test_current_class_attributes(mock_coordinator, mock_config_entry):
     """Test current class sensor attributes."""
     from datetime import datetime, timezone
+    from custom_components.firefly_cloud.const import get_offset_time
 
     # Mock current time to be during the Math class
-    now = datetime.now(timezone.utc).replace(hour=9, minute=30, second=0, microsecond=0)
+    now = get_offset_time().replace(hour=9, minute=30, second=0, microsecond=0)
 
     # Update event times
     math_event = mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"][0]
     math_event["start"] = now.replace(minute=0)
     math_event["end"] = now.replace(hour=10, minute=0)
 
-    with patch("homeassistant.util.dt.now", return_value=now):
+    with patch("custom_components.firefly_cloud.const.get_offset_time", return_value=now):
         sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_CURRENT_CLASS, "test-child-123")
 
         attributes = sensor.extra_state_attributes
@@ -800,11 +808,12 @@ async def test_current_class_attributes_no_class(mock_coordinator, mock_config_e
 async def test_next_class_attributes(mock_coordinator, mock_config_entry):
     """Test next class sensor attributes."""
     from datetime import datetime, timezone
+    from custom_components.firefly_cloud.const import get_offset_time
 
     # Mock current time to be after today's Math class so Science is next
-    now = datetime.now(timezone.utc).replace(hour=14, minute=0, second=0, microsecond=0)
+    now = get_offset_time().replace(hour=14, minute=0, second=0, microsecond=0)
 
-    with patch("homeassistant.util.dt.now", return_value=now):
+    with patch("custom_components.firefly_cloud.const.get_offset_time", return_value=now):
         sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_NEXT_CLASS, "test-child-123")
 
         attributes = sensor.extra_state_attributes
@@ -839,6 +848,147 @@ async def test_class_sensors_with_no_events(mock_coordinator, mock_config_entry)
     next_sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_NEXT_CLASS, "test-child-123")
 
     assert current_sensor.native_value is None
-    assert next_sensor.native_value is None
+    assert next_sensor.native_value == "None"
     assert current_sensor.available is True  # Still available, just no data
     assert next_sensor.available is True
+
+
+@pytest.mark.asyncio
+async def test_next_class_during_last_class_of_day(mock_coordinator, mock_config_entry):
+    """Test next class sensor shows None when in the last class of the day."""
+    from datetime import datetime, timezone, timedelta
+    from custom_components.firefly_cloud.const import get_offset_time
+
+    # Mock current time to be in the last class (Science 11am-12pm)
+    now = get_offset_time().replace(hour=11, minute=30, second=0, microsecond=0)
+
+    # Set up events: Math 9-10am (past), Science 11am-12pm (current), English tomorrow 9am
+    events = [
+        {
+            "start": now.replace(hour=9, minute=0),
+            "end": now.replace(hour=10, minute=0),
+            "subject": "Mathematics",
+            "location": "Room 101",
+            "description": "Algebra lesson",
+        },
+        {
+            "start": now.replace(hour=11, minute=0),
+            "end": now.replace(hour=12, minute=0),
+            "subject": "Science",
+            "location": "Lab 1",
+            "description": "Last class of day",
+        },
+        {
+            "start": now.replace(hour=9, minute=0) + timedelta(days=1),  # Tomorrow 9am
+            "end": now.replace(hour=10, minute=0) + timedelta(days=1),
+            "subject": "English",
+            "location": "Room 102",
+            "description": "Tomorrow's first class",
+        },
+    ]
+
+    mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"] = events
+
+    with patch("custom_components.firefly_cloud.const.get_offset_time", return_value=now):
+        current_sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_CURRENT_CLASS, "test-child-123")
+        next_sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_NEXT_CLASS, "test-child-123")
+
+        # Should be in Science class
+        assert current_sensor.native_value == "Science"
+        # Next should be "None" (last class of day)
+        assert next_sensor.native_value == "None"
+
+        # Check attributes
+        next_attributes = next_sensor.extra_state_attributes
+        assert next_attributes["status"] == "last_class_of_day"
+        assert next_attributes["context"] == "no_more_classes_today"
+
+
+@pytest.mark.asyncio
+async def test_next_class_after_school_hours_shows_tomorrow(mock_coordinator, mock_config_entry):
+    """Test next class sensor shows tomorrow's first class after school hours."""
+    from datetime import datetime, timezone, timedelta
+    from custom_components.firefly_cloud.const import get_offset_time
+
+    # Mock current time to be after school (6pm)
+    now = get_offset_time().replace(hour=18, minute=0, second=0, microsecond=0)
+
+    # Set up events: Science today (past), Math tomorrow (future)
+    events = [
+        {
+            "start": now.replace(hour=11, minute=0),  # Today 11am (past)
+            "end": now.replace(hour=12, minute=0),
+            "subject": "Science",
+            "location": "Lab 1",
+            "description": "Today's last class",
+        },
+        {
+            "start": now.replace(hour=9, minute=0) + timedelta(days=1),  # Tomorrow 9am
+            "end": now.replace(hour=10, minute=0) + timedelta(days=1),
+            "subject": "Mathematics",
+            "location": "Room 101",
+            "description": "Tomorrow's first class",
+        },
+    ]
+
+    mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"] = events
+
+    with patch("custom_components.firefly_cloud.const.get_offset_time", return_value=now):
+        current_sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_CURRENT_CLASS, "test-child-123")
+        next_sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_NEXT_CLASS, "test-child-123")
+
+        # No current class (after hours)
+        assert current_sensor.native_value is None
+        # Next should show tomorrow's first class
+        assert next_sensor.native_value == "Mathematics"
+
+        # Check attributes
+        next_attributes = next_sensor.extra_state_attributes
+        assert next_attributes["status"] == "class_scheduled"
+        assert next_attributes["class_name"] == "Mathematics"
+        assert next_attributes["context"] == "next_class_future_day"
+
+
+@pytest.mark.asyncio
+async def test_next_class_during_middle_class_shows_next_today(mock_coordinator, mock_config_entry):
+    """Test next class sensor shows next class today when in a middle class."""
+    from datetime import datetime, timezone
+    from custom_components.firefly_cloud.const import get_offset_time
+
+    # Mock current time to be in the middle class (Math 9:30am)
+    now = get_offset_time().replace(hour=9, minute=30, second=0, microsecond=0)
+
+    # Set up events: Math 9-10am (current), Science 11am-12pm (next today)
+    events = [
+        {
+            "start": now.replace(hour=9, minute=0),
+            "end": now.replace(hour=10, minute=0),
+            "subject": "Mathematics",
+            "location": "Room 101",
+            "description": "Current class",
+        },
+        {
+            "start": now.replace(hour=11, minute=0),
+            "end": now.replace(hour=12, minute=0),
+            "subject": "Science",
+            "location": "Lab 1",
+            "description": "Next class today",
+        },
+    ]
+
+    mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"] = events
+
+    with patch("custom_components.firefly_cloud.const.get_offset_time", return_value=now):
+        current_sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_CURRENT_CLASS, "test-child-123")
+        next_sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_NEXT_CLASS, "test-child-123")
+
+        # Should be in Math class
+        assert current_sensor.native_value == "Mathematics"
+        # Next should show Science (next class today)
+        assert next_sensor.native_value == "Science"
+
+        # Check attributes
+        next_attributes = next_sensor.extra_state_attributes
+        assert next_attributes["status"] == "class_scheduled"
+        assert next_attributes["class_name"] == "Science"
+        assert next_attributes["context"] == "next_class_today"

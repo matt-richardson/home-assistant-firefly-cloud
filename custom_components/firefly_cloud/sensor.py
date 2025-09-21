@@ -1,6 +1,6 @@
 """Sensor platform for Firefly Cloud integration."""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
@@ -295,7 +295,8 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
         if not events:
             return None
 
-        now = dt_util.now()
+        from .const import get_offset_time
+        now = get_offset_time()
 
         # Find current event (class currently happening)
         for event in events:
@@ -318,11 +319,35 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
         """Get the next upcoming class."""
         events = child_data.get("events", {}).get("week", [])
         if not events:
-            return None
+            return "None"
 
-        now = dt_util.now()
+        from .const import get_offset_time
+        now = get_offset_time()
+        current_date = now.date()
 
-        # Find next upcoming event
+        # Check if we're currently IN a class
+        current_class = self._get_current_class(child_data)
+        if current_class:
+            # We're in a class - find the next class using timezone-aware comparison
+            for event in events:
+                event_start = event["start"]
+                if hasattr(event_start, "tzinfo") and event_start.tzinfo is None:
+                    event_start = dt_util.as_utc(event_start)
+
+                if event_start > now:
+                    # Convert event time to local timezone for date comparison
+                    event_local = event_start.astimezone(now.tzinfo) if now.tzinfo else event_start.replace(tzinfo=None)
+
+                    # Check if it's today in local time
+                    if event_local.date() == current_date:
+                        return event["subject"]  # Next class today
+                    else:
+                        return "None"  # Next class is tomorrow - last class of day
+
+            # No upcoming events at all
+            return "None"
+
+        # We're not in a class - find the next class (today or future days)
         upcoming_events = []
         for event in events:
             event_start = event["start"]
@@ -337,12 +362,13 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
             # Events are already sorted by start time in coordinator
             return upcoming_events[0]["subject"]
 
-        return None
+        return "None"
 
     def _get_current_class_attributes(self, child_data: Dict[str, Any]) -> Dict[str, Any]:
         """Get attributes for current class sensor."""
         events = child_data.get("events", {}).get("week", [])
-        now = dt_util.now()
+        from .const import get_offset_time
+        now = get_offset_time()
 
         if not events:
             return {
@@ -392,7 +418,9 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
     def _get_next_class_attributes(self, child_data: Dict[str, Any]) -> Dict[str, Any]:
         """Get attributes for next class sensor."""
         events = child_data.get("events", {}).get("week", [])
-        now = dt_util.now()
+        from .const import get_offset_time
+        now = get_offset_time()
+        current_date = now.date()
 
         if not events:
             return {
@@ -400,7 +428,15 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
                 "current_time": now.isoformat(),
             }
 
-        # Find next upcoming event
+        # Check if we're currently IN a class
+        current_class = self._get_current_class(child_data)
+        if current_class:
+            # We're in a class - but let's use the same logic as "not in class"
+            # to find the truly next class, whether today or tomorrow
+            # This avoids the issue of late-night events being considered "next class today"
+            pass
+
+        # Find the next class (any day)
         upcoming_events = []
         for event in events:
             event_start = event["start"]
@@ -410,6 +446,7 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
 
             if event_start > now:
                 upcoming_events.append(event)
+
         if not upcoming_events:
             return {
                 "status": "no_upcoming_class",
@@ -417,12 +454,41 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
             }
 
         next_event = upcoming_events[0]
-
-        # Calculate time until next class
         event_start = next_event["start"]
+
+        # Convert event time to local timezone for proper date comparison
+        event_local = next_event["start"]
+        if hasattr(event_local, "tzinfo") and event_local.tzinfo:
+            # Convert UTC time to local timezone for date comparison
+            event_local = event_local.astimezone(now.tzinfo) if now.tzinfo else event_local.replace(tzinfo=None)
+
+        # Compare dates in the same timezone (both local)
+        current_date_str = now.date().isoformat()
+        event_local_date_str = event_local.date().isoformat()
+        is_today = current_date_str == event_local_date_str
+
+        # Determine context based on whether we're in a class and the timing
+        if current_class and is_today:
+            context = "next_class_today"
+        elif current_class and not is_today:
+            context = "last_class_of_day"  # In class but next class is not today
+        elif not current_class and is_today:
+            context = "next_class_today"
+        else:
+            context = "next_class_future_day"
+
+        # Convert to UTC for time calculations
         if hasattr(event_start, "tzinfo") and event_start.tzinfo is None:
             event_start = dt_util.as_utc(event_start)
         time_until = (event_start - now).total_seconds() / 60  # minutes
+
+        # Special handling for "last class of day" scenario
+        if context == "last_class_of_day":
+            return {
+                "status": "last_class_of_day",
+                "current_time": now.isoformat(),
+                "context": "no_more_classes_today",
+            }
 
         return {
             "status": "class_scheduled",
@@ -433,4 +499,5 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
             "minutes_until": round(time_until),
             "description": next_event.get("description"),
             "current_time": now.isoformat(),
+            "context": context,
         }

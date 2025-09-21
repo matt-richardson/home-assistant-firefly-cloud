@@ -30,8 +30,9 @@ def mock_api():
         "guid": "test-user-123",
     }
 
-    # Mock events
-    now = datetime.now()
+    # Mock events - use offset time for consistency with coordinator
+    from custom_components.firefly_cloud.const import get_offset_time
+    now = get_offset_time().replace(tzinfo=None)  # Match test expectation format
     api.get_events.return_value = [
         {
             "start": now.replace(hour=9, minute=0, second=0, microsecond=0).isoformat() + "Z",
@@ -173,8 +174,9 @@ async def test_coordinator_process_tasks(hass: HomeAssistant, mock_api):
 @pytest.mark.asyncio
 async def test_coordinator_filter_tasks_due_today(hass: HomeAssistant, mock_api):
     """Test filtering tasks due today."""
-    # Mock task due today - use UTC time to match coordinator behavior
-    now_utc = datetime.now(timezone.utc)
+    # Mock task due today - use offset time to match coordinator behavior
+    from custom_components.firefly_cloud.const import get_offset_time
+    now_utc = get_offset_time()
     today_end_utc = now_utc.replace(hour=23, minute=59, second=59, microsecond=0)
     task_due_today = {
         "guid": "urgent-task",
@@ -207,8 +209,9 @@ async def test_coordinator_filter_tasks_due_today(hass: HomeAssistant, mock_api)
 @pytest.mark.asyncio
 async def test_coordinator_filter_overdue_tasks(hass: HomeAssistant, mock_api):
     """Test filtering overdue tasks."""
-    # Mock overdue task - use UTC time to match coordinator behavior
-    now_utc = datetime.now(timezone.utc)
+    # Mock overdue task - use offset time to match coordinator behavior
+    from custom_components.firefly_cloud.const import get_offset_time
+    now_utc = get_offset_time()
     overdue_task = {
         "guid": "overdue-task",
         "title": "Late Assignment",
@@ -317,8 +320,9 @@ async def test_coordinator_partial_failure_recovery(hass: HomeAssistant, mock_ap
 @pytest.mark.asyncio
 async def test_coordinator_task_lookahead_filtering(hass: HomeAssistant, mock_api):
     """Test task filtering based on lookahead days."""
-    # Use UTC time to match coordinator behavior
-    now_utc = datetime.now(timezone.utc)
+    # Use offset time to match coordinator behavior
+    from custom_components.firefly_cloud.const import get_offset_time
+    now_utc = get_offset_time()
 
     # Mock tasks: one within lookahead, one beyond
     tasks = [
@@ -381,8 +385,9 @@ async def test_coordinator_shutdown(hass: HomeAssistant, mock_api):
 @pytest.mark.asyncio
 async def test_coordinator_multiple_event_days(hass: HomeAssistant, mock_api):
     """Test coordinator with events spanning multiple days."""
-    # Use UTC time to match coordinator behavior
-    now_utc = datetime.now(timezone.utc)
+    # Use offset time to match coordinator behavior
+    from custom_components.firefly_cloud.const import get_offset_time
+    now_utc = get_offset_time()
 
     # Mock events for different days
     events: List[Dict[str, Any]] = [
@@ -704,7 +709,8 @@ async def test_coordinator_task_lookahead_zero_days(hass: HomeAssistant, mock_ap
 @pytest.mark.asyncio
 async def test_coordinator_completed_tasks_filtering(hass: HomeAssistant, mock_api):
     """Test coordinator filtering completed tasks."""
-    now = datetime.now()
+    from custom_components.firefly_cloud.const import get_offset_time
+    now = get_offset_time().replace(tzinfo=None)  # Match test format
 
     # Mock mix of completed and incomplete tasks
     tasks = [
