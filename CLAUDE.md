@@ -13,7 +13,7 @@ The integration follows Home Assistant's modern async architecture pattern:
 - **API Layer** (`api.py`): Async HTTP client wrapping Firefly's GraphQL API and REST endpoints
 - **Data Coordinator** (`coordinator.py`): Centralized data fetching with 15-minute polling interval
 - **Config Flow** (`config_flow.py`): Multi-step authentication via browser redirect to Firefly login
-- **Sensor Platform** (`sensor.py`): Two sensor types (upcoming tasks, tasks due today)
+- **Sensor Platform** (`sensor.py`): Four sensor types (upcoming tasks, tasks due today, current class, next class)
 - **Calendar Platform** (`calendar.py`): School events and tasks in Home Assistant calendar format
 - **Todo Platform** (`todo.py`): Interactive todo list for managing school tasks
 - **Authentication Flow**: Device-based authentication using UUID device ID and secret token
@@ -109,6 +109,8 @@ Test the following error conditions:
 After successful setup, verify these entities are created for each child:
 - `sensor.firefly_upcoming_tasks_*` - Homework and assignments
 - `sensor.firefly_tasks_due_today_*` - Today's due tasks
+- `sensor.firefly_current_class_*` - Currently active class/lesson
+- `sensor.firefly_next_class_*` - Next scheduled class/lesson
 - `calendar.firefly_*` - School events and tasks in calendar format
 - `todo.firefly_*` - Interactive todo list for school tasks
 

@@ -8,9 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Current class sensor - shows actively running classes/lessons
+- Next class sensor - shows upcoming scheduled classes/lessons
+- Real-time school schedule tracking
 - HACS compatibility and metadata
 - GitHub release workflow
 - Changelog for version tracking
+
+### Fixed
+- Code quality improvements and linting fixes
 
 ## [0.1.1] - 2024-09-06
 

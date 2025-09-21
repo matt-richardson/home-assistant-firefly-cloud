@@ -6,6 +6,7 @@ A Home Assistant custom integration that connects to Firefly Cloud (school learn
 
 - **Upcoming Tasks**: Monitor homework, projects, and assignments with due dates
 - **Tasks Due Today**: Quick view of today's due assignments
+- **Current/Next Class**: Real-time school schedule showing current and upcoming lessons
 - **Calendar Integration**: School events and tasks displayed in Home Assistant calendar
 - **Todo Integration**: Interactive todo list for managing school tasks
 - **Multi-Child Support**: Family dashboard view or individual child dashboards
@@ -39,6 +40,8 @@ A Home Assistant custom integration that connects to Firefly Cloud (school learn
 For each child, the integration creates:
 - `sensor.firefly_upcoming_tasks_[child_name]` - Tasks due in configured timeframe
 - `sensor.firefly_tasks_due_today_[child_name]` - Tasks due today
+- `sensor.firefly_current_class_[child_name]` - Currently active class/lesson
+- `sensor.firefly_next_class_[child_name]` - Next scheduled class/lesson
 - `calendar.firefly_[child_name]` - School events and tasks in calendar format
 - `todo.firefly_[child_name]` - Interactive todo list for school tasks
 
@@ -47,6 +50,7 @@ For each child, the integration creates:
 The entities provide rich data perfect for Home Assistant dashboard cards:
 - Task lists grouped by subject and due date with sensor attributes
 - Overdue task notifications and counts
+- Real-time class schedule with current and next lesson information
 - Calendar view of school events and deadlines
 - Interactive todo lists for task management
 
@@ -129,6 +133,8 @@ The dev container provides multiple approaches for manual testing:
 After adding integration, verify entities are created:
 - `sensor.firefly_upcoming_tasks_*` - Homework and assignments
 - `sensor.firefly_tasks_due_today_*` - Today's due tasks
+- `sensor.firefly_current_class_*` - Currently active class/lesson
+- `sensor.firefly_next_class_*` - Next scheduled class/lesson
 - `calendar.firefly_*` - School events and tasks in calendar
 - `todo.firefly_*` - Interactive todo list for tasks
 
