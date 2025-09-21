@@ -1156,7 +1156,7 @@ async def test_coordinator_get_events_for_day_no_data(hass: HomeAssistant, mock_
         api=mock_api,
         task_lookahead_days=7,
     )
-    
+
     # Test with no data loaded
     result = coordinator.get_events_for_day(datetime.now())
     assert result == []
@@ -1170,10 +1170,10 @@ async def test_coordinator_get_events_for_day_with_data(hass: HomeAssistant, moc
         api=mock_api,
         task_lookahead_days=7,
     )
-    
+
     now = datetime.now()
     tomorrow = now + timedelta(days=1)
-    
+
     # Mock data structure
     coordinator.data = {
         "events": {
@@ -1186,12 +1186,12 @@ async def test_coordinator_get_events_for_day_with_data(hass: HomeAssistant, moc
             ]
         }
     }
-    
+
     # Test getting today's events
     today_events = coordinator.get_events_for_day(now)
     assert len(today_events) == 1
     assert today_events[0]["subject"] == "Today's Event"
-    
+
     # Test getting tomorrow's events from week data
     tomorrow_events = coordinator.get_events_for_day(tomorrow)
     assert len(tomorrow_events) == 1
@@ -1206,7 +1206,7 @@ async def test_coordinator_get_tasks_by_subject_no_data(hass: HomeAssistant, moc
         api=mock_api,
         task_lookahead_days=7,
     )
-    
+
     # Test with no data
     result = coordinator.get_tasks_by_subject()
     assert result == {}
@@ -1220,7 +1220,7 @@ async def test_coordinator_get_tasks_by_subject_with_data(hass: HomeAssistant, m
         api=mock_api,
         task_lookahead_days=7,
     )
-    
+
     # Mock data structure
     coordinator.data = {
         "tasks": {
@@ -1231,9 +1231,9 @@ async def test_coordinator_get_tasks_by_subject_with_data(hass: HomeAssistant, m
             ]
         }
     }
-    
+
     result = coordinator.get_tasks_by_subject()
-    
+
     assert "Math" in result
     assert "Science" in result
     assert len(result["Math"]) == 2
@@ -1251,9 +1251,9 @@ async def test_coordinator_get_special_requirements_today(hass: HomeAssistant, m
         api=mock_api,
         task_lookahead_days=7,
     )
-    
+
     now = datetime.now()
-    
+
     # Mock today's events with special requirements
     events_with_requirements = [
         {
@@ -1272,11 +1272,11 @@ async def test_coordinator_get_special_requirements_today(hass: HomeAssistant, m
             "description": "Sports kit required for outdoor activities"
         }
     ]
-    
+
     # Patch get_events_for_day to return our mock events
     with patch.object(coordinator, 'get_events_for_day', return_value=events_with_requirements):
         requirements = coordinator.get_special_requirements_today()
-        
+
         assert "Sports kit required" in requirements
         assert "Special equipment for Art" in requirements
         # Should deduplicate sports kit requirement
@@ -1284,7 +1284,7 @@ async def test_coordinator_get_special_requirements_today(hass: HomeAssistant, m
         assert sports_kit_count == 1
 
 
-@pytest.mark.asyncio 
+@pytest.mark.asyncio
 async def test_coordinator_process_tasks_keyerror_handling(hass: HomeAssistant, mock_api):
     """Test _process_tasks handling KeyError and TypeError."""
     # Mock task that will cause KeyError during processing
@@ -1294,18 +1294,18 @@ async def test_coordinator_process_tasks_keyerror_handling(hass: HomeAssistant, 
             "description": "Task missing critical fields",
         }
     ]
-    
+
     coordinator = FireflyUpdateCoordinator(
         hass=hass,
         api=mock_api,
         task_lookahead_days=7,
     )
-    
+
     data = await coordinator._async_update_data()
-    
+
     child_guid = list(data["children_data"].keys())[0]
     child_data = data["children_data"][child_guid]
-    
+
     # Task should be filtered out due to processing error (gracefully handled)
     assert len(child_data["tasks"]["all"]) >= 0
 
@@ -1314,7 +1314,7 @@ async def test_coordinator_process_tasks_keyerror_handling(hass: HomeAssistant, 
 async def test_coordinator_filter_tasks_naive_datetime_handling(hass: HomeAssistant, mock_api):
     """Test _filter_tasks_by_date with naive datetime inputs."""
     now_utc = datetime.now(timezone.utc)
-    
+
     # Mock task with proper date
     mock_api.get_tasks.return_value = [
         {
@@ -1328,19 +1328,19 @@ async def test_coordinator_filter_tasks_naive_datetime_handling(hass: HomeAssist
             "setter": {"name": "Teacher"},
         }
     ]
-    
+
     coordinator = FireflyUpdateCoordinator(
         hass=hass,
         api=mock_api,
         task_lookahead_days=7,
     )
-    
+
     # Test with naive datetime (coordinator should handle timezone conversion)
     naive_start = datetime.now().replace(tzinfo=None)
     naive_end = naive_start + timedelta(days=1)
-    
+
     filtered_tasks = coordinator._filter_tasks_by_date(mock_api.get_tasks.return_value, naive_start, naive_end)
-    
+
     assert len(filtered_tasks) >= 0  # Should not crash
 
 
@@ -1348,7 +1348,7 @@ async def test_coordinator_filter_tasks_naive_datetime_handling(hass: HomeAssist
 async def test_coordinator_filter_tasks_no_timezone_due_date(hass: HomeAssistant, mock_api):
     """Test _filter_tasks_by_date with due date without timezone info."""
     now = datetime.now()
-    
+
     # Mock task with naive due date (no timezone)
     mock_api.get_tasks.return_value = [
         {
@@ -1362,18 +1362,18 @@ async def test_coordinator_filter_tasks_no_timezone_due_date(hass: HomeAssistant
             "setter": {"name": "Teacher"},
         }
     ]
-    
+
     coordinator = FireflyUpdateCoordinator(
         hass=hass,
         api=mock_api,
         task_lookahead_days=7,
     )
-    
+
     start = datetime.now(timezone.utc)
     end = start + timedelta(days=1)
-    
+
     filtered_tasks = coordinator._filter_tasks_by_date(mock_api.get_tasks.return_value, start, end)
-    
+
     assert len(filtered_tasks) >= 0  # Should handle naive datetime gracefully
 
 
@@ -1381,7 +1381,7 @@ async def test_coordinator_filter_tasks_no_timezone_due_date(hass: HomeAssistant
 async def test_coordinator_filter_overdue_tasks_naive_now(hass: HomeAssistant, mock_api):
     """Test _filter_overdue_tasks with naive now datetime."""
     past_time = datetime.now(timezone.utc) - timedelta(days=1)
-    
+
     mock_api.get_tasks.return_value = [
         {
             "guid": "overdue-task",
@@ -1394,18 +1394,18 @@ async def test_coordinator_filter_overdue_tasks_naive_now(hass: HomeAssistant, m
             "setter": {"name": "Teacher"},
         }
     ]
-    
+
     coordinator = FireflyUpdateCoordinator(
         hass=hass,
         api=mock_api,
         task_lookahead_days=7,
     )
-    
+
     # Test with naive now datetime
     naive_now = datetime.now().replace(tzinfo=None)
-    
+
     overdue_tasks = coordinator._filter_overdue_tasks(mock_api.get_tasks.return_value, naive_now)
-    
+
     assert len(overdue_tasks) >= 0  # Should handle timezone conversion
 
 
@@ -1413,7 +1413,7 @@ async def test_coordinator_filter_overdue_tasks_naive_now(hass: HomeAssistant, m
 async def test_coordinator_filter_overdue_tasks_naive_due_date(hass: HomeAssistant, mock_api):
     """Test _filter_overdue_tasks with naive due date."""
     past_time = datetime.now() - timedelta(days=1)
-    
+
     mock_api.get_tasks.return_value = [
         {
             "guid": "naive-overdue-task",
@@ -1426,15 +1426,15 @@ async def test_coordinator_filter_overdue_tasks_naive_due_date(hass: HomeAssista
             "setter": {"name": "Teacher"},
         }
     ]
-    
+
     coordinator = FireflyUpdateCoordinator(
         hass=hass,
         api=mock_api,
         task_lookahead_days=7,
     )
-    
+
     now = datetime.now(timezone.utc)
-    
+
     overdue_tasks = coordinator._filter_overdue_tasks(mock_api.get_tasks.return_value, now)
-    
+
     assert len(overdue_tasks) >= 0  # Should handle naive due date conversion

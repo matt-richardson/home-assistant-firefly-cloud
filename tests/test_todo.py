@@ -352,29 +352,29 @@ async def test_todo_items_deduplication():
     """Test that duplicate tasks across categories are properly deduplicated."""
     coordinator = Mock(spec=FireflyUpdateCoordinator)
     coordinator.last_update_success = True
-    
+
     # Create same task appearing in multiple categories
     duplicate_task = {
         "id": "duplicate123",
         "title": "Same Task",
         "description": "Appears in multiple lists",
         "due_date": datetime.now(timezone.utc),
-        "task_type": "homework", 
+        "task_type": "homework",
         "setter": "Teacher",
         "completionStatus": "Todo",
     }
-    
+
     # Different task to ensure we're not losing other tasks
     unique_task = {
         "id": "unique456",
-        "title": "Different Task", 
+        "title": "Different Task",
         "description": "Only appears once",
         "due_date": datetime.now(timezone.utc),
         "task_type": "project",
         "setter": "Teacher2",
         "completionStatus": "Todo",
     }
-    
+
     coordinator.data = {
         "children_data": {
             "test-child-123": {
@@ -382,7 +382,7 @@ async def test_todo_items_deduplication():
                 "tasks": {
                     "upcoming": [duplicate_task, unique_task],
                     "due_today": [duplicate_task],  # Same task appears here
-                    "overdue": [duplicate_task],    # And here too
+                    "overdue": [duplicate_task],  # And here too
                 },
             }
         }
@@ -391,33 +391,33 @@ async def test_todo_items_deduplication():
     config_entry = Mock(spec=ConfigEntry)
     config_entry.data = {CONF_SCHOOL_NAME: "Test School"}
     config_entry.entry_id = "test-entry"
-    
+
     entity = FireflyTodoListEntity(coordinator, config_entry, "test-child-123")
     todo_items = entity.todo_items
 
     # Should only have 2 unique tasks, despite duplicate_task appearing 3 times
     assert todo_items is not None
     assert len(todo_items) == 2
-    
+
     # Verify we have the correct unique tasks
     task_titles = {item.summary for item in todo_items}
     assert "Same Task" in task_titles
     assert "Different Task" in task_titles
 
 
-@pytest.mark.asyncio 
+@pytest.mark.asyncio
 async def test_todo_items_with_tasks_missing_ids():
     """Test handling of tasks that don't have IDs (should be skipped)."""
     coordinator = Mock(spec=FireflyUpdateCoordinator)
     coordinator.last_update_success = True
-    
+
     # Task without ID should be skipped during deduplication
     task_without_id = {
         "title": "No ID Task",
         "description": "Missing ID field",
         "completionStatus": "Todo",
     }
-    
+
     # Task with ID should be included
     task_with_id = {
         "id": "valid123",
@@ -425,11 +425,11 @@ async def test_todo_items_with_tasks_missing_ids():
         "description": "Has proper ID",
         "completionStatus": "Todo",
     }
-    
+
     coordinator.data = {
         "children_data": {
             "test-child-123": {
-                "name": "Test Child", 
+                "name": "Test Child",
                 "tasks": {
                     "upcoming": [task_without_id, task_with_id],
                     "due_today": [],
@@ -442,7 +442,7 @@ async def test_todo_items_with_tasks_missing_ids():
     config_entry = Mock(spec=ConfigEntry)
     config_entry.data = {CONF_SCHOOL_NAME: "Test School"}
     config_entry.entry_id = "test-entry"
-    
+
     entity = FireflyTodoListEntity(coordinator, config_entry, "test-child-123")
     todo_items = entity.todo_items
 

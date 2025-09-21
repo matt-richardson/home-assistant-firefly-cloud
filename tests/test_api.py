@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from unittest.mock import AsyncMock, patch
+
 import pytest
 
 from custom_components.firefly_cloud.api import FireflyAPIClient
@@ -391,6 +392,7 @@ async def test_graphql_query_connection_error(api_client, mock_aiohttp_session):
 async def test_graphql_query_timeout(api_client, mock_aiohttp_session):
     """Test GraphQL query with timeout."""
     import asyncio
+
     from tests.conftest import mock_http_response
 
     mock_aiohttp_session._mock_responses["post"] = mock_http_response(raise_for_status_exception=asyncio.TimeoutError())
@@ -733,6 +735,7 @@ async def test_api_client_init_with_user_guid(mock_aiohttp_session):
 async def test_get_school_info_timeout(mock_aiohttp_session):
     """Test school info retrieval with timeout."""
     import asyncio
+
     from tests.conftest import mock_http_response
 
     mock_aiohttp_session._mock_responses["get"] = mock_http_response(
@@ -747,6 +750,7 @@ async def test_get_school_info_timeout(mock_aiohttp_session):
 async def test_get_school_info_aiohttp_client_error(mock_aiohttp_session):
     """Test school info retrieval with aiohttp client error."""
     import aiohttp
+
     from tests.conftest import mock_http_response
 
     mock_aiohttp_session._mock_responses["get"] = mock_http_response(
@@ -794,6 +798,7 @@ async def test_get_school_info_missing_name_or_id(mock_aiohttp_session):
 async def test_get_api_version_timeout(api_client, mock_aiohttp_session):
     """Test API version retrieval with timeout."""
     import asyncio
+
     from tests.conftest import mock_http_response
 
     mock_aiohttp_session._mock_responses["get"] = mock_http_response(
@@ -808,6 +813,7 @@ async def test_get_api_version_timeout(api_client, mock_aiohttp_session):
 async def test_get_api_version_client_error(api_client, mock_aiohttp_session):
     """Test API version retrieval with client error."""
     import aiohttp
+
     from tests.conftest import mock_http_response
 
     mock_aiohttp_session._mock_responses["get"] = mock_http_response(
@@ -857,6 +863,7 @@ async def test_get_api_version_empty_version_data(api_client, mock_aiohttp_sessi
 async def test_verify_credentials_client_response_error_401(api_client, mock_aiohttp_session):
     """Test credential verification with 401 client response error."""
     import aiohttp
+
     from tests.conftest import mock_http_response
 
     mock_aiohttp_session._mock_responses["get"] = mock_http_response(
@@ -876,6 +883,7 @@ async def test_verify_credentials_client_response_error_401(api_client, mock_aio
 async def test_verify_credentials_client_response_error_other(api_client, mock_aiohttp_session):
     """Test credential verification with non-401 client response error."""
     import aiohttp
+
     from tests.conftest import mock_http_response
 
     mock_aiohttp_session._mock_responses["get"] = mock_http_response(
@@ -895,6 +903,7 @@ async def test_verify_credentials_client_response_error_other(api_client, mock_a
 async def test_verify_credentials_generic_client_error(api_client, mock_aiohttp_session):
     """Test credential verification with generic client error."""
     import aiohttp
+
     from tests.conftest import mock_http_response
 
     mock_aiohttp_session._mock_responses["get"] = mock_http_response(
@@ -933,6 +942,7 @@ async def test_parse_authentication_response_empty_secret(api_client):
 async def test_graphql_query_retry_logic(api_client, mock_aiohttp_session):
     """Test GraphQL query retry logic on timeout."""
     import asyncio
+
     from tests.conftest import mock_http_response
 
     # Mock timeout error that exhausts retries
@@ -948,6 +958,7 @@ async def test_graphql_query_retry_logic(api_client, mock_aiohttp_session):
 async def test_graphql_query_client_error_retry(api_client, mock_aiohttp_session):
     """Test GraphQL query retry logic on client error."""
     import aiohttp
+
     from tests.conftest import mock_http_response
 
     # Mock client error that exhausts retries
@@ -972,7 +983,7 @@ async def test_get_participating_groups_no_users_data(api_client):
         assert result == []
 
 
-@pytest.mark.asyncio  
+@pytest.mark.asyncio
 async def test_get_events_rest_api_connection_error_retry(api_client, mock_aiohttp_session):
     """Test REST API events with connection error retry logic."""
     import aiohttp
@@ -995,6 +1006,7 @@ async def test_get_events_rest_api_connection_error_retry(api_client, mock_aioht
 async def test_get_tasks_connection_error_retry(api_client, mock_aiohttp_session):
     """Test get_tasks with connection error retry logic."""
     import aiohttp
+
     from tests.conftest import mock_http_response
 
     # Mock connection error that exhausts retries
@@ -1010,6 +1022,7 @@ async def test_get_tasks_connection_error_retry(api_client, mock_aiohttp_session
 async def test_get_tasks_timeout_retry(api_client, mock_aiohttp_session):
     """Test get_tasks with timeout retry logic."""
     import asyncio
+
     from tests.conftest import mock_http_response
 
     # Mock timeout error that exhausts retries
