@@ -2,27 +2,29 @@
 
 from datetime import datetime, timedelta
 from types import MappingProxyType
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
+from custom_components.firefly_cloud.const import (
+    CONF_CHILDREN_GUIDS,
+    CONF_DEVICE_ID,
+    CONF_HOST,
+    CONF_SCHOOL_NAME,
+    CONF_SECRET,
+    CONF_USER_GUID,
+    DOMAIN,
+    SENSOR_CURRENT_CLASS,
+    SENSOR_NEXT_CLASS,
+    SENSOR_TASKS_DUE_TODAY,
+    SENSOR_TYPES,
+    SENSOR_UPCOMING_TASKS,
+)
 from custom_components.firefly_cloud.sensor import (
     FireflySensor,
     async_setup_entry,
-)
-from custom_components.firefly_cloud.const import (
-    DOMAIN,
-    SENSOR_UPCOMING_TASKS,
-    SENSOR_TASKS_DUE_TODAY,
-    SENSOR_TYPES,
-    CONF_SCHOOL_NAME,
-    CONF_HOST,
-    CONF_DEVICE_ID,
-    CONF_SECRET,
-    CONF_USER_GUID,
-    CONF_CHILDREN_GUIDS,
 )
 
 
@@ -145,13 +147,15 @@ async def test_async_setup_entry(hass: HomeAssistant, mock_config_entry, mock_co
 
     await async_setup_entry(hass, mock_config_entry, mock_add_entities)
 
-    assert len(entities) == 4  # 2 sensor types × 2 children
+    assert len(entities) == 8  # 4 sensor types × 2 children
     assert all(isinstance(e, FireflySensor) for e in entities)
 
     # Check that all sensor types are created
     sensor_types = [e._sensor_type for e in entities]
     assert SENSOR_UPCOMING_TASKS in sensor_types
     assert SENSOR_TASKS_DUE_TODAY in sensor_types
+    assert SENSOR_CURRENT_CLASS in sensor_types
+    assert SENSOR_NEXT_CLASS in sensor_types
 
 
 @pytest.mark.asyncio
@@ -285,7 +289,7 @@ async def test_sensor_handles_missing_data_gracefully(mock_coordinator, mock_con
 @pytest.mark.asyncio
 async def test_all_sensor_types_defined():
     """Test that all sensor types have proper configuration."""
-    for sensor_type in [SENSOR_UPCOMING_TASKS, SENSOR_TASKS_DUE_TODAY]:
+    for sensor_type in [SENSOR_UPCOMING_TASKS, SENSOR_TASKS_DUE_TODAY, SENSOR_CURRENT_CLASS, SENSOR_NEXT_CLASS]:
         assert sensor_type in SENSOR_TYPES
         config = SENSOR_TYPES[sensor_type]
         assert "name" in config
@@ -552,8 +556,8 @@ async def test_async_setup_entry_no_children(hass: HomeAssistant):
 
     await async_setup_entry(hass, config_entry, mock_add_entities)
 
-    # When children_guids is empty, uses user GUID, creating 2 entities (2 sensor types × 1 user)
-    assert len(entities) == 2
+    # When children_guids is empty, uses user GUID, creating 4 entities (4 sensor types × 1 user)
+    assert len(entities) == 4
 
 
 @pytest.mark.asyncio
@@ -610,8 +614,8 @@ async def test_async_setup_entry_multiple_children(hass: HomeAssistant):
 
     await async_setup_entry(hass, config_entry, mock_add_entities)
 
-    # Should create 2 sensors × 3 children = 6 entities
-    assert len(entities) == 6
+    # Should create 4 sensors × 3 children = 12 entities
+    assert len(entities) == 12
 
     # Check all children have sensors
     child_guids = [e._child_guid for e in entities]
@@ -623,9 +627,11 @@ async def test_async_setup_entry_multiple_children(hass: HomeAssistant):
     for child_guid in ["child-1", "child-2", "child-3"]:
         child_entities = [e for e in entities if e._child_guid == child_guid]
         sensor_types = [e._sensor_type for e in child_entities]
-        assert len(sensor_types) == 2
+        assert len(sensor_types) == 4
         assert SENSOR_UPCOMING_TASKS in sensor_types
         assert SENSOR_TASKS_DUE_TODAY in sensor_types
+        assert SENSOR_CURRENT_CLASS in sensor_types
+        assert SENSOR_NEXT_CLASS in sensor_types
 
 
 @pytest.mark.asyncio
@@ -634,6 +640,8 @@ async def test_sensor_device_info_consistency(mock_coordinator, mock_config_entr
     sensors = [
         FireflySensor(mock_coordinator, mock_config_entry, SENSOR_UPCOMING_TASKS, "test-child-123"),
         FireflySensor(mock_coordinator, mock_config_entry, SENSOR_TASKS_DUE_TODAY, "test-child-123"),
+        FireflySensor(mock_coordinator, mock_config_entry, SENSOR_CURRENT_CLASS, "test-child-123"),
+        FireflySensor(mock_coordinator, mock_config_entry, SENSOR_NEXT_CLASS, "test-child-123"),
     ]
 
     base_device_info = sensors[0].device_info
@@ -649,7 +657,7 @@ async def test_sensor_device_info_consistency(mock_coordinator, mock_config_entr
 async def test_sensor_unique_ids_are_unique(mock_coordinator, mock_config_entry):
     """Test that all sensors have unique IDs."""
     children = ["child-1", "child-2"]
-    sensor_types = [SENSOR_UPCOMING_TASKS, SENSOR_TASKS_DUE_TODAY]
+    sensor_types = [SENSOR_UPCOMING_TASKS, SENSOR_TASKS_DUE_TODAY, SENSOR_CURRENT_CLASS, SENSOR_NEXT_CLASS]
 
     # Mock coordinator data for multiple children
     mock_coordinator.data["children_guids"] = children
@@ -689,3 +697,148 @@ async def test_sensor_extra_state_attributes_no_data(mock_config_entry):
     attributes = sensor.extra_state_attributes
     assert isinstance(attributes, dict)
     # Should at least have some basic info, even if empty
+
+
+@pytest.mark.asyncio
+async def test_current_class_sensor_no_class(mock_coordinator, mock_config_entry):
+    """Test current class sensor when no class is active."""
+    sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_CURRENT_CLASS, "test-child-123")
+
+    assert "Current Class" in sensor.name
+    assert sensor.unique_id == f"{mock_config_entry.entry_id}_{SENSOR_CURRENT_CLASS}_test-child-123"
+    assert sensor.icon == "mdi:school"
+    assert sensor.native_value is None  # No current class
+    assert sensor.native_unit_of_measurement is None
+
+
+@pytest.mark.asyncio
+async def test_current_class_sensor_with_class(mock_coordinator, mock_config_entry):
+    """Test current class sensor when a class is currently active."""
+    from datetime import datetime, timezone
+
+    from homeassistant.util import dt as dt_util
+
+    # Mock current time to be during the Math class (9-10am)
+    now = datetime.now(timezone.utc).replace(hour=9, minute=30, second=0, microsecond=0)
+
+    # Update event times to match current time
+    math_event = mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"][0]
+    math_event["start"] = now.replace(minute=0)
+    math_event["end"] = now.replace(hour=10, minute=0)
+
+    with patch("homeassistant.util.dt.now", return_value=now):
+        sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_CURRENT_CLASS, "test-child-123")
+        assert sensor.native_value == "Mathematics"
+
+
+@pytest.mark.asyncio
+async def test_next_class_sensor(mock_coordinator, mock_config_entry):
+    """Test next class sensor."""
+    from datetime import datetime, timezone
+
+    # Mock current time to be after today's Math class (e.g., 2pm)
+    now = datetime.now(timezone.utc).replace(hour=14, minute=0, second=0, microsecond=0)
+
+    with patch("homeassistant.util.dt.now", return_value=now):
+        sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_NEXT_CLASS, "test-child-123")
+
+        assert "Next Class" in sensor.name
+        assert sensor.unique_id == f"{mock_config_entry.entry_id}_{SENSOR_NEXT_CLASS}_test-child-123"
+        assert sensor.icon == "mdi:clock-outline"
+        # Should show next scheduled class based on mock data (Science tomorrow)
+        assert sensor.native_value == "Science"
+        assert sensor.native_unit_of_measurement is None
+
+
+@pytest.mark.asyncio
+async def test_next_class_sensor_no_upcoming(mock_coordinator, mock_config_entry):
+    """Test next class sensor when no upcoming classes."""
+    # Clear all future events
+    mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"] = []
+
+    sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_NEXT_CLASS, "test-child-123")
+    assert sensor.native_value is None
+
+
+@pytest.mark.asyncio
+async def test_current_class_attributes(mock_coordinator, mock_config_entry):
+    """Test current class sensor attributes."""
+    from datetime import datetime, timezone
+
+    # Mock current time to be during the Math class
+    now = datetime.now(timezone.utc).replace(hour=9, minute=30, second=0, microsecond=0)
+
+    # Update event times
+    math_event = mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"][0]
+    math_event["start"] = now.replace(minute=0)
+    math_event["end"] = now.replace(hour=10, minute=0)
+
+    with patch("homeassistant.util.dt.now", return_value=now):
+        sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_CURRENT_CLASS, "test-child-123")
+
+        attributes = sensor.extra_state_attributes
+        assert "status" in attributes
+        assert attributes["status"] == "in_class"
+        assert attributes["class_name"] == "Mathematics"
+        assert attributes["location"] == "Room 101"
+        assert "minutes_remaining" in attributes
+        assert attributes["minutes_remaining"] == 30  # 30 minutes left in class
+
+
+@pytest.mark.asyncio
+async def test_current_class_attributes_no_class(mock_coordinator, mock_config_entry):
+    """Test current class sensor attributes when no class is active."""
+    sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_CURRENT_CLASS, "test-child-123")
+
+    attributes = sensor.extra_state_attributes
+    assert "status" in attributes
+    assert attributes["status"] == "no_current_class"
+    assert "current_time" in attributes
+
+
+@pytest.mark.asyncio
+async def test_next_class_attributes(mock_coordinator, mock_config_entry):
+    """Test next class sensor attributes."""
+    from datetime import datetime, timezone
+
+    # Mock current time to be after today's Math class so Science is next
+    now = datetime.now(timezone.utc).replace(hour=14, minute=0, second=0, microsecond=0)
+
+    with patch("homeassistant.util.dt.now", return_value=now):
+        sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_NEXT_CLASS, "test-child-123")
+
+        attributes = sensor.extra_state_attributes
+        assert "status" in attributes
+        assert attributes["status"] == "class_scheduled"
+        assert attributes["class_name"] == "Science"
+        assert attributes["location"] == "Lab 1"
+        assert "minutes_until" in attributes
+
+
+@pytest.mark.asyncio
+async def test_next_class_attributes_no_upcoming(mock_coordinator, mock_config_entry):
+    """Test next class sensor attributes when no upcoming classes."""
+    # Clear all future events
+    mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"] = []
+
+    sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_NEXT_CLASS, "test-child-123")
+
+    attributes = sensor.extra_state_attributes
+    assert "status" in attributes
+    assert attributes["status"] == "no_upcoming_class"
+    assert "current_time" in attributes
+
+
+@pytest.mark.asyncio
+async def test_class_sensors_with_no_events(mock_coordinator, mock_config_entry):
+    """Test class sensors when no events data is available."""
+    # Remove events data
+    mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"] = []
+
+    current_sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_CURRENT_CLASS, "test-child-123")
+    next_sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_NEXT_CLASS, "test-child-123")
+
+    assert current_sensor.native_value is None
+    assert next_sensor.native_value is None
+    assert current_sensor.available is True  # Still available, just no data
+    assert next_sensor.available is True

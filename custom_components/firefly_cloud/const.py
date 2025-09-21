@@ -30,6 +30,8 @@ FIREFLY_TASK_API_PATH = "/api/v2/taskListing/view/student/tasks/all/filterBy"
 # Sensor types
 SENSOR_UPCOMING_TASKS = "upcoming_tasks"
 SENSOR_TASKS_DUE_TODAY = "tasks_due_today"
+SENSOR_CURRENT_CLASS = "current_class"
+SENSOR_NEXT_CLASS = "next_class"
 
 # Sensor configurations
 SENSOR_TYPES = {
@@ -43,6 +45,18 @@ SENSOR_TYPES = {
         "name": "Tasks Due Today",
         "icon": "mdi:clipboard-alert",
         "unit": "tasks",
+        "device_class": None,
+    },
+    SENSOR_CURRENT_CLASS: {
+        "name": "Current Class",
+        "icon": "mdi:school",
+        "unit": None,
+        "device_class": None,
+    },
+    SENSOR_NEXT_CLASS: {
+        "name": "Next Class",
+        "icon": "mdi:clock-outline",
+        "unit": None,
         "device_class": None,
     },
 }
