@@ -163,7 +163,7 @@ Test integration behavior with:
 If not using the dev container, you'll need:
 
 1. **Python 3.11+** with pip
-2. **Virtual Environment**: 
+2. **Virtual Environment**:
    ```bash
    python -m venv venv
    source venv/bin/activate
@@ -171,6 +171,52 @@ If not using the dev container, you'll need:
 3. **Dependencies**: `pip install homeassistant aiohttp lxml python-dateutil voluptuous`
 4. **Development Tools**: `pip install pytest pytest-asyncio pytest-cov black flake8 mypy pylint`
 5. **Testing**: Run `pytest tests/` from the project root
+
+### Contributing
+
+This project uses automated release management via [release-please](https://github.com/googleapis/release-please).
+
+**Commit Message Format**
+
+All commits must follow [Conventional Commits](https://conventionalcommits.org) format:
+
+```
+<type>: <description>
+
+[optional body]
+```
+
+**Commit Types:**
+- `feat:` - New feature (triggers minor version bump)
+- `fix:` - Bug fix (triggers patch version bump)
+- `docs:` - Documentation changes
+- `chore:` - Maintenance tasks, dependency updates
+- `refactor:` - Code refactoring
+- `test:` - Test additions or modifications
+- `ci:` - CI/CD configuration changes
+
+**Examples:**
+```bash
+git commit -m "feat: add sensor for current class schedule"
+git commit -m "fix: resolve timezone handling for next class sensor"
+git commit -m "docs: update installation instructions"
+```
+
+**Breaking Changes:**
+Add `BREAKING CHANGE:` in the commit footer to trigger a major version bump:
+```bash
+git commit -m "feat!: remove deprecated API
+
+BREAKING CHANGE: The old API endpoints have been removed."
+```
+
+**Release Process:**
+1. Commits following conventional format are pushed to `main`
+2. Release-please automatically creates/updates a release PR
+3. Merge the release PR to publish a new release
+4. Versions are automatically bumped in `manifest.json` and `CHANGELOG.md`
+
+A git commit-msg hook is included to validate commit messages locally.
 
 ### Additional Resources
 

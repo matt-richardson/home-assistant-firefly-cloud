@@ -62,6 +62,48 @@ Use `venv` when running tests
 Always run tests before saying that a change is complete.
 Always ask the user if they want commit to git after a change is complete.
 
+### Commit Message Format
+
+This project uses [Conventional Commits](https://conventionalcommits.org) for automated release management via release-please.
+
+**Required format:**
+```
+<type>: <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+**Common types:**
+- `feat:` - New feature (triggers minor version bump)
+- `fix:` - Bug fix (triggers patch version bump)
+- `docs:` - Documentation changes
+- `chore:` - Maintenance tasks, dependency updates
+- `refactor:` - Code refactoring without functional changes
+- `test:` - Test additions or modifications
+- `ci:` - CI/CD configuration changes
+
+**Examples:**
+```
+feat: add sensor for current class schedule
+fix: resolve timezone handling for next class sensor
+docs: update installation instructions
+chore: update dependencies to latest versions
+```
+
+**Breaking changes:** Add `BREAKING CHANGE:` in the footer to trigger a major version bump.
+
+### Release Process
+
+Releases are automated via release-please:
+1. Push conventional commits to `main` branch
+2. Release-please creates/updates a release PR automatically
+3. Merge the release PR to publish the release
+4. Version bumps happen in both `manifest.json` and `CHANGELOG.md`
+
+Do not manually edit version numbers - let release-please manage them.
+
 ## Manual Testing Approach
 
 ### DevContainer Testing (Recommended)
