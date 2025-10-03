@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.1.2](https://github.com/matt-richardson/home-assistant-firefly-cloud/compare/v0.1.1...v0.1.2) (2025-10-03)
+
+
+### Bug Fixes
+
+* change current class sensor to display "None" instead of "unknown" ([5e2f256](https://github.com/matt-richardson/home-assistant-firefly-cloud/commit/5e2f256524c0ef8a45e2e693249501c72737758e))
+
 ## [Unreleased]
 
 ### Added
