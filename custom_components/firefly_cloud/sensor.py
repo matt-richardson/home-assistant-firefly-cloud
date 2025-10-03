@@ -293,7 +293,7 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
         """Get the current class if one is active, otherwise return None."""
         events = child_data.get("events", {}).get("week", [])
         if not events:
-            return None
+            return "None"
 
         from .const import get_offset_time
 
@@ -313,8 +313,8 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
             if event_start <= now <= event_end:
                 return event["subject"]
 
-        # If no current class, return None (not "None" string)
-        return None
+        # If no current class, return "None" string
+        return "None"
 
     def _get_next_class(self, child_data: Dict[str, Any]) -> Optional[str]:
         """Get the next upcoming class."""
@@ -329,7 +329,7 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
 
         # Check if we're currently IN a class
         current_class = self._get_current_class(child_data)
-        if current_class:
+        if current_class and current_class != "None":
             # We're in a class - find the next class using timezone-aware comparison
             for event in events:
                 event_start = event["start"]
@@ -471,11 +471,12 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
         is_today = current_date_str == event_local_date_str
 
         # Determine context based on whether we're in a class and the timing
-        if current_class and is_today:
+        in_class = current_class and current_class != "None"
+        if in_class and is_today:
             context = "next_class_today"
-        elif current_class and not is_today:
+        elif in_class and not is_today:
             context = "last_class_of_day"  # In class but next class is not today
-        elif not current_class and is_today:
+        elif not in_class and is_today:
             context = "next_class_today"
         else:
             context = "next_class_future_day"

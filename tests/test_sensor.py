@@ -717,7 +717,7 @@ async def test_current_class_sensor_no_class(mock_coordinator, mock_config_entry
     assert "Current Class" in sensor.name
     assert sensor.unique_id == f"{mock_config_entry.entry_id}_{SENSOR_CURRENT_CLASS}_test-child-123"
     assert sensor.icon == "mdi:school"
-    assert sensor.native_value is None  # No current class
+    assert sensor.native_value == "None"  # No current class
     assert sensor.native_unit_of_measurement is None
 
 
@@ -847,7 +847,7 @@ async def test_class_sensors_with_no_events(mock_coordinator, mock_config_entry)
     current_sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_CURRENT_CLASS, "test-child-123")
     next_sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_NEXT_CLASS, "test-child-123")
 
-    assert current_sensor.native_value is None
+    assert current_sensor.native_value == "None"
     assert next_sensor.native_value == "None"
     assert current_sensor.available is True  # Still available, just no data
     assert next_sensor.available is True
@@ -938,7 +938,7 @@ async def test_next_class_after_school_hours_shows_tomorrow(mock_coordinator, mo
         next_sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_NEXT_CLASS, "test-child-123")
 
         # No current class (after hours)
-        assert current_sensor.native_value is None
+        assert current_sensor.native_value == "None"
         # Next should show tomorrow's first class
         assert next_sensor.native_value == "Mathematics"
 
