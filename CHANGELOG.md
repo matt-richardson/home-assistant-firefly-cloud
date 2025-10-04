@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.3.0](https://github.com/matt-richardson/home-assistant-firefly-cloud/compare/v0.2.0...v0.3.0) (2025-10-04)
+
+
+### Features
+
+* add translations and improve options dialog UI ([eecb198](https://github.com/matt-richardson/home-assistant-firefly-cloud/commit/eecb1984300e8866a58d08e9bba391a57d1ed99c))
+
 ## [0.2.0](https://github.com/matt-richardson/home-assistant-firefly-cloud/compare/v0.1.2...v0.2.0) (2025-10-04)
 
 
