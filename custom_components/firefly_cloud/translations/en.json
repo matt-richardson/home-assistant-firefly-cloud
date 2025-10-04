@@ -35,5 +35,20 @@
       "already_in_progress": "Configuration of this Firefly Cloud school is already in progress.",
       "reauth_successful": "Reauthentication successful! Your Firefly Cloud integration is now working again."
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Firefly Cloud Options",
+        "data": {
+          "task_lookahead_days": "Task lookahead days",
+          "show_class_times": "Show class times"
+        },
+        "data_description": {
+          "task_lookahead_days": "Number of days ahead to look for upcoming tasks (1-30 days)",
+          "show_class_times": "Show class start/end times as prefix (e.g., '8.45-9.45: English')"
+        }
+      }
+    }
   }
 }

@@ -7,7 +7,7 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
-from homeassistant.helpers import aiohttp_client
+from homeassistant.helpers import aiohttp_client, selector
 
 from .api import FireflyAPIClient
 from .const import (
@@ -286,7 +286,13 @@ class FireflyCloudOptionsFlowHandler(config_entries.OptionsFlow):
                         CONF_TASK_LOOKAHEAD_DAYS,
                         self.config_entry.data.get(CONF_TASK_LOOKAHEAD_DAYS, DEFAULT_TASK_LOOKAHEAD_DAYS),
                     ),
-                ): vol.All(int, vol.Range(min=1, max=30)),
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=1,
+                        max=30,
+                        mode=selector.NumberSelectorMode.BOX,
+                    )
+                ),
                 vol.Optional(
                     CONF_SHOW_CLASS_TIMES,
                     default=self.config_entry.options.get(
