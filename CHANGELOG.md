@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.2.0](https://github.com/matt-richardson/home-assistant-firefly-cloud/compare/v0.1.2...v0.2.0) (2025-10-04)
+
+
+### Features
+
+* support multi-week timetable fetching for 30-day calendar range ([f5d9500](https://github.com/matt-richardson/home-assistant-firefly-cloud/commit/f5d9500c3fb59589d8ce0a5f34a1fff085ad09a7))
+
 ## [0.1.2](https://github.com/matt-richardson/home-assistant-firefly-cloud/compare/v0.1.1...v0.1.2) (2025-10-03)
 
 
