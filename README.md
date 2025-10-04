@@ -35,6 +35,12 @@ A Home Assistant custom integration that connects to Firefly Cloud (school learn
 4. Follow the browser authentication flow to log into Firefly
 5. The integration will automatically discover your children and create sensors
 
+### Configuration Options
+
+After setup, you can configure additional options by clicking "Configure" on the integration:
+
+- **Show Class Times**: Display time prefixes for current and next class sensors (e.g., "09.00-10.00: Mathematics" instead of just "Mathematics"). Default: disabled.
+
 ## Entities Created
 
 For each child, the integration creates:

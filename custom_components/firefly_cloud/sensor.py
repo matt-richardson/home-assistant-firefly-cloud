@@ -14,7 +14,9 @@ from homeassistant.util import dt as dt_util
 from .const import (
     CONF_CHILDREN_GUIDS,
     CONF_SCHOOL_NAME,
+    CONF_SHOW_CLASS_TIMES,
     CONF_USER_GUID,
+    DEFAULT_SHOW_CLASS_TIMES,
     DOMAIN,
     SENSOR_CURRENT_CLASS,
     SENSOR_NEXT_CLASS,
@@ -289,8 +291,8 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
             "test_count": len([t for t in tasks if t["task_type"] == "test"]),
         }
 
-    def _get_current_class(self, child_data: Dict[str, Any]) -> Optional[str]:
-        """Get the current class if one is active, otherwise return None."""
+    def _get_current_class_subject(self, child_data: Dict[str, Any]) -> Optional[str]:
+        """Get the current class subject without time prefix."""
         events = child_data.get("events", {}).get("week", [])
         if not events:
             return "None"
@@ -316,6 +318,45 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
         # If no current class, return "None" string
         return "None"
 
+    def _get_current_class(self, child_data: Dict[str, Any]) -> Optional[str]:
+        """Get the current class if one is active, otherwise return None."""
+        events = child_data.get("events", {}).get("week", [])
+        if not events:
+            return "None"
+
+        from .const import get_offset_time
+
+        now = get_offset_time()
+
+        # Get show_class_times option
+        show_times = self._config_entry.options.get(
+            CONF_SHOW_CLASS_TIMES,
+            self._config_entry.data.get(CONF_SHOW_CLASS_TIMES, DEFAULT_SHOW_CLASS_TIMES),
+        )
+
+        # Find current event (class currently happening)
+        for event in events:
+            event_start = event["start"]
+            event_end = event["end"]
+
+            # Handle timezone awareness mismatch
+            if hasattr(event_start, "tzinfo") and event_start.tzinfo is None:
+                event_start = dt_util.as_utc(event_start)
+            if hasattr(event_end, "tzinfo") and event_end.tzinfo is None:
+                event_end = dt_util.as_utc(event_end)
+
+            if event_start <= now <= event_end:
+                subject = event["subject"]
+                if show_times:
+                    # Format times as HH.MM
+                    start_time = event["start"].strftime("%H.%M")
+                    end_time = event["end"].strftime("%H.%M")
+                    return f"{start_time}-{end_time}: {subject}"
+                return subject
+
+        # If no current class, return "None" string
+        return "None"
+
     def _get_next_class(self, child_data: Dict[str, Any]) -> Optional[str]:
         """Get the next upcoming class."""
         events = child_data.get("events", {}).get("week", [])
@@ -327,9 +368,15 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
         now = get_offset_time()
         current_date = now.date()
 
-        # Check if we're currently IN a class
-        current_class = self._get_current_class(child_data)
-        if current_class and current_class != "None":
+        # Get show_class_times option
+        show_times = self._config_entry.options.get(
+            CONF_SHOW_CLASS_TIMES,
+            self._config_entry.data.get(CONF_SHOW_CLASS_TIMES, DEFAULT_SHOW_CLASS_TIMES),
+        )
+
+        # Check if we're currently IN a class (need to check without time prefix for comparison)
+        current_class_raw = self._get_current_class_subject(child_data)
+        if current_class_raw and current_class_raw != "None":
             # We're in a class - find the next class using timezone-aware comparison
             for event in events:
                 event_start = event["start"]
@@ -342,7 +389,13 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
 
                     # Check if it's today in local time
                     if event_local.date() == current_date:
-                        return event["subject"]  # Next class today
+                        subject = event["subject"]
+                        if show_times:
+                            # Format times as HH.MM
+                            start_time = event["start"].strftime("%H.%M")
+                            end_time = event["end"].strftime("%H.%M")
+                            return f"{start_time}-{end_time}: {subject}"
+                        return subject
                     else:
                         return "None"  # Next class is tomorrow - last class of day
 
@@ -362,7 +415,14 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
 
         if upcoming_events:
             # Events are already sorted by start time in coordinator
-            return upcoming_events[0]["subject"]
+            next_event = upcoming_events[0]
+            subject = next_event["subject"]
+            if show_times:
+                # Format times as HH.MM
+                start_time = next_event["start"].strftime("%H.%M")
+                end_time = next_event["end"].strftime("%H.%M")
+                return f"{start_time}-{end_time}: {subject}"
+            return subject
 
         return "None"
 

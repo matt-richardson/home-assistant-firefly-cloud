@@ -991,3 +991,398 @@ async def test_next_class_during_middle_class_shows_next_today(mock_coordinator,
         assert next_attributes["status"] == "class_scheduled"
         assert next_attributes["class_name"] == "Science"
         assert next_attributes["context"] == "next_class_today"
+
+
+@pytest.mark.asyncio
+async def test_current_class_with_time_prefix_enabled(mock_coordinator):
+    """Test current class sensor with time prefix option enabled."""
+    from custom_components.firefly_cloud.const import (
+        CONF_CHILDREN_GUIDS,
+        CONF_DEVICE_ID,
+        CONF_HOST,
+        CONF_SCHOOL_CODE,
+        CONF_SCHOOL_NAME,
+        CONF_SECRET,
+        CONF_TASK_LOOKAHEAD_DAYS,
+        CONF_USER_GUID,
+        DEFAULT_TASK_LOOKAHEAD_DAYS,
+        DOMAIN,
+        get_offset_time,
+    )
+
+    # Create config entry with time prefix enabled
+    config_entry = ConfigEntry(
+        version=1,
+        minor_version=1,
+        domain=DOMAIN,
+        title="Test School - John Doe",
+        data={
+            CONF_SCHOOL_CODE: "testschool",
+            CONF_SCHOOL_NAME: "Test School",
+            CONF_HOST: "https://testschool.fireflycloud.net",
+            CONF_DEVICE_ID: "test-device-123",
+            CONF_SECRET: "test-secret-456",
+            CONF_USER_GUID: "test-user-789",
+            CONF_CHILDREN_GUIDS: ["test-child-123", "test-child-456"],
+            CONF_TASK_LOOKAHEAD_DAYS: DEFAULT_TASK_LOOKAHEAD_DAYS,
+        },
+        options={"show_class_times": True},
+        entry_id="test-entry-id",
+        unique_id="test-unique-id",
+        source="user",
+        discovery_keys=MappingProxyType({}),
+        subentries_data={},
+    )
+
+    # Mock current time to be during the Math class (9-10am)
+    now = get_offset_time().replace(hour=9, minute=30, second=0, microsecond=0)
+
+    # Update event times to match current time
+    math_event = mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"][0]
+    math_event["start"] = now.replace(minute=0)
+    math_event["end"] = now.replace(hour=10, minute=0)
+
+    with patch("custom_components.firefly_cloud.const.get_offset_time", return_value=now):
+        sensor = FireflySensor(mock_coordinator, config_entry, SENSOR_CURRENT_CLASS, "test-child-123")
+        # Should show time prefix: "09.00-10.00: Mathematics"
+        assert sensor.native_value == "09.00-10.00: Mathematics"
+
+
+@pytest.mark.asyncio
+async def test_current_class_with_time_prefix_disabled(mock_coordinator):
+    """Test current class sensor with time prefix option disabled."""
+    from custom_components.firefly_cloud.const import (
+        CONF_CHILDREN_GUIDS,
+        CONF_DEVICE_ID,
+        CONF_HOST,
+        CONF_SCHOOL_CODE,
+        CONF_SCHOOL_NAME,
+        CONF_SECRET,
+        CONF_TASK_LOOKAHEAD_DAYS,
+        CONF_USER_GUID,
+        DEFAULT_TASK_LOOKAHEAD_DAYS,
+        DOMAIN,
+        get_offset_time,
+    )
+
+    # Create config entry with time prefix disabled (default)
+    config_entry = ConfigEntry(
+        version=1,
+        minor_version=1,
+        domain=DOMAIN,
+        title="Test School - John Doe",
+        data={
+            CONF_SCHOOL_CODE: "testschool",
+            CONF_SCHOOL_NAME: "Test School",
+            CONF_HOST: "https://testschool.fireflycloud.net",
+            CONF_DEVICE_ID: "test-device-123",
+            CONF_SECRET: "test-secret-456",
+            CONF_USER_GUID: "test-user-789",
+            CONF_CHILDREN_GUIDS: ["test-child-123", "test-child-456"],
+            CONF_TASK_LOOKAHEAD_DAYS: DEFAULT_TASK_LOOKAHEAD_DAYS,
+        },
+        options={"show_class_times": False},
+        entry_id="test-entry-id",
+        unique_id="test-unique-id",
+        source="user",
+        discovery_keys=MappingProxyType({}),
+        subentries_data={},
+    )
+
+    # Mock current time to be during the Math class (9-10am)
+    now = get_offset_time().replace(hour=9, minute=30, second=0, microsecond=0)
+
+    # Update event times to match current time
+    math_event = mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"][0]
+    math_event["start"] = now.replace(minute=0)
+    math_event["end"] = now.replace(hour=10, minute=0)
+
+    with patch("custom_components.firefly_cloud.const.get_offset_time", return_value=now):
+        sensor = FireflySensor(mock_coordinator, config_entry, SENSOR_CURRENT_CLASS, "test-child-123")
+        # Should show just the subject: "Mathematics"
+        assert sensor.native_value == "Mathematics"
+
+
+@pytest.mark.asyncio
+async def test_current_class_none_no_time_prefix(mock_coordinator):
+    """Test current class sensor shows 'None' without time prefix."""
+    from custom_components.firefly_cloud.const import (
+        CONF_CHILDREN_GUIDS,
+        CONF_DEVICE_ID,
+        CONF_HOST,
+        CONF_SCHOOL_CODE,
+        CONF_SCHOOL_NAME,
+        CONF_SECRET,
+        CONF_TASK_LOOKAHEAD_DAYS,
+        CONF_USER_GUID,
+        DEFAULT_TASK_LOOKAHEAD_DAYS,
+        DOMAIN,
+        get_offset_time,
+    )
+
+    # Create config entry with time prefix enabled
+    config_entry = ConfigEntry(
+        version=1,
+        minor_version=1,
+        domain=DOMAIN,
+        title="Test School - John Doe",
+        data={
+            CONF_SCHOOL_CODE: "testschool",
+            CONF_SCHOOL_NAME: "Test School",
+            CONF_HOST: "https://testschool.fireflycloud.net",
+            CONF_DEVICE_ID: "test-device-123",
+            CONF_SECRET: "test-secret-456",
+            CONF_USER_GUID: "test-user-789",
+            CONF_CHILDREN_GUIDS: ["test-child-123", "test-child-456"],
+            CONF_TASK_LOOKAHEAD_DAYS: DEFAULT_TASK_LOOKAHEAD_DAYS,
+        },
+        options={"show_class_times": True},
+        entry_id="test-entry-id",
+        unique_id="test-unique-id",
+        source="user",
+        discovery_keys=MappingProxyType({}),
+        subentries_data={},
+    )
+
+    # Mock current time to be outside of class hours (8am, before 9am Math class)
+    now = get_offset_time().replace(hour=8, minute=0, second=0, microsecond=0)
+
+    with patch("custom_components.firefly_cloud.const.get_offset_time", return_value=now):
+        sensor = FireflySensor(mock_coordinator, config_entry, SENSOR_CURRENT_CLASS, "test-child-123")
+        # Should show "None" without any time prefix
+        assert sensor.native_value == "None"
+
+
+@pytest.mark.asyncio
+async def test_next_class_with_time_prefix_enabled(mock_coordinator):
+    """Test next class sensor with time prefix option enabled."""
+    from custom_components.firefly_cloud.const import (
+        CONF_CHILDREN_GUIDS,
+        CONF_DEVICE_ID,
+        CONF_HOST,
+        CONF_SCHOOL_CODE,
+        CONF_SCHOOL_NAME,
+        CONF_SECRET,
+        CONF_TASK_LOOKAHEAD_DAYS,
+        CONF_USER_GUID,
+        DEFAULT_TASK_LOOKAHEAD_DAYS,
+        DOMAIN,
+        get_offset_time,
+    )
+
+    # Create config entry with time prefix enabled
+    config_entry = ConfigEntry(
+        version=1,
+        minor_version=1,
+        domain=DOMAIN,
+        title="Test School - John Doe",
+        data={
+            CONF_SCHOOL_CODE: "testschool",
+            CONF_SCHOOL_NAME: "Test School",
+            CONF_HOST: "https://testschool.fireflycloud.net",
+            CONF_DEVICE_ID: "test-device-123",
+            CONF_SECRET: "test-secret-456",
+            CONF_USER_GUID: "test-user-789",
+            CONF_CHILDREN_GUIDS: ["test-child-123", "test-child-456"],
+            CONF_TASK_LOOKAHEAD_DAYS: DEFAULT_TASK_LOOKAHEAD_DAYS,
+        },
+        options={"show_class_times": True},
+        entry_id="test-entry-id",
+        unique_id="test-unique-id",
+        source="user",
+        discovery_keys=MappingProxyType({}),
+        subentries_data={},
+    )
+
+    # Mock current time to be during the Math class (9-10am)
+    now = get_offset_time().replace(hour=9, minute=30, second=0, microsecond=0)
+
+    # Update event times to match current time
+    math_event = mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"][0]
+    math_event["start"] = now.replace(minute=0)
+    math_event["end"] = now.replace(hour=10, minute=0)
+
+    science_event = mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"][1]
+    science_event["start"] = now.replace(hour=11, minute=0)
+    science_event["end"] = now.replace(hour=12, minute=0)
+
+    with patch("custom_components.firefly_cloud.const.get_offset_time", return_value=now):
+        sensor = FireflySensor(mock_coordinator, config_entry, SENSOR_NEXT_CLASS, "test-child-123")
+        # Should show time prefix: "11.00-12.00: Science"
+        assert sensor.native_value == "11.00-12.00: Science"
+
+
+@pytest.mark.asyncio
+async def test_next_class_with_time_prefix_disabled(mock_coordinator):
+    """Test next class sensor with time prefix option disabled."""
+    from custom_components.firefly_cloud.const import (
+        CONF_CHILDREN_GUIDS,
+        CONF_DEVICE_ID,
+        CONF_HOST,
+        CONF_SCHOOL_CODE,
+        CONF_SCHOOL_NAME,
+        CONF_SECRET,
+        CONF_TASK_LOOKAHEAD_DAYS,
+        CONF_USER_GUID,
+        DEFAULT_TASK_LOOKAHEAD_DAYS,
+        DOMAIN,
+        get_offset_time,
+    )
+
+    # Create config entry with time prefix disabled
+    config_entry = ConfigEntry(
+        version=1,
+        minor_version=1,
+        domain=DOMAIN,
+        title="Test School - John Doe",
+        data={
+            CONF_SCHOOL_CODE: "testschool",
+            CONF_SCHOOL_NAME: "Test School",
+            CONF_HOST: "https://testschool.fireflycloud.net",
+            CONF_DEVICE_ID: "test-device-123",
+            CONF_SECRET: "test-secret-456",
+            CONF_USER_GUID: "test-user-789",
+            CONF_CHILDREN_GUIDS: ["test-child-123", "test-child-456"],
+            CONF_TASK_LOOKAHEAD_DAYS: DEFAULT_TASK_LOOKAHEAD_DAYS,
+        },
+        options={"show_class_times": False},
+        entry_id="test-entry-id",
+        unique_id="test-unique-id",
+        source="user",
+        discovery_keys=MappingProxyType({}),
+        subentries_data={},
+    )
+
+    # Mock current time to be during the Math class (9-10am)
+    now = get_offset_time().replace(hour=9, minute=30, second=0, microsecond=0)
+
+    # Update event times to match current time
+    math_event = mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"][0]
+    math_event["start"] = now.replace(minute=0)
+    math_event["end"] = now.replace(hour=10, minute=0)
+
+    science_event = mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"][1]
+    science_event["start"] = now.replace(hour=11, minute=0)
+    science_event["end"] = now.replace(hour=12, minute=0)
+
+    with patch("custom_components.firefly_cloud.const.get_offset_time", return_value=now):
+        sensor = FireflySensor(mock_coordinator, config_entry, SENSOR_NEXT_CLASS, "test-child-123")
+        # Should show just the subject: "Science"
+        assert sensor.native_value == "Science"
+
+
+@pytest.mark.asyncio
+async def test_next_class_in_class_no_upcoming_with_time_prefix(mock_coordinator):
+    """Test next class sensor shows 'None' when in last class (with time prefix enabled)."""
+    from custom_components.firefly_cloud.const import (
+        CONF_CHILDREN_GUIDS,
+        CONF_DEVICE_ID,
+        CONF_HOST,
+        CONF_SCHOOL_CODE,
+        CONF_SCHOOL_NAME,
+        CONF_SECRET,
+        CONF_TASK_LOOKAHEAD_DAYS,
+        CONF_USER_GUID,
+        DEFAULT_TASK_LOOKAHEAD_DAYS,
+        DOMAIN,
+        get_offset_time,
+    )
+
+    # Create config entry with time prefix enabled
+    config_entry = ConfigEntry(
+        version=1,
+        minor_version=1,
+        domain=DOMAIN,
+        title="Test School - John Doe",
+        data={
+            CONF_SCHOOL_CODE: "testschool",
+            CONF_SCHOOL_NAME: "Test School",
+            CONF_HOST: "https://testschool.fireflycloud.net",
+            CONF_DEVICE_ID: "test-device-123",
+            CONF_SECRET: "test-secret-456",
+            CONF_USER_GUID: "test-user-789",
+            CONF_CHILDREN_GUIDS: ["test-child-123", "test-child-456"],
+            CONF_TASK_LOOKAHEAD_DAYS: DEFAULT_TASK_LOOKAHEAD_DAYS,
+        },
+        options={"show_class_times": True},
+        entry_id="test-entry-id",
+        unique_id="test-unique-id",
+        source="user",
+        discovery_keys=MappingProxyType({}),
+        subentries_data={},
+    )
+
+    # Mock current time to be during Science (last class), 11-12pm
+    now = get_offset_time().replace(hour=11, minute=30, second=0, microsecond=0)
+
+    # Update event times - only Science class exists
+    science_event = mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"][1]
+    science_event["start"] = now.replace(minute=0)
+    science_event["end"] = now.replace(hour=12, minute=0)
+
+    # Remove math event so Science is the only/last class
+    mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"] = [science_event]
+
+    with patch("custom_components.firefly_cloud.const.get_offset_time", return_value=now):
+        sensor = FireflySensor(mock_coordinator, config_entry, SENSOR_NEXT_CLASS, "test-child-123")
+        # Should show "None" without time prefix (no next class)
+        assert sensor.native_value == "None"
+
+
+@pytest.mark.asyncio
+async def test_next_class_not_in_class_with_time_prefix(mock_coordinator):
+    """Test next class sensor when not in a class with time prefix enabled."""
+    from custom_components.firefly_cloud.const import (
+        CONF_CHILDREN_GUIDS,
+        CONF_DEVICE_ID,
+        CONF_HOST,
+        CONF_SCHOOL_CODE,
+        CONF_SCHOOL_NAME,
+        CONF_SECRET,
+        CONF_TASK_LOOKAHEAD_DAYS,
+        CONF_USER_GUID,
+        DEFAULT_TASK_LOOKAHEAD_DAYS,
+        DOMAIN,
+        get_offset_time,
+    )
+
+    # Create config entry with time prefix enabled
+    config_entry = ConfigEntry(
+        version=1,
+        minor_version=1,
+        domain=DOMAIN,
+        title="Test School - John Doe",
+        data={
+            CONF_SCHOOL_CODE: "testschool",
+            CONF_SCHOOL_NAME: "Test School",
+            CONF_HOST: "https://testschool.fireflycloud.net",
+            CONF_DEVICE_ID: "test-device-123",
+            CONF_SECRET: "test-secret-456",
+            CONF_USER_GUID: "test-user-789",
+            CONF_CHILDREN_GUIDS: ["test-child-123", "test-child-456"],
+            CONF_TASK_LOOKAHEAD_DAYS: DEFAULT_TASK_LOOKAHEAD_DAYS,
+        },
+        options={"show_class_times": True},
+        entry_id="test-entry-id",
+        unique_id="test-unique-id",
+        source="user",
+        discovery_keys=MappingProxyType({}),
+        subentries_data={},
+    )
+
+    # Mock current time to be between classes (10:30am)
+    now = get_offset_time().replace(hour=10, minute=30, second=0, microsecond=0)
+
+    # Update event times
+    math_event = mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"][0]
+    math_event["start"] = now.replace(hour=9, minute=0)
+    math_event["end"] = now.replace(hour=10, minute=0)
+
+    science_event = mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"][1]
+    science_event["start"] = now.replace(hour=11, minute=0)
+    science_event["end"] = now.replace(hour=12, minute=0)
+
+    with patch("custom_components.firefly_cloud.const.get_offset_time", return_value=now):
+        sensor = FireflySensor(mock_coordinator, config_entry, SENSOR_NEXT_CLASS, "test-child-123")
+        # Should show time prefix for next upcoming class: "11.00-12.00: Science"
+        assert sensor.native_value == "11.00-12.00: Science"

@@ -14,10 +14,12 @@ CONF_CHILDREN_GUIDS = "children_guids"
 CONF_SCHOOL_NAME = "school_name"
 CONF_HOST = "host"
 CONF_TASK_LOOKAHEAD_DAYS = "task_lookahead_days"
+CONF_SHOW_CLASS_TIMES = "show_class_times"
 
 # Defaults
 DEFAULT_SCAN_INTERVAL = timedelta(minutes=15)
 DEFAULT_TASK_LOOKAHEAD_DAYS = 7
+DEFAULT_SHOW_CLASS_TIMES = False
 DEFAULT_APP_ID = "Home Assistant Firefly Cloud Integration"
 
 # API endpoints

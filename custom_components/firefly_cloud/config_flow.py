@@ -17,8 +17,10 @@ from .const import (
     CONF_SCHOOL_CODE,
     CONF_SCHOOL_NAME,
     CONF_SECRET,
+    CONF_SHOW_CLASS_TIMES,
     CONF_TASK_LOOKAHEAD_DAYS,
     CONF_USER_GUID,
+    DEFAULT_SHOW_CLASS_TIMES,
     DEFAULT_TASK_LOOKAHEAD_DAYS,
     DOMAIN,
 )
@@ -285,6 +287,13 @@ class FireflyCloudOptionsFlowHandler(config_entries.OptionsFlow):
                         self.config_entry.data.get(CONF_TASK_LOOKAHEAD_DAYS, DEFAULT_TASK_LOOKAHEAD_DAYS),
                     ),
                 ): vol.All(int, vol.Range(min=1, max=30)),
+                vol.Optional(
+                    CONF_SHOW_CLASS_TIMES,
+                    default=self.config_entry.options.get(
+                        CONF_SHOW_CLASS_TIMES,
+                        self.config_entry.data.get(CONF_SHOW_CLASS_TIMES, DEFAULT_SHOW_CLASS_TIMES),
+                    ),
+                ): bool,
             }
         )
 
@@ -292,6 +301,7 @@ class FireflyCloudOptionsFlowHandler(config_entries.OptionsFlow):
             step_id="init",
             data_schema=options_schema,
             description_placeholders={
-                "task_lookahead_help": "Number of days ahead to look for upcoming tasks (1-30 days)"
+                "task_lookahead_help": "Number of days ahead to look for upcoming tasks (1-30 days)",
+                "show_class_times_help": "Show class start/end times as prefix (e.g., '8.45-9.45: English')",
             },
         )
