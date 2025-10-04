@@ -1,7 +1,7 @@
 """Firefly Cloud API client."""
 
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 from urllib.parse import quote
 from uuid import uuid4
@@ -322,13 +322,70 @@ class FireflyAPIClient:
 
     async def _get_events_rest_api(self, start: datetime, end: datetime, user_guid: str) -> List[Dict[str, Any]]:
         """Get events using the REST API timetable endpoint."""
+        import logging
+        logger = logging.getLogger(__name__)
+
         # Determine the time period (week/day) based on date range
         days_diff = (end - start).days
-        if days_diff <= 1:
-            period = "day"
-        else:
-            period = "week"
 
+        # If the range is 1 day or less, fetch a single day
+        if days_diff <= 1:
+            return await self._fetch_timetable_period(start, "day", user_guid)
+
+        # For longer ranges, fetch multiple weeks to cover the entire period
+        # The REST API "week" endpoint only returns one week at a time
+        all_events = []
+        current_date = start
+
+        while current_date < end:
+            week_events = await self._fetch_timetable_period(current_date, "week", user_guid)
+            all_events.extend(week_events)
+
+            # Move to next week
+            current_date = current_date + timedelta(days=7)
+
+        # Remove duplicates (events might appear in multiple week fetches)
+        # and filter to only events within the requested range
+        seen_guids = set()
+        filtered_events = []
+
+        # Ensure start and end are timezone-aware for comparison
+        from homeassistant.util import dt as dt_util
+        if start.tzinfo is None:
+            start = dt_util.as_utc(start)
+        if end.tzinfo is None:
+            end = dt_util.as_utc(end)
+
+        for event in all_events:
+            event_guid = event.get("guid")
+            event_start_str = event.get("start")
+
+            # Skip if we've seen this event before
+            if event_guid and event_guid in seen_guids:
+                continue
+
+            # Parse event start time and check if it's in range
+            try:
+                if event_start_str:
+                    event_start = datetime.fromisoformat(event_start_str.replace("Z", "+00:00"))
+                    # Ensure event_start is timezone-aware
+                    if event_start.tzinfo is None:
+                        event_start = dt_util.as_utc(event_start)
+                    # Only include events that start within our requested range
+                    if start <= event_start < end:
+                        filtered_events.append(event)
+                        if event_guid:
+                            seen_guids.add(event_guid)
+            except (ValueError, AttributeError) as err:
+                logger.warning("Error parsing event start time: %s", err)
+                continue
+
+        return filtered_events
+
+    async def _fetch_timetable_period(
+        self, start: datetime, period: str, user_guid: str
+    ) -> List[Dict[str, Any]]:
+        """Fetch timetable for a specific period (day or week)."""
         url = f"{self._host}/api/v3/timetable/{user_guid}/{period}"
         params = {
             "ffauth_device_id": self._device_id,

@@ -1027,3 +1027,106 @@ async def test_get_tasks_timeout_retry(api_client, mock_aiohttp_session):
 
     with pytest.raises(FireflyConnectionError, match="Timeout getting tasks"):
         await api_client.get_tasks()
+
+
+@pytest.mark.asyncio
+async def test_get_events_rest_api_multi_week_range(api_client, mock_aiohttp_session):
+    """Test REST API events for 30-day range requiring multiple week fetches."""
+    from datetime import datetime, timezone
+
+    from tests.conftest import mock_http_response
+
+    start = datetime(2023, 1, 1, 9, 0, tzinfo=timezone.utc)
+    end = datetime(2023, 1, 31, 17, 0, tzinfo=timezone.utc)  # 30 days = multiple weeks
+
+    # Mock events from different weeks
+    week1_events = [
+        {"guid": "event1", "subject": "Week 1 Event", "startUtc": "2023-01-02T09:00:00Z"},
+        {"guid": "event2", "subject": "Week 1 Event 2", "startUtc": "2023-01-05T10:00:00Z"},
+    ]
+    week2_events = [
+        {"guid": "event3", "subject": "Week 2 Event", "startUtc": "2023-01-10T09:00:00Z"},
+    ]
+    week3_events = [
+        {"guid": "event4", "subject": "Week 3 Event", "startUtc": "2023-01-17T09:00:00Z"},
+    ]
+    week4_events = [
+        {"guid": "event5", "subject": "Week 4 Event", "startUtc": "2023-01-24T09:00:00Z"},
+    ]
+    week5_events = [
+        {"guid": "event6", "subject": "Week 5 Event", "startUtc": "2023-01-30T09:00:00Z"},
+    ]
+
+    # Mock responses for multiple week fetches
+    # The mock will cycle through these responses for each week
+    all_week_events = week1_events + week2_events + week3_events + week4_events + week5_events
+    mock_aiohttp_session._mock_responses["get"] = mock_http_response(json_data=all_week_events, status=200)
+
+    result = await api_client._get_events_rest_api(start, end, "user-123")
+
+    # Should have all 6 events from 5 weeks
+    assert len(result) == 6
+    assert result[0]["subject"] == "Week 1 Event"
+    assert result[5]["subject"] == "Week 5 Event"
+
+
+@pytest.mark.asyncio
+async def test_get_events_rest_api_deduplication(api_client, mock_aiohttp_session):
+    """Test that duplicate events across multiple week fetches are deduplicated."""
+    from datetime import datetime, timezone
+
+    from tests.conftest import mock_http_response
+
+    start = datetime(2023, 1, 1, 9, 0, tzinfo=timezone.utc)
+    end = datetime(2023, 1, 15, 17, 0, tzinfo=timezone.utc)  # 14 days = 2 weeks
+
+    # Same event appears in both week fetches (overlapping weeks)
+    duplicate_event = {"guid": "event1", "subject": "Duplicate Event", "startUtc": "2023-01-07T09:00:00Z"}
+    week1_events = [
+        duplicate_event,
+        {"guid": "event2", "subject": "Week 1 Only", "startUtc": "2023-01-03T09:00:00Z"},
+    ]
+    week2_events = [
+        duplicate_event,  # Same event
+        {"guid": "event3", "subject": "Week 2 Only", "startUtc": "2023-01-10T09:00:00Z"},
+    ]
+
+    # Mock returns all events (including duplicate) for simplicity
+    # The deduplication happens in the code, not in the mock
+    all_events = week1_events + week2_events
+    mock_aiohttp_session._mock_responses["get"] = mock_http_response(json_data=all_events, status=200)
+
+    result = await api_client._get_events_rest_api(start, end, "user-123")
+
+    # Should have only 3 events (duplicate removed)
+    assert len(result) == 3
+    guids = [e["guid"] for e in result]
+    assert guids.count("event1") == 1  # Duplicate removed
+
+
+@pytest.mark.asyncio
+async def test_get_events_rest_api_date_filtering(api_client, mock_aiohttp_session):
+    """Test that events outside the requested range are filtered out."""
+    from datetime import datetime, timezone
+
+    from tests.conftest import mock_http_response
+
+    start = datetime(2023, 1, 5, 0, 0, tzinfo=timezone.utc)
+    end = datetime(2023, 1, 12, 0, 0, tzinfo=timezone.utc)  # Request Jan 5-12
+
+    # Week fetch returns events outside the requested range
+    week_events = [
+        {"guid": "event1", "subject": "Before Range", "startUtc": "2023-01-02T09:00:00Z"},  # Before start
+        {"guid": "event2", "subject": "In Range 1", "startUtc": "2023-01-06T09:00:00Z"},  # In range
+        {"guid": "event3", "subject": "In Range 2", "startUtc": "2023-01-10T09:00:00Z"},  # In range
+        {"guid": "event4", "subject": "After Range", "startUtc": "2023-01-15T09:00:00Z"},  # After end
+    ]
+
+    mock_aiohttp_session._mock_responses["get"] = mock_http_response(json_data=week_events, status=200)
+
+    result = await api_client._get_events_rest_api(start, end, "user-123")
+
+    # Should have only 2 events (those in range)
+    assert len(result) == 2
+    assert result[0]["subject"] == "In Range 1"
+    assert result[1]["subject"] == "In Range 2"
