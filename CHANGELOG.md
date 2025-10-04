@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.3.1](https://github.com/matt-richardson/home-assistant-firefly-cloud/compare/v0.3.0...v0.3.1) (2025-10-04)
+
+
+### Bug Fixes
+
+* show time prefix on now/next class sensors in local time ([177b573](https://github.com/matt-richardson/home-assistant-firefly-cloud/commit/177b57359df97bbd22393525d61b33711a05d8a0))
+
 ## [0.3.0](https://github.com/matt-richardson/home-assistant-firefly-cloud/compare/v0.2.0...v0.3.0) (2025-10-04)
 
 
