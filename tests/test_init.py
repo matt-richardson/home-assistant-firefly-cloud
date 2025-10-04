@@ -13,7 +13,16 @@ from custom_components.firefly_cloud import (
     async_unload_entry,
     async_update_options,
 )
-from custom_components.firefly_cloud.const import DOMAIN
+from custom_components.firefly_cloud.const import (
+    CONF_CHILDREN_GUIDS,
+    CONF_DEVICE_ID,
+    CONF_HOST,
+    CONF_SCHOOL_CODE,
+    CONF_SCHOOL_NAME,
+    CONF_SECRET,
+    CONF_USER_GUID,
+    DOMAIN,
+)
 from custom_components.firefly_cloud.exceptions import (
     FireflyAuthenticationError,
     FireflyConnectionError,
@@ -514,3 +523,35 @@ async def test_async_setup_entry_creates_api_client_correctly(
 
         # Verify session was obtained
         mock_session_getter.assert_called_once_with(hass)
+
+
+@pytest.mark.asyncio
+async def test_async_migrate_entry_version_1(hass: HomeAssistant):
+    """Test migration of config entry at version 1 (no-op)."""
+    from custom_components.firefly_cloud import async_migrate_entry
+    from homeassistant.helpers import entity_registry as er
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+    # Create a config entry at version 1
+    config_entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            CONF_SCHOOL_CODE: "testschool",
+            CONF_SCHOOL_NAME: "Test School",
+            CONF_HOST: "https://testschool.fireflycloud.net",
+            CONF_DEVICE_ID: "test-device-123",
+            CONF_SECRET: "test-secret-456",
+            CONF_USER_GUID: "test-user-789",
+            CONF_CHILDREN_GUIDS: ["child1"],
+        },
+        version=1,
+    )
+    config_entry.add_to_hass(hass)
+
+    # Run migration
+    result = await async_migrate_entry(hass, config_entry)
+
+    # Should return True (success)
+    assert result is True
+    # Version should still be 1
+    assert config_entry.version == 1

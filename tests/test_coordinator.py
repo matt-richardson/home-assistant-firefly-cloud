@@ -1433,3 +1433,67 @@ async def test_coordinator_filter_overdue_tasks_naive_due_date(hass: HomeAssista
     overdue_tasks = coordinator._filter_overdue_tasks(mock_api.get_tasks.return_value, now)
 
     assert len(overdue_tasks) >= 0  # Should handle naive due date conversion
+
+
+@pytest.mark.asyncio
+async def test_coordinator_process_tasks_subject_dict(hass):
+    """Test coordinator handles task with subject as dict."""
+    from custom_components.firefly_cloud.api import FireflyAPIClient
+    from custom_components.firefly_cloud.coordinator import FireflyUpdateCoordinator
+    from unittest.mock import AsyncMock
+
+    # Create mock API client
+    mock_api = AsyncMock(spec=FireflyAPIClient)
+
+    coordinator = FireflyUpdateCoordinator(hass, mock_api, task_lookahead_days=7, children_guids=["child1"])
+
+    # Create task with subject as dict
+    tasks = [
+        {
+            "guid": "task1",
+            "title": "Math Homework",
+            "description": "Page 42",
+            "subject": {"name": "Mathematics", "id": "math-id"},  # Dict format
+            "dueDate": "2024-01-15T12:00:00Z",
+            "setter": {"name": "Mr. Smith"},
+            "personal": False,
+        }
+    ]
+
+    processed = coordinator._process_tasks(tasks)
+
+    assert len(processed) == 1
+    assert processed[0]["subject"] == "Mathematics"
+
+
+@pytest.mark.asyncio
+async def test_coordinator_process_tasks_subject_string(hass):
+    """Test coordinator handles task with subject as string."""
+    from custom_components.firefly_cloud.api import FireflyAPIClient
+    from custom_components.firefly_cloud.coordinator import FireflyUpdateCoordinator
+    from unittest.mock import AsyncMock
+
+    # Create mock API client
+    mock_api = AsyncMock(spec=FireflyAPIClient)
+
+    coordinator = FireflyUpdateCoordinator(hass, mock_api, task_lookahead_days=7, children_guids=["child1"])
+
+    # Create task with subject as string
+    tasks = [
+        {
+            "guid": "task1",
+            "title": "Math Homework",
+            "description": "Page 42",
+            "subject": "Mathematics",  # String format
+            "dueDate": "2024-01-15T12:00:00Z",
+            "setter": {"name": "Mr. Smith"},
+            "personal": False,
+        }
+    ]
+
+    processed = coordinator._process_tasks(tasks)
+
+    assert len(processed) == 1
+    assert processed[0]["subject"] == "Mathematics"
+
+

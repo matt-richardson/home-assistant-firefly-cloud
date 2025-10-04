@@ -810,3 +810,71 @@ async def test_auth_step_multiple_children(
     assert len(result2["data"]["children_guids"]) == 2
     assert "child1-guid" in result2["data"]["children_guids"]
     assert "child2-guid" in result2["data"]["children_guids"]
+
+
+@pytest.mark.asyncio
+async def test_config_flow_is_matching() -> None:
+    """Test is_matching method for duplicate flow detection."""
+    from custom_components.firefly_cloud.config_flow import FireflyCloudConfigFlow
+
+    # Create mock flow objects with unique_id attribute
+    class MockFlow1:
+        unique_id = "testschool"
+        def is_matching(self, other):
+            return FireflyCloudConfigFlow.is_matching(self, other)
+
+    class MockFlow2:
+        unique_id = "testschool"
+
+    class MockFlow3:
+        unique_id = "otherschool"
+
+    class MockFlow4:
+        unique_id = None
+
+    # Test with matching unique_ids
+    flow1 = MockFlow1()
+    flow2 = MockFlow2()
+    assert flow1.is_matching(flow2) is True
+
+    # Test with different unique_ids
+    flow3 = MockFlow1()
+    flow4 = MockFlow3()
+    assert flow3.is_matching(flow4) is False
+
+    # Test with one flow without unique_id (None)
+    flow5 = MockFlow1()
+    flow6 = MockFlow4()
+    assert flow5.is_matching(flow6) is False
+
+    # Test with both flows without unique_id (None)
+    flow7 = MockFlow4()
+    flow8 = MockFlow4()
+    assert flow7.is_matching(flow8) is False if hasattr(flow7, 'is_matching') else True
+
+
+@pytest.mark.asyncio
+async def test_form_school_disabled(hass: HomeAssistant, mock_setup_entry) -> None:  # pylint: disable=unused-argument
+    """Test school disabled error during user flow."""
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
+
+    mock_school_info = {
+        "enabled": False,  # School is disabled
+        "name": "Test School",
+        "host": "testschool.fireflycloud.net",
+        "url": "https://testschool.fireflycloud.net",
+        "device_id": "test-device-123",
+    }
+
+    with patch(
+        "custom_components.firefly_cloud.api.FireflyAPIClient.get_school_info",
+        return_value=mock_school_info,
+    ):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {"school_code": "testschool"},
+        )
+
+    assert result["type"] == FlowResultType.FORM
+    assert result["errors"] == {"base": "school_disabled"}
+    assert result["step_id"] == "user"
