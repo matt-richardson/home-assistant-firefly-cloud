@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.2.0](https://github.com/matt-richardson/home-assistant-firefly-cloud/compare/v0.1.2...v0.2.0) (2025-10-04)
+
+
+### Features
+
+* add optional time prefix for current and next class sensors ([d924ab6](https://github.com/matt-richardson/home-assistant-firefly-cloud/commit/d924ab6bb8efb8038873bb29d8777f0dcfde439e))
+* support multi-week timetable fetching for 30-day calendar range ([f5d9500](https://github.com/matt-richardson/home-assistant-firefly-cloud/commit/f5d9500c3fb59589d8ce0a5f34a1fff085ad09a7))
+
+
+### Bug Fixes
+
+* ensure PNG icons are available for Home Assistant UI ([aaa8a4f](https://github.com/matt-richardson/home-assistant-firefly-cloud/commit/aaa8a4f98e9fb4899c4a9796e9e4876055bc0958))
+
 ## [0.1.2](https://github.com/matt-richardson/home-assistant-firefly-cloud/compare/v0.1.1...v0.1.2) (2025-10-03)
 
 
