@@ -1044,8 +1044,8 @@ async def test_current_class_with_time_prefix_enabled(mock_coordinator):
 
     with patch("custom_components.firefly_cloud.const.get_offset_time", return_value=now):
         sensor = FireflySensor(mock_coordinator, config_entry, SENSOR_CURRENT_CLASS, "test-child-123")
-        # Should show time prefix: "09.00-10.00: Mathematics"
-        assert sensor.native_value == "09.00-10.00: Mathematics"
+        # Should show time prefix: "9.00-10.00: Mathematics"
+        assert sensor.native_value == "9.00-10.00: Mathematics"
 
 
 @pytest.mark.asyncio
@@ -1386,3 +1386,83 @@ async def test_next_class_not_in_class_with_time_prefix(mock_coordinator):
         sensor = FireflySensor(mock_coordinator, config_entry, SENSOR_NEXT_CLASS, "test-child-123")
         # Should show time prefix for next upcoming class: "11.00-12.00: Science"
         assert sensor.native_value == "11.00-12.00: Science"
+
+
+@pytest.mark.asyncio
+async def test_class_times_show_local_timezone(mock_coordinator):
+    """Test that class times are shown in local timezone, not UTC."""
+    from custom_components.firefly_cloud.const import (
+        CONF_CHILDREN_GUIDS,
+        CONF_DEVICE_ID,
+        CONF_HOST,
+        CONF_SCHOOL_CODE,
+        CONF_SCHOOL_NAME,
+        CONF_SECRET,
+        CONF_TASK_LOOKAHEAD_DAYS,
+        CONF_USER_GUID,
+        DEFAULT_TASK_LOOKAHEAD_DAYS,
+        DOMAIN,
+    )
+    from homeassistant.util import dt as dt_util
+
+    # Create config entry with time prefix enabled
+    config_entry = ConfigEntry(
+        version=1,
+        minor_version=1,
+        domain=DOMAIN,
+        title="Test School - John Doe",
+        data={
+            CONF_SCHOOL_CODE: "testschool",
+            CONF_SCHOOL_NAME: "Test School",
+            CONF_HOST: "https://testschool.fireflycloud.net",
+            CONF_DEVICE_ID: "test-device-123",
+            CONF_SECRET: "test-secret-456",
+            CONF_USER_GUID: "test-user-789",
+            CONF_CHILDREN_GUIDS: ["test-child-123", "test-child-456"],
+            CONF_TASK_LOOKAHEAD_DAYS: DEFAULT_TASK_LOOKAHEAD_DAYS,
+        },
+        options={"show_class_times": True},
+        entry_id="test-entry-id",
+        unique_id="test-unique-id",
+        source="user",
+        discovery_keys=MappingProxyType({}),
+        subentries_data={},
+    )
+
+    # Create times in UTC: 9am UTC = 7pm AEST (Melbourne time, UTC+10)
+    # This mimics what might come from the API
+    now_utc = dt_util.utcnow().replace(hour=9, minute=30, second=0, microsecond=0)
+    now_local = dt_util.as_local(now_utc)
+
+    # Create events with UTC times (9-10am UTC)
+    class_start_utc = now_utc.replace(minute=0)
+    class_end_utc = now_utc.replace(hour=10, minute=0)
+
+    # Set up coordinator data with UTC times
+    mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"] = [
+        {
+            "start": class_start_utc,
+            "end": class_end_utc,
+            "subject": "Mathematics",
+            "location": "Room 101",
+            "description": "Test class",
+        }
+    ]
+
+    with patch("custom_components.firefly_cloud.const.get_offset_time", return_value=now_local):
+        sensor = FireflySensor(mock_coordinator, config_entry, SENSOR_CURRENT_CLASS, "test-child-123")
+
+        # The sensor should show times in local timezone, not UTC
+        # If local is AEST (UTC+10), 09:00 UTC should display as 19:00 local
+        value = sensor.native_value
+
+        # The value should contain the local time representation, not UTC time
+        assert value is not None
+        if value != "None":
+            # Extract the time from the format "H.MM-H.MM: Subject"
+            time_part = value.split(":")[0] if ":" in value else ""
+            # The time should be in local timezone (19.00-20.00 for AEST)
+            # Not UTC timezone (9.00-10.00)
+            local_start = class_start_utc.astimezone(now_local.tzinfo) if now_local.tzinfo else class_start_utc
+            expected_start = f"{local_start.hour}.{local_start.minute:02d}"
+            assert time_part.startswith(expected_start), f"Expected time to start with {expected_start} (local), but got {time_part}"
