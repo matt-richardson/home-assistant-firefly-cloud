@@ -529,11 +529,14 @@ async def test_async_setup_entry_creates_api_client_correctly(
 async def test_async_migrate_entry_version_1(hass: HomeAssistant):
     """Test migration of config entry at version 1 (no-op)."""
     from custom_components.firefly_cloud import async_migrate_entry
-    from pytest_homeassistant_custom_component.common import MockConfigEntry
+    from conftest import create_config_entry_with_version_compat
 
     # Create a config entry at version 1
-    config_entry = MockConfigEntry(
+    from types import MappingProxyType
+
+    config_entry = create_config_entry_with_version_compat(
         domain=DOMAIN,
+        title="Test School - User",
         data={
             CONF_SCHOOL_CODE: "testschool",
             CONF_SCHOOL_NAME: "Test School",
@@ -543,9 +546,15 @@ async def test_async_migrate_entry_version_1(hass: HomeAssistant):
             CONF_USER_GUID: "test-user-789",
             CONF_CHILDREN_GUIDS: ["child1"],
         },
+        options={},
         version=1,
+        minor_version=1,
+        source="user",
+        unique_id="testschool",
+        entry_id="test-entry-migration",
+        discovery_keys=MappingProxyType({}),
     )
-    config_entry.add_to_hass(hass)
+    hass.config_entries._entries[config_entry.entry_id] = config_entry
 
     # Run migration
     result = await async_migrate_entry(hass, config_entry)
