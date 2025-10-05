@@ -66,6 +66,7 @@ jobs:
         uses: hacs/action@main
         with:
           category: integration
+          ignore: brands # Ignore brands check as we are waiting for https://github.com/home-assistant/brands/pull/8080 to be merged
 
       - name: Hassfest validation
         uses: home-assistant/actions/hassfest@master
