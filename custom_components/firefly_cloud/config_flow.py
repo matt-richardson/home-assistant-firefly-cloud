@@ -45,7 +45,7 @@ STEP_AUTH_DATA_SCHEMA = vol.Schema(
 )
 
 
-class FireflyCloudConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+class FireflyCloudConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
     """Handle a config flow for Firefly Cloud."""
 
     VERSION = 1
