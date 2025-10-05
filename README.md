@@ -6,6 +6,7 @@ A Home Assistant custom integration that connects to Firefly Cloud (school learn
 
 - **Upcoming Tasks**: Monitor homework, projects, and assignments with due dates
 - **Tasks Due Today**: Quick view of today's due assignments
+- **Overdue Tasks**: Track assignments past their due date with days overdue
 - **Current/Next Class**: Real-time school schedule showing current and upcoming lessons
 - **Calendar Integration**: School events and tasks displayed in Home Assistant calendar
 - **Todo Integration**: Interactive todo list for managing school tasks
@@ -46,6 +47,7 @@ After setup, you can configure additional options by clicking "Configure" on the
 For each child, the integration creates:
 - `sensor.firefly_upcoming_tasks_[child_name]` - Tasks due in configured timeframe
 - `sensor.firefly_tasks_due_today_[child_name]` - Tasks due today
+- `sensor.firefly_overdue_tasks_[child_name]` - Tasks past their due date
 - `sensor.firefly_current_class_[child_name]` - Currently active class/lesson
 - `sensor.firefly_next_class_[child_name]` - Next scheduled class/lesson
 - `calendar.firefly_[child_name]` - School events and tasks in calendar format
@@ -139,6 +141,7 @@ The dev container provides multiple approaches for manual testing:
 After adding integration, verify entities are created:
 - `sensor.firefly_upcoming_tasks_*` - Homework and assignments
 - `sensor.firefly_tasks_due_today_*` - Today's due tasks
+- `sensor.firefly_overdue_tasks_*` - Tasks past their due date
 - `sensor.firefly_current_class_*` - Currently active class/lesson
 - `sensor.firefly_next_class_*` - Next scheduled class/lesson
 - `calendar.firefly_*` - School events and tasks in calendar

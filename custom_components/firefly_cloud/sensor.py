@@ -20,6 +20,7 @@ from .const import (
     DOMAIN,
     SENSOR_CURRENT_CLASS,
     SENSOR_NEXT_CLASS,
+    SENSOR_OVERDUE_TASKS,
     SENSOR_TASKS_DUE_TODAY,
     SENSOR_TYPES,
     SENSOR_UPCOMING_TASKS,
@@ -145,12 +146,14 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
                 return len(child_data.get("tasks", {}).get("upcoming", []))
             if self._sensor_type == SENSOR_TASKS_DUE_TODAY:
                 return len(child_data.get("tasks", {}).get("due_today", []))
+            if self._sensor_type == SENSOR_OVERDUE_TASKS:
+                return len(child_data.get("tasks", {}).get("overdue", []))
             if self._sensor_type == SENSOR_CURRENT_CLASS:
                 return self._get_current_class(child_data)
             if self._sensor_type == SENSOR_NEXT_CLASS:
                 return self._get_next_class(child_data)
         except (KeyError, TypeError, AttributeError):
-            if self._sensor_type in [SENSOR_UPCOMING_TASKS, SENSOR_TASKS_DUE_TODAY]:
+            if self._sensor_type in [SENSOR_UPCOMING_TASKS, SENSOR_TASKS_DUE_TODAY, SENSOR_OVERDUE_TASKS]:
                 return 0
             return None
 
@@ -174,6 +177,8 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
             attributes.update(self._get_upcoming_tasks_attributes(child_data))
         elif self._sensor_type == SENSOR_TASKS_DUE_TODAY:
             attributes.update(self._get_tasks_due_today_attributes(child_data))
+        elif self._sensor_type == SENSOR_OVERDUE_TASKS:
+            attributes.update(self._get_overdue_tasks_attributes(child_data))
         elif self._sensor_type == SENSOR_CURRENT_CLASS:
             attributes.update(self._get_current_class_attributes(child_data))
         elif self._sensor_type == SENSOR_NEXT_CLASS:
@@ -289,6 +294,30 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
             "homework_count": len([t for t in tasks if t["task_type"] == "homework"]),
             "project_count": len([t for t in tasks if t["task_type"] == "project"]),
             "test_count": len([t for t in tasks if t["task_type"] == "test"]),
+        }
+
+    def _get_overdue_tasks_attributes(self, child_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Get attributes for overdue tasks sensor."""
+        tasks = child_data.get("tasks", {}).get("overdue", [])
+
+        return {
+            "tasks": [
+                {
+                    "title": task["title"],
+                    "subject": task.get("subject", "Unknown"),
+                    "due_date": task["due_date"].isoformat() if task["due_date"] else None,
+                    "due_date_formatted": (task["due_date"].strftime("%A, %d %B %Y") if task["due_date"] else None),
+                    "task_type": task["task_type"],
+                    "days_overdue": ((datetime.now().date() - task["due_date"].date()).days if task["due_date"] else 0),
+                    "setter": task["setter"],
+                    "description": (
+                        task["description"][:100] + "..."
+                        if task["description"] and len(task["description"]) > 100
+                        else task["description"]
+                    ),
+                }
+                for task in tasks
+            ],
         }
 
     def _get_current_class_subject(self, child_data: Dict[str, Any]) -> Optional[str]:

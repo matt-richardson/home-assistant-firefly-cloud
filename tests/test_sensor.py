@@ -18,6 +18,7 @@ from custom_components.firefly_cloud.const import (
     DOMAIN,
     SENSOR_CURRENT_CLASS,
     SENSOR_NEXT_CLASS,
+    SENSOR_OVERDUE_TASKS,
     SENSOR_TASKS_DUE_TODAY,
     SENSOR_TYPES,
     SENSOR_UPCOMING_TASKS,
@@ -149,13 +150,14 @@ async def test_async_setup_entry(hass: HomeAssistant, mock_config_entry, mock_co
 
     await async_setup_entry(hass, mock_config_entry, mock_add_entities)
 
-    assert len(entities) == 8  # 4 sensor types × 2 children
+    assert len(entities) == 10  # 5 sensor types × 2 children
     assert all(isinstance(e, FireflySensor) for e in entities)
 
     # Check that all sensor types are created
     sensor_types = [e._sensor_type for e in entities]
     assert SENSOR_UPCOMING_TASKS in sensor_types
     assert SENSOR_TASKS_DUE_TODAY in sensor_types
+    assert SENSOR_OVERDUE_TASKS in sensor_types
     assert SENSOR_CURRENT_CLASS in sensor_types
     assert SENSOR_NEXT_CLASS in sensor_types
 
@@ -208,6 +210,93 @@ async def test_tasks_due_today_sensor_with_tasks(mock_coordinator, mock_config_e
     sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_TASKS_DUE_TODAY, "test-child-123")
 
     assert sensor.native_value == 1
+
+
+@pytest.mark.asyncio
+async def test_overdue_tasks_sensor(mock_coordinator, mock_config_entry):
+    """Test overdue tasks sensor."""
+    sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_OVERDUE_TASKS, "test-child-123")
+
+    assert "Overdue Tasks" in sensor.name
+    assert sensor.unique_id == f"{mock_config_entry.entry_id}_{SENSOR_OVERDUE_TASKS}_test-child-123"
+    assert sensor.icon == "mdi:alert-circle"
+    assert sensor.native_value == 0
+    assert sensor.native_unit_of_measurement == "tasks"
+
+
+@pytest.mark.asyncio
+async def test_overdue_tasks_sensor_with_tasks(mock_coordinator, mock_config_entry):
+    """Test overdue tasks sensor with tasks."""
+    from custom_components.firefly_cloud.const import get_offset_time
+
+    now = get_offset_time().replace(tzinfo=None)
+    mock_coordinator.data["children_data"]["test-child-123"]["tasks"]["overdue"] = [
+        {
+            "id": "overdue-task-1",
+            "title": "Late Assignment",
+            "description": "This was due last week",
+            "due_date": now - timedelta(days=7),
+            "set_date": now - timedelta(days=14),
+            "subject": "History",
+            "task_type": "homework",
+            "completion_status": "Todo",
+            "setter": "Mr. Brown",
+            "raw_data": {},
+        },
+        {
+            "id": "overdue-task-2",
+            "title": "Overdue Project",
+            "description": "Final project submission",
+            "due_date": now - timedelta(days=3),
+            "set_date": now - timedelta(days=30),
+            "subject": "Science",
+            "task_type": "project",
+            "completion_status": "Todo",
+            "setter": "Dr. Smith",
+            "raw_data": {},
+        },
+    ]
+
+    sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_OVERDUE_TASKS, "test-child-123")
+
+    assert sensor.native_value == 2
+
+
+@pytest.mark.asyncio
+async def test_overdue_tasks_sensor_attributes(mock_coordinator, mock_config_entry):
+    """Test overdue tasks sensor attributes."""
+    from custom_components.firefly_cloud.const import get_offset_time
+
+    now = get_offset_time().replace(tzinfo=None)
+
+    # Add overdue tasks to coordinator data
+    mock_coordinator.data["children_data"]["test-child-123"]["tasks"]["overdue"] = [
+        {
+            "id": "overdue-task",
+            "title": "Late Assignment",
+            "description": "This was due last week",
+            "due_date": now - timedelta(days=7),
+            "set_date": now - timedelta(days=14),
+            "subject": "History",
+            "task_type": "homework",
+            "completion_status": "Todo",
+            "setter": "Mr. Brown",
+            "raw_data": {},
+        }
+    ]
+
+    sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_OVERDUE_TASKS, "test-child-123")
+
+    attributes = sensor.extra_state_attributes
+    assert "tasks" in attributes
+    assert "last_updated" in attributes
+
+    # Check task details
+    tasks = attributes["tasks"]
+    assert len(tasks) == 1
+    assert tasks[0]["title"] == "Late Assignment"
+    assert tasks[0]["subject"] == "History"
+    assert tasks[0]["days_overdue"] == 7
 
 
 @pytest.mark.asyncio
@@ -295,7 +384,7 @@ async def test_sensor_handles_missing_data_gracefully(mock_coordinator, mock_con
 @pytest.mark.asyncio
 async def test_all_sensor_types_defined():
     """Test that all sensor types have proper configuration."""
-    for sensor_type in [SENSOR_UPCOMING_TASKS, SENSOR_TASKS_DUE_TODAY, SENSOR_CURRENT_CLASS, SENSOR_NEXT_CLASS]:
+    for sensor_type in [SENSOR_UPCOMING_TASKS, SENSOR_TASKS_DUE_TODAY, SENSOR_OVERDUE_TASKS, SENSOR_CURRENT_CLASS, SENSOR_NEXT_CLASS]:
         assert sensor_type in SENSOR_TYPES
         config = SENSOR_TYPES[sensor_type]
         assert "name" in config
@@ -401,14 +490,18 @@ async def test_sensor_handles_empty_tasks(mock_coordinator, mock_config_entry):
     # Clear tasks data
     mock_coordinator.data["children_data"]["test-child-123"]["tasks"]["upcoming"] = []
     mock_coordinator.data["children_data"]["test-child-123"]["tasks"]["due_today"] = []
+    mock_coordinator.data["children_data"]["test-child-123"]["tasks"]["overdue"] = []
 
     upcoming_sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_UPCOMING_TASKS, "test-child-123")
     due_today_sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_TASKS_DUE_TODAY, "test-child-123")
+    overdue_sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_OVERDUE_TASKS, "test-child-123")
 
     assert upcoming_sensor.native_value == 0
     assert due_today_sensor.native_value == 0
+    assert overdue_sensor.native_value == 0
     assert upcoming_sensor.available is True
     assert due_today_sensor.available is True
+    assert overdue_sensor.available is True
 
 
 @pytest.mark.asyncio
@@ -566,8 +659,8 @@ async def test_async_setup_entry_no_children(hass: HomeAssistant):
 
     await async_setup_entry(hass, config_entry, mock_add_entities)
 
-    # When children_guids is empty, uses user GUID, creating 4 entities (4 sensor types × 1 user)
-    assert len(entities) == 4
+    # When children_guids is empty, uses user GUID, creating 5 entities (5 sensor types × 1 user)
+    assert len(entities) == 5
 
 
 @pytest.mark.asyncio
@@ -624,8 +717,8 @@ async def test_async_setup_entry_multiple_children(hass: HomeAssistant):
 
     await async_setup_entry(hass, config_entry, mock_add_entities)
 
-    # Should create 4 sensors × 3 children = 12 entities
-    assert len(entities) == 12
+    # Should create 5 sensors × 3 children = 15 entities
+    assert len(entities) == 15
 
     # Check all children have sensors
     child_guids = [e._child_guid for e in entities]
@@ -637,9 +730,10 @@ async def test_async_setup_entry_multiple_children(hass: HomeAssistant):
     for child_guid in ["child-1", "child-2", "child-3"]:
         child_entities = [e for e in entities if e._child_guid == child_guid]
         sensor_types = [e._sensor_type for e in child_entities]
-        assert len(sensor_types) == 4
+        assert len(sensor_types) == 5
         assert SENSOR_UPCOMING_TASKS in sensor_types
         assert SENSOR_TASKS_DUE_TODAY in sensor_types
+        assert SENSOR_OVERDUE_TASKS in sensor_types
         assert SENSOR_CURRENT_CLASS in sensor_types
         assert SENSOR_NEXT_CLASS in sensor_types
 
@@ -650,6 +744,7 @@ async def test_sensor_device_info_consistency(mock_coordinator, mock_config_entr
     sensors = [
         FireflySensor(mock_coordinator, mock_config_entry, SENSOR_UPCOMING_TASKS, "test-child-123"),
         FireflySensor(mock_coordinator, mock_config_entry, SENSOR_TASKS_DUE_TODAY, "test-child-123"),
+        FireflySensor(mock_coordinator, mock_config_entry, SENSOR_OVERDUE_TASKS, "test-child-123"),
         FireflySensor(mock_coordinator, mock_config_entry, SENSOR_CURRENT_CLASS, "test-child-123"),
         FireflySensor(mock_coordinator, mock_config_entry, SENSOR_NEXT_CLASS, "test-child-123"),
     ]
@@ -667,7 +762,7 @@ async def test_sensor_device_info_consistency(mock_coordinator, mock_config_entr
 async def test_sensor_unique_ids_are_unique(mock_coordinator, mock_config_entry):
     """Test that all sensors have unique IDs."""
     children = ["child-1", "child-2"]
-    sensor_types = [SENSOR_UPCOMING_TASKS, SENSOR_TASKS_DUE_TODAY, SENSOR_CURRENT_CLASS, SENSOR_NEXT_CLASS]
+    sensor_types = [SENSOR_UPCOMING_TASKS, SENSOR_TASKS_DUE_TODAY, SENSOR_OVERDUE_TASKS, SENSOR_CURRENT_CLASS, SENSOR_NEXT_CLASS]
 
     # Mock coordinator data for multiple children
     mock_coordinator.data["children_guids"] = children
