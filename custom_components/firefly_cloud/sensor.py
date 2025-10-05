@@ -196,9 +196,7 @@ class FireflySensor(FireflyBaseEntity, SensorEntity):
                     "due_date": task["due_date"].isoformat() if task["due_date"] else None,
                     "due_date_formatted": (task["due_date"].strftime("%A, %d %B %Y") if task["due_date"] else None),
                     "task_type": task["task_type"],
-                    "days_until_due": (
-                        (task["due_date"].date() - now.date()).days if task["due_date"] else None
-                    ),
+                    "days_until_due": ((task["due_date"].date() - now.date()).days if task["due_date"] else None),
                     "setter": task["setter"],
                 }
                 for task in tasks
