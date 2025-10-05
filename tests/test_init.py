@@ -529,7 +529,6 @@ async def test_async_setup_entry_creates_api_client_correctly(
 async def test_async_migrate_entry_version_1(hass: HomeAssistant):
     """Test migration of config entry at version 1 (no-op)."""
     from custom_components.firefly_cloud import async_migrate_entry
-    from homeassistant.helpers import entity_registry as er
     from pytest_homeassistant_custom_component.common import MockConfigEntry
 
     # Create a config entry at version 1

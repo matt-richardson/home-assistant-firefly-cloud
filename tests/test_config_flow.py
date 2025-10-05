@@ -820,6 +820,7 @@ async def test_config_flow_is_matching() -> None:
     # Create mock flow objects with unique_id attribute
     class MockFlow1:
         unique_id = "testschool"
+
         def is_matching(self, other):
             return FireflyCloudConfigFlow.is_matching(self, other)
 
@@ -850,7 +851,7 @@ async def test_config_flow_is_matching() -> None:
     # Test with both flows without unique_id (None)
     flow7 = MockFlow4()
     flow8 = MockFlow4()
-    assert flow7.is_matching(flow8) is False if hasattr(flow7, 'is_matching') else True
+    assert flow7.is_matching(flow8) is False if hasattr(flow7, "is_matching") else True
 
 
 @pytest.mark.asyncio

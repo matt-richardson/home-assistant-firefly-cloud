@@ -384,7 +384,13 @@ async def test_sensor_handles_missing_data_gracefully(mock_coordinator, mock_con
 @pytest.mark.asyncio
 async def test_all_sensor_types_defined():
     """Test that all sensor types have proper configuration."""
-    for sensor_type in [SENSOR_UPCOMING_TASKS, SENSOR_TASKS_DUE_TODAY, SENSOR_OVERDUE_TASKS, SENSOR_CURRENT_CLASS, SENSOR_NEXT_CLASS]:
+    for sensor_type in [
+        SENSOR_UPCOMING_TASKS,
+        SENSOR_TASKS_DUE_TODAY,
+        SENSOR_OVERDUE_TASKS,
+        SENSOR_CURRENT_CLASS,
+        SENSOR_NEXT_CLASS,
+    ]:
         assert sensor_type in SENSOR_TYPES
         config = SENSOR_TYPES[sensor_type]
         assert "name" in config
@@ -762,7 +768,13 @@ async def test_sensor_device_info_consistency(mock_coordinator, mock_config_entr
 async def test_sensor_unique_ids_are_unique(mock_coordinator, mock_config_entry):
     """Test that all sensors have unique IDs."""
     children = ["child-1", "child-2"]
-    sensor_types = [SENSOR_UPCOMING_TASKS, SENSOR_TASKS_DUE_TODAY, SENSOR_OVERDUE_TASKS, SENSOR_CURRENT_CLASS, SENSOR_NEXT_CLASS]
+    sensor_types = [
+        SENSOR_UPCOMING_TASKS,
+        SENSOR_TASKS_DUE_TODAY,
+        SENSOR_OVERDUE_TASKS,
+        SENSOR_CURRENT_CLASS,
+        SENSOR_NEXT_CLASS,
+    ]
 
     # Mock coordinator data for multiple children
     mock_coordinator.data["children_guids"] = children
@@ -1560,4 +1572,6 @@ async def test_class_times_show_local_timezone(mock_coordinator):
             # Not UTC timezone (9.00-10.00)
             local_start = class_start_utc.astimezone(now_local.tzinfo) if now_local.tzinfo else class_start_utc
             expected_start = f"{local_start.hour}.{local_start.minute:02d}"
-            assert time_part.startswith(expected_start), f"Expected time to start with {expected_start} (local), but got {time_part}"
+            assert time_part.startswith(
+                expected_start
+            ), f"Expected time to start with {expected_start} (local), but got {time_part}"

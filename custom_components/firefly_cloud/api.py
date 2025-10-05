@@ -323,6 +323,7 @@ class FireflyAPIClient:
     async def _get_events_rest_api(self, start: datetime, end: datetime, user_guid: str) -> List[Dict[str, Any]]:
         """Get events using the REST API timetable endpoint."""
         import logging
+
         logger = logging.getLogger(__name__)
 
         # Determine the time period (week/day) based on date range
@@ -351,6 +352,7 @@ class FireflyAPIClient:
 
         # Ensure start and end are timezone-aware for comparison
         from homeassistant.util import dt as dt_util
+
         if start.tzinfo is None:
             start = dt_util.as_utc(start)
         if end.tzinfo is None:
@@ -382,9 +384,7 @@ class FireflyAPIClient:
 
         return filtered_events
 
-    async def _fetch_timetable_period(
-        self, start: datetime, period: str, user_guid: str
-    ) -> List[Dict[str, Any]]:
+    async def _fetch_timetable_period(self, start: datetime, period: str, user_guid: str) -> List[Dict[str, Any]]:
         """Fetch timetable for a specific period (day or week)."""
         url = f"{self._host}/api/v3/timetable/{user_guid}/{period}"
         params = {

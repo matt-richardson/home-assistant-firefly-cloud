@@ -454,7 +454,9 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
             subject = next_event["subject"]
             if show_times:
                 # Convert to local timezone before formatting
-                start_local = dt_util.as_local(next_event["start"]) if next_event["start"].tzinfo else next_event["start"]
+                start_local = (
+                    dt_util.as_local(next_event["start"]) if next_event["start"].tzinfo else next_event["start"]
+                )
                 end_local = dt_util.as_local(next_event["end"]) if next_event["end"].tzinfo else next_event["end"]
                 # Format times as H.MM (no leading zeros on hours)
                 start_time = f"{start_local.hour}.{start_local.minute:02d}"

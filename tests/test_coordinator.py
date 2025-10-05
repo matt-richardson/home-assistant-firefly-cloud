@@ -1495,5 +1495,3 @@ async def test_coordinator_process_tasks_subject_string(hass):
 
     assert len(processed) == 1
     assert processed[0]["subject"] == "Mathematics"
-
-
