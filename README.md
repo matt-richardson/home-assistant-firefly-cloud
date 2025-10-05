@@ -1,5 +1,8 @@
 # Home Assistant Firefly Cloud Integration
 
+[![Test](https://github.com/matt-richardson/home-assistant-firefly-cloud/actions/workflows/test.yml/badge.svg)](https://github.com/matt-richardson/home-assistant-firefly-cloud/actions/workflows/test.yml)
+[![codecov](https://codecov.io/gh/matt-richardson/home-assistant-firefly-cloud/branch/main/graph/badge.svg)](https://codecov.io/gh/matt-richardson/home-assistant-firefly-cloud)
+
 A Home Assistant custom integration that connects to Firefly Cloud (school learning platform) to display children's school schedules and upcoming tasks on your smart home dashboard.
 
 ## Features
@@ -180,6 +183,22 @@ If not using the dev container, you'll need:
 3. **Dependencies**: `pip install homeassistant aiohttp lxml python-dateutil voluptuous`
 4. **Development Tools**: `pip install pytest pytest-asyncio pytest-cov black flake8 mypy pylint`
 5. **Testing**: Run `pytest tests/` from the project root
+
+### CI/CD Pipeline
+
+This project uses GitHub Actions for continuous integration and testing:
+
+**Automated Testing**
+- Tests run on every pull request and push to main
+- Multi-version testing: Python 3.11, 3.12, and 3.13
+- Code coverage requirement: >95%
+- Linting: black, flake8, pylint, mypy
+- Integration validation: HACS and Hassfest
+
+**Branch Protection**
+- Main branch is protected with required status checks
+- PRs (including release PRs) cannot be merged until all tests pass
+- See `.github/BRANCH_PROTECTION.md` for setup instructions
 
 ### Contributing
 
