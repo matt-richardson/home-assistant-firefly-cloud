@@ -11,7 +11,6 @@ from homeassistant.util import dt as dt_util
 
 from .const import (
     CONF_CHILDREN_GUIDS,
-    CONF_SCHOOL_NAME,
     CONF_SHOW_CLASS_TIMES,
     CONF_USER_GUID,
     DEFAULT_SHOW_CLASS_TIMES,
@@ -68,9 +67,8 @@ class FireflySensor(FireflyBaseEntity, SensorEntity):
         child_guid: str,
     ) -> None:
         """Initialize the sensor."""
-        school_name = config_entry.data.get(CONF_SCHOOL_NAME, "firefly")
         sensor_config = SENSOR_TYPES[sensor_type]
-        base_name = f"{school_name} {sensor_config['name']}"
+        base_name = sensor_config["name"]
 
         super().__init__(coordinator, config_entry, child_guid, base_name)
 

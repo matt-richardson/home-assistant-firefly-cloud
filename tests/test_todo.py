@@ -77,7 +77,7 @@ class TestFireflyTodoListEntity:
         assert todo_entity._child_guid == "child123"
         assert todo_entity._config_entry == mock_config_entry
         assert todo_entity.unique_id == "test_entry_todo_child123"
-        assert "Test School Tasks" in todo_entity._base_name
+        assert "Tasks" == todo_entity._base_name
         assert todo_entity.icon == "mdi:clipboard-check"
 
         # Test device info
@@ -92,7 +92,7 @@ class TestFireflyTodoListEntity:
         """Test entity name with child data available."""
         name = todo_entity.name
         assert "Test Child" in name
-        assert "Test School Tasks" in name
+        assert name == "Tasks (Test Child)"
 
     def test_name_without_child_data(self, todo_entity, mock_coordinator):
         """Test entity name without child data."""

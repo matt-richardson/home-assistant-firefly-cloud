@@ -2,6 +2,7 @@
 
 import datetime
 from datetime import timedelta
+from typing import TypedDict
 
 DOMAIN = "firefly_cloud"
 
@@ -37,8 +38,18 @@ SENSOR_OVERDUE_TASKS = "overdue_tasks"
 SENSOR_CURRENT_CLASS = "current_class"
 SENSOR_NEXT_CLASS = "next_class"
 
+
+class SensorConfig(TypedDict):
+    """Type definition for sensor configuration."""
+
+    name: str
+    icon: str
+    unit: str | None
+    device_class: str | None
+
+
 # Sensor configurations
-SENSOR_TYPES = {
+SENSOR_TYPES: dict[str, SensorConfig] = {
     SENSOR_UPCOMING_TASKS: {
         "name": "Upcoming Tasks",
         "icon": "mdi:clipboard-text",

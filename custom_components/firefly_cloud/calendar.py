@@ -10,7 +10,6 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
     CONF_CHILDREN_GUIDS,
-    CONF_SCHOOL_NAME,
     CONF_USER_GUID,
     DOMAIN,
 )
@@ -56,8 +55,7 @@ class FireflyCalendar(FireflyBaseEntity, CalendarEntity):
         child_guid: str,
     ) -> None:
         """Initialize the calendar."""
-        school_name = config_entry.data.get(CONF_SCHOOL_NAME, "firefly")
-        base_name = f"{school_name} Schedule"
+        base_name = "Schedule"
 
         super().__init__(coordinator, config_entry, child_guid, base_name)
 
