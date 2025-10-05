@@ -17,7 +17,6 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
     CONF_CHILDREN_GUIDS,
-    CONF_SCHOOL_NAME,
     CONF_USER_GUID,
     DOMAIN,
 )

@@ -11,7 +11,6 @@ from homeassistant.util import dt as dt_util
 
 from .const import (
     CONF_CHILDREN_GUIDS,
-    CONF_SCHOOL_NAME,
     CONF_USER_GUID,
     DOMAIN,
 )

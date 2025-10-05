@@ -11,7 +11,6 @@ from homeassistant.util import dt as dt_util
 
 from .const import (
     CONF_CHILDREN_GUIDS,
-    CONF_SCHOOL_NAME,
     CONF_SHOW_CLASS_TIMES,
     CONF_USER_GUID,
     DEFAULT_SHOW_CLASS_TIMES,
