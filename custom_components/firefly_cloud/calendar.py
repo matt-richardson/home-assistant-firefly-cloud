@@ -6,7 +6,6 @@ from typing import List, Optional
 from homeassistant.components.calendar import CalendarEntity, CalendarEvent
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
 
@@ -17,6 +16,7 @@ from .const import (
     DOMAIN,
 )
 from .coordinator import FireflyUpdateCoordinator
+from .entity import FireflyBaseEntity
 
 
 async def async_setup_entry(
@@ -47,7 +47,7 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class FireflyCalendar(CalendarEntity):
+class FireflyCalendar(FireflyBaseEntity, CalendarEntity):
     """Firefly Cloud calendar entity."""
 
     def __init__(
@@ -57,67 +57,19 @@ class FireflyCalendar(CalendarEntity):
         child_guid: str,
     ) -> None:
         """Initialize the calendar."""
-        super().__init__()
-        self.coordinator = coordinator
+        school_name = config_entry.data.get(CONF_SCHOOL_NAME, "firefly")
+        base_name = f"{school_name} Schedule"
+
+        super().__init__(coordinator, config_entry, child_guid, base_name)
+
         self._config_entry = config_entry
-        self._child_guid = child_guid
-        self._unsub_coordinator = None
 
         # Generate unique entity ID
-        school_name = config_entry.data.get(CONF_SCHOOL_NAME, "firefly")
         self._attr_unique_id = f"{config_entry.entry_id}_calendar_{child_guid}"
 
-        # Set entity properties - will be updated with child name when data is available
-        self._base_name = f"{school_name} Schedule"
-        self._attr_name = f"{self._base_name} ({child_guid[:8]})"
+        # Set entity properties
         self._attr_icon = "mdi:calendar-month"
         self._attr_should_poll = False
-        self._attr_available = False  # Will be updated by coordinator
-
-        # Device info for grouping
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, config_entry.entry_id)},
-            name=f"Firefly Cloud - {school_name}",
-            manufacturer="Firefly Learning",
-            model="Firefly Cloud Integration",
-            sw_version="1.0.0",
-            configuration_url=config_entry.data.get("host"),
-        )
-
-    async def async_added_to_hass(self) -> None:
-        """When entity is added to hass."""
-        await super().async_added_to_hass()
-        # Subscribe to coordinator updates
-        self._unsub_coordinator = self.coordinator.async_add_listener(self._handle_coordinator_update)  # type: ignore
-
-    async def async_will_remove_from_hass(self) -> None:
-        """When entity will be removed from hass."""
-        if self._unsub_coordinator:
-            self._unsub_coordinator()
-        await super().async_will_remove_from_hass()
-
-    @property
-    def available(self) -> bool:
-        """Return True if entity is available."""
-        return (
-            self.coordinator.last_update_success
-            and self.coordinator.data is not None
-            and self._child_guid in self.coordinator.data.get("children_data", {})
-        )
-
-    @property
-    def name(self) -> str:
-        """Return the display name of the calendar."""
-        if self.coordinator.data and self._child_guid in self.coordinator.data.get("children_data", {}):
-            child_data = self.coordinator.data["children_data"][self._child_guid]
-            child_name = child_data.get("name")
-            if child_name:
-                return f"{self._base_name} ({child_name})"
-        return self._attr_name or f"{self._base_name} ({self._child_guid[:8]})"
-
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator."""
-        self.async_write_ha_state()
 
     @property
     def event(self) -> Optional[CalendarEvent]:

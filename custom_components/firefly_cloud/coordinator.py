@@ -49,58 +49,21 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
     async def _async_update_data(self) -> Dict[str, Any]:
         """Fetch data from Firefly API."""
         try:
-            # Get user info if we don't have it
-            if not self._user_info:
-                self._user_info = await self.api.get_user_info()
+            await self._ensure_user_and_children_info()
 
-            # Get children info if we don't have it and we have children GUIDs
-            if not self._children_info and self.children_guids:
-                try:
-                    self._children_info = await self.api.get_children_info()
-                except (FireflyConnectionError, FireflyAuthenticationError, FireflyTokenExpiredError) as err:
-                    _LOGGER.warning("Failed to fetch children info: %s", err)
-                    self._children_info = []
-
-            # Calculate date ranges (timezone-aware)
+            # Calculate date ranges and fetch data
             from .const import get_offset_time
 
             now = get_offset_time()
-            today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-            today_end = today_start + timedelta(days=1)
-            week_start = today_start
-            # Extended range for calendar view (30 days)
-            calendar_end = today_start + timedelta(days=30)
-            task_end = today_start + timedelta(days=self.task_lookahead_days)
-
-            # Determine which users to fetch data for
+            date_ranges = self._calculate_date_ranges(now)
+            # _ensure_user_and_children_info guarantees _user_info is not None
+            assert self._user_info is not None
             target_guids = self.children_guids if self.children_guids else [self._user_info["guid"]]
 
-            # Initialize data structure for multi-child support
-            children_data = {}
+            # Fetch data for all children
+            children_data = await self._fetch_all_children_data(target_guids, date_ranges, now)
 
-            # Fetch data for each child/user
-            for child_guid in target_guids:
-
-                # Fetch data in parallel for this child
-                events_today = await self.api.get_events(today_start, today_end, child_guid)
-                events_calendar = await self.api.get_events(week_start, calendar_end, child_guid)
-                tasks = await self.api.get_tasks(student_guid=child_guid)
-
-                children_data[child_guid] = {
-                    "events": {
-                        "today": self._process_events(events_today),
-                        "week": self._process_events(events_calendar),  # Use extended range for calendar
-                    },
-                    "tasks": {
-                        "all": self._process_tasks(tasks),
-                        "due_today": self._filter_tasks_by_date(tasks, today_start, today_end),
-                        "upcoming": self._filter_tasks_by_date(tasks, now, task_end),
-                        "overdue": self._filter_overdue_tasks(tasks, now),
-                    },
-                    "name": self._extract_child_name(child_guid),
-                }
-
-            # Process and organize the data
+            # Build response data
             data = {
                 "user_info": self._user_info,
                 "children_guids": target_guids,
@@ -108,28 +71,7 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
                 "last_updated": now,
             }
 
-            total_events_today = 0
-            total_events_week = 0
-            total_tasks = 0
-            for child_data in children_data.values():
-                if isinstance(child_data, dict):
-                    events_data = child_data.get("events")
-                    tasks_data = child_data.get("tasks")
-                    if isinstance(events_data, dict):
-                        total_events_today += len(events_data.get("today", []))
-                        total_events_week += len(events_data.get("week", []))
-                    if isinstance(tasks_data, dict):
-                        total_tasks += len(tasks_data.get("all", []))
-
-            _LOGGER.debug(
-                "Successfully updated Firefly data for %d children: "
-                "%d events today, %d events this week, %d total tasks",
-                len(target_guids),
-                total_events_today,
-                total_events_week,
-                total_tasks,
-            )
-
+            self._log_update_statistics(target_guids, children_data)
             return data
 
         except FireflyTokenExpiredError as err:
@@ -147,6 +89,87 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
         except Exception as err:
             _LOGGER.exception("Unexpected error updating Firefly data")
             raise UpdateFailed(f"Unexpected error: {err}") from err
+
+    async def _ensure_user_and_children_info(self) -> None:
+        """Ensure user info and children info are fetched."""
+        if not self._user_info:
+            self._user_info = await self.api.get_user_info()
+
+        if not self._children_info and self.children_guids:
+            try:
+                self._children_info = await self.api.get_children_info()
+            except (FireflyConnectionError, FireflyAuthenticationError, FireflyTokenExpiredError) as err:
+                _LOGGER.warning("Failed to fetch children info: %s", err)
+                self._children_info = []
+
+    def _calculate_date_ranges(self, now: datetime) -> Dict[str, datetime]:
+        """Calculate date ranges for data fetching."""
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        return {
+            "today_start": today_start,
+            "today_end": today_start + timedelta(days=1),
+            "week_start": today_start,
+            "calendar_end": today_start + timedelta(days=30),
+            "task_end": today_start + timedelta(days=self.task_lookahead_days),
+        }
+
+    async def _fetch_all_children_data(
+        self, target_guids: List[str], date_ranges: Dict[str, datetime], now: datetime
+    ) -> Dict[str, Dict[str, Any]]:
+        """Fetch data for all children."""
+        children_data = {}
+
+        for child_guid in target_guids:
+            children_data[child_guid] = await self._fetch_child_data(child_guid, date_ranges, now)
+
+        return children_data
+
+    async def _fetch_child_data(
+        self, child_guid: str, date_ranges: Dict[str, datetime], now: datetime
+    ) -> Dict[str, Any]:
+        """Fetch data for a single child."""
+        events_today = await self.api.get_events(date_ranges["today_start"], date_ranges["today_end"], child_guid)
+        events_calendar = await self.api.get_events(date_ranges["week_start"], date_ranges["calendar_end"], child_guid)
+        tasks = await self.api.get_tasks(student_guid=child_guid)
+
+        return {
+            "events": {
+                "today": self._process_events(events_today),
+                "week": self._process_events(events_calendar),
+            },
+            "tasks": {
+                "all": self._process_tasks(tasks),
+                "due_today": self._filter_tasks_by_date(tasks, date_ranges["today_start"], date_ranges["today_end"]),
+                "upcoming": self._filter_tasks_by_date(tasks, now, date_ranges["task_end"]),
+                "overdue": self._filter_overdue_tasks(tasks, now),
+            },
+            "name": self._extract_child_name(child_guid),
+        }
+
+    def _log_update_statistics(self, target_guids: List[str], children_data: Dict[str, Dict[str, Any]]) -> None:
+        """Log statistics about the update."""
+        total_events_today = 0
+        total_events_week = 0
+        total_tasks = 0
+
+        for child_data in children_data.values():
+            if isinstance(child_data, dict):
+                events_data = child_data.get("events")
+                tasks_data = child_data.get("tasks")
+                if isinstance(events_data, dict):
+                    total_events_today += len(events_data.get("today", []))
+                    total_events_week += len(events_data.get("week", []))
+                if isinstance(tasks_data, dict):
+                    total_tasks += len(tasks_data.get("all", []))
+
+        _LOGGER.debug(
+            "Successfully updated Firefly data for %d children: "
+            "%d events today, %d events this week, %d total tasks",
+            len(target_guids),
+            total_events_today,
+            total_events_week,
+            total_tasks,
+        )
 
     def _process_events(self, events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Process and clean event data."""

@@ -201,6 +201,54 @@ class FireflyCloudConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type:
 
         return await self.async_step_reauth_confirm()
 
+    async def _handle_reauth_input(self, user_input: Dict[str, Any]) -> Dict[str, str]:
+        """Handle reauthentication input processing.
+
+        Returns a dict of errors (empty dict if successful).
+        """
+        assert self._api_client is not None  # Caller ensures this is not None
+        errors: Dict[str, str] = {}
+        try:
+            # Parse authentication response
+            auth_data = await self._api_client.parse_authentication_response(user_input["auth_response"])
+
+            # Update API client with secret
+            self._api_client._secret = auth_data["secret"]
+
+            # Verify credentials work
+            if not await self._api_client.verify_credentials():
+                errors["base"] = "invalid_auth"
+                return errors
+
+            # Update the existing config entry
+            entry_id = self.context.get("entry_id")
+            if not entry_id:
+                errors["base"] = "invalid_auth"
+                return errors
+
+            entry = self.hass.config_entries.async_get_entry(entry_id)
+            if not entry:
+                errors["base"] = "invalid_auth"
+                return errors
+
+            new_data = entry.data.copy()
+            new_data[CONF_SECRET] = auth_data["secret"]
+
+            self.hass.config_entries.async_update_entry(entry, data=new_data)
+
+            # Reload the integration
+            await self.hass.config_entries.async_reload(entry_id)
+
+        except FireflyAuthenticationError:
+            errors["base"] = "invalid_auth"
+        except FireflyConnectionError:
+            errors["base"] = "cannot_connect"
+        except Exception:  # pylint: disable=broad-except
+            _LOGGER.exception("Unexpected error during reauthentication")
+            errors["base"] = "unknown"
+
+        return errors
+
     async def async_step_reauth_confirm(self, user_input: Optional[Dict[str, Any]] = None) -> FlowResult:
         """Handle reauthentication confirmation."""
         errors: Dict[str, str] = {}
@@ -209,42 +257,9 @@ class FireflyCloudConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type:
             if not self._api_client:
                 errors["base"] = "unknown"
             else:
-                try:
-                    # Parse authentication response
-                    auth_data = await self._api_client.parse_authentication_response(user_input["auth_response"])
-
-                    # Update API client with secret
-                    self._api_client._secret = auth_data["secret"]
-
-                    # Verify credentials work
-                    if not await self._api_client.verify_credentials():
-                        errors["base"] = "invalid_auth"
-                    else:
-                        # Update the existing config entry
-                        entry_id = self.context.get("entry_id")
-                        if not entry_id:
-                            errors["base"] = "invalid_auth"
-                        else:
-                            entry = self.hass.config_entries.async_get_entry(entry_id)
-
-                            if entry:
-                                new_data = entry.data.copy()
-                                new_data[CONF_SECRET] = auth_data["secret"]
-
-                                self.hass.config_entries.async_update_entry(entry, data=new_data)
-
-                                # Reload the integration
-                                await self.hass.config_entries.async_reload(entry_id)
-
-                                return self.async_abort(reason="reauth_successful")  # type: ignore[return-value]
-
-                except FireflyAuthenticationError:
-                    errors["base"] = "invalid_auth"
-                except FireflyConnectionError:
-                    errors["base"] = "cannot_connect"
-                except Exception:  # pylint: disable=broad-except
-                    _LOGGER.exception("Unexpected error during reauthentication")
-                    errors["base"] = "unknown"
+                errors = await self._handle_reauth_input(user_input)
+                if not errors:
+                    return self.async_abort(reason="reauth_successful")  # type: ignore[return-value]
 
         # Show reauthentication form
         if not self._api_client or not self._school_info:

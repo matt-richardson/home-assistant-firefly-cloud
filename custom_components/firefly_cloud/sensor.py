@@ -6,9 +6,7 @@ from typing import Any, Dict, List, Optional
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
 from .const import (
@@ -26,6 +24,7 @@ from .const import (
     SENSOR_UPCOMING_TASKS,
 )
 from .coordinator import FireflyUpdateCoordinator
+from .entity import FireflyBaseEntity
 
 
 async def async_setup_entry(
@@ -58,7 +57,7 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class FireflySensor(CoordinatorEntity, SensorEntity):
+class FireflySensor(FireflyBaseEntity, SensorEntity):
     """Base Firefly sensor."""
 
     def __init__(
@@ -69,93 +68,65 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
         child_guid: str,
     ) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator)
+        school_name = config_entry.data.get(CONF_SCHOOL_NAME, "firefly")
+        sensor_config = SENSOR_TYPES[sensor_type]
+        base_name = f"{school_name} {sensor_config['name']}"
+
+        super().__init__(coordinator, config_entry, child_guid, base_name)
+
         self._config_entry = config_entry
         self._sensor_type = sensor_type
-        self._sensor_config = SENSOR_TYPES[sensor_type]
-        self._child_guid = child_guid
+        self._sensor_config = sensor_config
 
         # Generate unique entity ID
-        school_name = config_entry.data.get(CONF_SCHOOL_NAME, "firefly")
         self._attr_unique_id = f"{config_entry.entry_id}_{sensor_type}_{child_guid}"
 
-        # Set entity properties - will be updated with child name when data is available
-        self._base_name = f"{school_name} {self._sensor_config['name']}"
-        self._attr_name = f"{self._base_name} ({child_guid[:8]})"
-        self._attr_icon = self._sensor_config["icon"]
-        self._attr_native_unit_of_measurement = self._sensor_config["unit"]
+        # Set entity properties
+        self._attr_icon = sensor_config["icon"]
+        self._attr_native_unit_of_measurement = sensor_config["unit"]
+
         # Only set device_class if it's not None and cast to proper type
-        device_class = self._sensor_config.get("device_class")
+        device_class = sensor_config.get("device_class")
         if device_class is not None:
-            # Cast to SensorDeviceClass if it's a string, otherwise use as-is
             if isinstance(device_class, str):
                 try:
                     self._attr_device_class = SensorDeviceClass(device_class)
                 except ValueError:
-                    # If the string doesn't match any SensorDeviceClass, skip setting it
                     pass
             else:
                 self._attr_device_class = device_class
 
-        # Device info for grouping
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, config_entry.entry_id)},
-            name=f"Firefly Cloud - {school_name}",
-            manufacturer="Firefly Learning",
-            model="Firefly Cloud Integration",
-            sw_version="1.0.0",
-            configuration_url=config_entry.data.get("host"),
-        )
-
-    @property
-    def name(self) -> str:
-        """Return the display name of the sensor."""
-        if self.coordinator.data and self._child_guid in self.coordinator.data.get("children_data", {}):
-            child_data = self.coordinator.data["children_data"][self._child_guid]
-            child_name = child_data.get("name")
-            if child_name:
-                return f"{self._base_name} ({child_name})"
-        return self._attr_name or f"{self._base_name} ({self._child_guid[:8]})"
-
-    @property
-    def available(self) -> bool:
-        """Return True if entity is available."""
-        return (
-            self.coordinator.last_update_success
-            and self.coordinator.data is not None
-            and self._child_guid in self.coordinator.data.get("children_data", {})
-        )
-
     @property
     def native_value(self) -> Optional[str | int]:
         """Return the state of the sensor."""
-        if not self.coordinator.data:
+        child_data = self._get_child_data()
+        if not child_data:
             return None
 
-        # Get data for this specific child
-        children_data = self.coordinator.data.get("children_data", {})
+        return self._calculate_sensor_value(child_data)
 
-        # Return None if child doesn't exist
-        if self._child_guid not in children_data:
-            return None
-
-        child_data = children_data[self._child_guid]
-
+    def _calculate_sensor_value(self, child_data: Dict[str, Any]) -> Optional[str | int]:
+        """Calculate the sensor value based on sensor type."""
         try:
-            if self._sensor_type == SENSOR_UPCOMING_TASKS:
-                return len(child_data.get("tasks", {}).get("upcoming", []))
-            if self._sensor_type == SENSOR_TASKS_DUE_TODAY:
-                return len(child_data.get("tasks", {}).get("due_today", []))
-            if self._sensor_type == SENSOR_OVERDUE_TASKS:
-                return len(child_data.get("tasks", {}).get("overdue", []))
+            task_count_sensors = {
+                SENSOR_UPCOMING_TASKS: "upcoming",
+                SENSOR_TASKS_DUE_TODAY: "due_today",
+                SENSOR_OVERDUE_TASKS: "overdue",
+            }
+
+            if self._sensor_type in task_count_sensors:
+                task_type = task_count_sensors[self._sensor_type]
+                return len(child_data.get("tasks", {}).get(task_type, []))
+
             if self._sensor_type == SENSOR_CURRENT_CLASS:
                 return self._get_current_class(child_data)
+
             if self._sensor_type == SENSOR_NEXT_CLASS:
                 return self._get_next_class(child_data)
+
         except (KeyError, TypeError, AttributeError):
             if self._sensor_type in [SENSOR_UPCOMING_TASKS, SENSOR_TASKS_DUE_TODAY, SENSOR_OVERDUE_TASKS]:
                 return 0
-            return None
 
         return None
 
@@ -389,6 +360,20 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
         # If no current class, return "None" string
         return "None"
 
+    def _format_class_with_time(self, event: Dict[str, Any], show_times: bool) -> str:
+        """Format a class event with optional time prefix."""
+        subject = event["subject"]
+        if not show_times:
+            return subject
+
+        # Convert to local timezone before formatting
+        start_local = dt_util.as_local(event["start"]) if event["start"].tzinfo else event["start"]
+        end_local = dt_util.as_local(event["end"]) if event["end"].tzinfo else event["end"]
+        # Format times as H.MM (no leading zeros on hours)
+        start_time = f"{start_local.hour}.{start_local.minute:02d}"
+        end_time = f"{end_local.hour}.{end_local.minute:02d}"
+        return f"{start_time}-{end_time}: {subject}"
+
     def _get_next_class(self, child_data: Dict[str, Any]) -> Optional[str]:
         """Get the next upcoming class."""
         events = child_data.get("events", {}).get("week", [])
@@ -398,73 +383,49 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
         from .const import get_offset_time
 
         now = get_offset_time()
-        current_date = now.date()
-
-        # Get show_class_times option
         show_times = self._config_entry.options.get(
             CONF_SHOW_CLASS_TIMES,
             self._config_entry.data.get(CONF_SHOW_CLASS_TIMES, DEFAULT_SHOW_CLASS_TIMES),
         )
 
-        # Check if we're currently IN a class (need to check without time prefix for comparison)
+        # Check if we're currently in a class
         current_class_raw = self._get_current_class_subject(child_data)
         if current_class_raw and current_class_raw != "None":
-            # We're in a class - find the next class using timezone-aware comparison
-            for event in events:
-                event_start = event["start"]
-                if hasattr(event_start, "tzinfo") and event_start.tzinfo is None:
-                    event_start = dt_util.as_utc(event_start)
+            return self._find_next_class_after_current(events, now, show_times)
 
-                if event_start > now:
-                    # Convert event time to local timezone for date comparison
-                    event_local = event_start.astimezone(now.tzinfo) if now.tzinfo else event_start.replace(tzinfo=None)
+        # Not in a class - find the next upcoming class
+        return self._find_next_upcoming_class(events, now, show_times)
 
-                    # Check if it's today in local time
-                    if event_local.date() == current_date:
-                        subject = event["subject"]
-                        if show_times:
-                            # Convert to local timezone before formatting
-                            start_local = dt_util.as_local(event["start"]) if event["start"].tzinfo else event["start"]
-                            end_local = dt_util.as_local(event["end"]) if event["end"].tzinfo else event["end"]
-                            # Format times as H.MM (no leading zeros on hours)
-                            start_time = f"{start_local.hour}.{start_local.minute:02d}"
-                            end_time = f"{end_local.hour}.{end_local.minute:02d}"
-                            return f"{start_time}-{end_time}: {subject}"
-                        return subject
-                    else:
-                        return "None"  # Next class is tomorrow - last class of day
+    def _find_next_class_after_current(self, events: List[Dict[str, Any]], now: datetime, show_times: bool) -> str:
+        """Find the next class when currently in a class."""
+        current_date = now.date()
 
-            # No upcoming events at all
-            return "None"
-
-        # We're not in a class - find the next class (today or future days)
-        upcoming_events = []
         for event in events:
-            event_start = event["start"]
-            # Handle timezone awareness mismatch
-            if hasattr(event_start, "tzinfo") and event_start.tzinfo is None:
-                event_start = dt_util.as_utc(event_start)
-
+            event_start = self._normalize_event_time(event["start"])
             if event_start > now:
-                upcoming_events.append(event)
-
-        if upcoming_events:
-            # Events are already sorted by start time in coordinator
-            next_event = upcoming_events[0]
-            subject = next_event["subject"]
-            if show_times:
-                # Convert to local timezone before formatting
-                start_local = (
-                    dt_util.as_local(next_event["start"]) if next_event["start"].tzinfo else next_event["start"]
-                )
-                end_local = dt_util.as_local(next_event["end"]) if next_event["end"].tzinfo else next_event["end"]
-                # Format times as H.MM (no leading zeros on hours)
-                start_time = f"{start_local.hour}.{start_local.minute:02d}"
-                end_time = f"{end_local.hour}.{end_local.minute:02d}"
-                return f"{start_time}-{end_time}: {subject}"
-            return subject
+                event_local = event_start.astimezone(now.tzinfo) if now.tzinfo else event_start.replace(tzinfo=None)
+                if event_local.date() == current_date:
+                    return self._format_class_with_time(event, show_times)
+                # Next class is tomorrow
+                return "None"
 
         return "None"
+
+    def _find_next_upcoming_class(self, events: List[Dict[str, Any]], now: datetime, show_times: bool) -> str:
+        """Find the next upcoming class when not currently in a class."""
+        upcoming_events = [event for event in events if self._normalize_event_time(event["start"]) > now]
+
+        if upcoming_events:
+            return self._format_class_with_time(upcoming_events[0], show_times)
+
+        return "None"
+
+    @staticmethod
+    def _normalize_event_time(event_time: datetime) -> datetime:
+        """Normalize event time to be timezone-aware."""
+        if hasattr(event_time, "tzinfo") and event_time.tzinfo is None:
+            return dt_util.as_utc(event_time)
+        return event_time
 
     def _get_current_class_attributes(self, child_data: Dict[str, Any]) -> Dict[str, Any]:
         """Get attributes for current class sensor."""
@@ -526,73 +487,43 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
         now = get_offset_time()
 
         if not events:
-            return {
-                "status": "no_upcoming_class",
-                "current_time": now.isoformat(),
-            }
+            return {"status": "no_upcoming_class", "current_time": now.isoformat()}
 
-        # Check if we're currently IN a class
-        current_class = self._get_current_class(child_data)
-        if current_class:
-            # We're in a class - but let's use the same logic as "not in class"
-            # to find the truly next class, whether today or tomorrow
-            # This avoids the issue of late-night events being considered "next class today"
-            pass
-
-        # Find the next class (any day)
-        upcoming_events = []
-        for event in events:
-            event_start = event["start"]
-            # Handle timezone awareness mismatch
-            if hasattr(event_start, "tzinfo") and event_start.tzinfo is None:
-                event_start = dt_util.as_utc(event_start)
-
-            if event_start > now:
-                upcoming_events.append(event)
-
+        upcoming_events = self._get_upcoming_events(events, now)
         if not upcoming_events:
-            return {
-                "status": "no_upcoming_class",
-                "current_time": now.isoformat(),
-            }
+            return {"status": "no_upcoming_class", "current_time": now.isoformat()}
 
         next_event = upcoming_events[0]
-        event_start = next_event["start"]
+        return self._build_next_class_attributes(next_event, now, child_data)
 
-        # Convert event time to local timezone for proper date comparison
-        event_local = next_event["start"]
-        if hasattr(event_local, "tzinfo") and event_local.tzinfo:
-            # Convert UTC time to local timezone for date comparison
-            event_local = event_local.astimezone(now.tzinfo) if now.tzinfo else event_local.replace(tzinfo=None)
+    def _get_upcoming_events(self, events: List[Dict[str, Any]], now: datetime) -> List[Dict[str, Any]]:
+        """Get list of upcoming events after the current time."""
+        upcoming_events = []
+        for event in events:
+            event_start = self._normalize_event_time(event["start"])
+            if event_start > now:
+                upcoming_events.append(event)
+        return upcoming_events
 
-        # Compare dates in the same timezone (both local)
-        current_date_str = now.date().isoformat()
-        event_local_date_str = event_local.date().isoformat()
-        is_today = current_date_str == event_local_date_str
+    def _build_next_class_attributes(
+        self, next_event: Dict[str, Any], now: datetime, child_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Build attributes dict for next class sensor."""
+        current_class = self._get_current_class(child_data)
+        event_start = self._normalize_event_time(next_event["start"])
+        event_local = event_start.astimezone(now.tzinfo) if now.tzinfo else event_start.replace(tzinfo=None)
+        is_today = now.date() == event_local.date()
 
-        # Determine context based on whether we're in a class and the timing
-        in_class = current_class and current_class != "None"
-        if in_class and is_today:
-            context = "next_class_today"
-        elif in_class and not is_today:
-            context = "last_class_of_day"  # In class but next class is not today
-        elif not in_class and is_today:
-            context = "next_class_today"
-        else:
-            context = "next_class_future_day"
+        context = self._determine_next_class_context(current_class, is_today)
 
-        # Convert to UTC for time calculations
-        if hasattr(event_start, "tzinfo") and event_start.tzinfo is None:
-            event_start = dt_util.as_utc(event_start)
-        time_until = (event_start - now).total_seconds() / 60  # minutes
-
-        # Special handling for "last class of day" scenario
         if context == "last_class_of_day":
             return {
                 "status": "last_class_of_day",
                 "current_time": now.isoformat(),
                 "context": "no_more_classes_today",
             }
+
+        time_until = (event_start - now).total_seconds() / 60
 
         return {
             "status": "class_scheduled",
@@ -605,3 +536,16 @@ class FireflySensor(CoordinatorEntity, SensorEntity):
             "current_time": now.isoformat(),
             "context": context,
         }
+
+    @staticmethod
+    def _determine_next_class_context(current_class: Optional[str], is_today: bool) -> str:
+        """Determine the context for the next class."""
+        in_class = current_class and current_class != "None"
+
+        if in_class and is_today:
+            return "next_class_today"
+        if in_class and not is_today:
+            return "last_class_of_day"
+        if not in_class and is_today:
+            return "next_class_today"
+        return "next_class_future_day"
