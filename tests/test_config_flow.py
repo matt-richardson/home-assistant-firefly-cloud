@@ -305,6 +305,7 @@ async def test_abort_if_already_configured(hass: HomeAssistant) -> None:
     # Create an existing config entry with the same unique_id as the school code we'll test
     # and add it manually to Home Assistant's registry
     from homeassistant.config_entries import ConfigEntry
+    from conftest import create_config_entry_with_version_compat
 
     from custom_components.firefly_cloud.const import (
         CONF_DEVICE_ID,
@@ -318,7 +319,7 @@ async def test_abort_if_already_configured(hass: HomeAssistant) -> None:
         DOMAIN,
     )
 
-    existing_entry = ConfigEntry(
+    existing_entry = create_config_entry_with_version_compat(
         version=1,
         minor_version=1,
         domain=DOMAIN,
@@ -337,7 +338,6 @@ async def test_abort_if_already_configured(hass: HomeAssistant) -> None:
         unique_id="testschool",
         source="user",
         discovery_keys=MappingProxyType({}),
-        subentries_data={},
     )
     # Add to the config entries registry
     hass.config_entries._entries[existing_entry.entry_id] = existing_entry
