@@ -5,7 +5,6 @@ from types import MappingProxyType
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from homeassistant.config_entries import ConfigEntry
 from conftest import create_config_entry_with_version_compat
 from homeassistant.core import HomeAssistant
 

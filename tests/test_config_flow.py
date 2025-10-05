@@ -304,7 +304,6 @@ async def test_abort_if_already_configured(hass: HomeAssistant) -> None:
     """Test abort if already configured."""
     # Create an existing config entry with the same unique_id as the school code we'll test
     # and add it manually to Home Assistant's registry
-    from homeassistant.config_entries import ConfigEntry
     from conftest import create_config_entry_with_version_compat
 
     from custom_components.firefly_cloud.const import (
