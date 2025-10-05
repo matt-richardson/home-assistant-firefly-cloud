@@ -43,6 +43,7 @@ class FireflyAPIClient:
         host: str,
         device_id: str,
         secret: str,
+        *,
         app_id: str = DEFAULT_APP_ID,
         user_guid: Optional[str] = None,
     ) -> None:
@@ -322,67 +323,76 @@ class FireflyAPIClient:
 
     async def _get_events_rest_api(self, start: datetime, end: datetime, user_guid: str) -> List[Dict[str, Any]]:
         """Get events using the REST API timetable endpoint."""
-        import logging
-
-        logger = logging.getLogger(__name__)
-
-        # Determine the time period (week/day) based on date range
         days_diff = (end - start).days
 
         # If the range is 1 day or less, fetch a single day
         if days_diff <= 1:
             return await self._fetch_timetable_period(start, "day", user_guid)
 
-        # For longer ranges, fetch multiple weeks to cover the entire period
-        # The REST API "week" endpoint only returns one week at a time
+        # Fetch all weeks in the range
+        all_events = await self._fetch_all_weeks(start, end, user_guid)
+
+        # Filter and deduplicate events
+        return self._filter_events_by_range(all_events, start, end)
+
+    async def _fetch_all_weeks(self, start: datetime, end: datetime, user_guid: str) -> List[Dict[str, Any]]:
+        """Fetch all weeks in the date range."""
         all_events = []
         current_date = start
 
         while current_date < end:
             week_events = await self._fetch_timetable_period(current_date, "week", user_guid)
             all_events.extend(week_events)
-
-            # Move to next week
             current_date = current_date + timedelta(days=7)
 
-        # Remove duplicates (events might appear in multiple week fetches)
-        # and filter to only events within the requested range
+        return all_events
+
+    def _filter_events_by_range(
+        self, events: List[Dict[str, Any]], start: datetime, end: datetime
+    ) -> List[Dict[str, Any]]:
+        """Filter events to only include those within the date range and remove duplicates."""
+        import logging
+        from homeassistant.util import dt as dt_util
+
+        logger = logging.getLogger(__name__)
+
+        # Ensure start and end are timezone-aware
+        start = dt_util.as_utc(start) if start.tzinfo is None else start
+        end = dt_util.as_utc(end) if end.tzinfo is None else end
+
         seen_guids = set()
         filtered_events = []
 
-        # Ensure start and end are timezone-aware for comparison
-        from homeassistant.util import dt as dt_util
-
-        if start.tzinfo is None:
-            start = dt_util.as_utc(start)
-        if end.tzinfo is None:
-            end = dt_util.as_utc(end)
-
-        for event in all_events:
+        for event in events:
             event_guid = event.get("guid")
-            event_start_str = event.get("start")
 
-            # Skip if we've seen this event before
+            # Skip duplicates
             if event_guid and event_guid in seen_guids:
                 continue
 
-            # Parse event start time and check if it's in range
-            try:
-                if event_start_str:
-                    event_start = datetime.fromisoformat(event_start_str.replace("Z", "+00:00"))
-                    # Ensure event_start is timezone-aware
-                    if event_start.tzinfo is None:
-                        event_start = dt_util.as_utc(event_start)
-                    # Only include events that start within our requested range
-                    if start <= event_start < end:
-                        filtered_events.append(event)
-                        if event_guid:
-                            seen_guids.add(event_guid)
-            except (ValueError, AttributeError) as err:
-                logger.warning("Error parsing event start time: %s", err)
-                continue
+            # Check if event is within range
+            if self._is_event_in_range(event, start, end, dt_util, logger):
+                filtered_events.append(event)
+                if event_guid:
+                    seen_guids.add(event_guid)
 
         return filtered_events
+
+    @staticmethod
+    def _is_event_in_range(event: Dict[str, Any], start: datetime, end: datetime, dt_util: Any, logger: Any) -> bool:
+        """Check if an event falls within the specified date range."""
+        event_start_str = event.get("start")
+        if not event_start_str:
+            return False
+
+        try:
+            event_start = datetime.fromisoformat(event_start_str.replace("Z", "+00:00"))
+            if event_start.tzinfo is None:
+                event_start = dt_util.as_utc(event_start)
+            return start <= event_start < end
+        except (ValueError, AttributeError) as err:
+            logger.warning("Error parsing event start time: %s", err)
+            return False
 
     async def _fetch_timetable_period(self, start: datetime, period: str, user_guid: str) -> List[Dict[str, Any]]:
         """Fetch timetable for a specific period (day or week)."""
@@ -446,8 +456,37 @@ class FireflyAPIClient:
         # Should never reach here due to exception handling above
         return []
 
+    def _build_tasks_payload(
+        self,
+        *,
+        student_guid: Optional[str],
+        page: int,
+        page_size: int,
+        completion_status: str,
+        owner_type: str,
+        archive_status: str,
+        sorting_criteria: List[Dict[str, str]],
+    ) -> Dict[str, Any]:
+        """Build payload for get_tasks API call."""
+        payload = {
+            "ownerType": owner_type,
+            "page": page,
+            "pageSize": page_size,
+            "archiveStatus": archive_status,
+            "completionStatus": completion_status,
+            "readStatus": "All",
+            "markingStatus": "All",
+            "sortingCriteria": sorting_criteria,
+        }
+
+        if student_guid:
+            payload["forStudentGuid"] = student_guid
+
+        return payload
+
     async def get_tasks(
         self,
+        *,
         student_guid: Optional[str] = None,
         page: int = 0,
         page_size: int = 100,
@@ -460,31 +499,24 @@ class FireflyAPIClient:
         if sorting_criteria is None:
             sorting_criteria = [{"column": "DueDate", "order": "Descending"}]
 
-        url = f"{self._host}/api/v2/taskListing/view/parent/tasks/all/filterBy"
-        params = {
-            "ffauth_device_id": self._device_id,
-            "ffauth_secret": self._secret,
-        }
-
-        payload = {
-            "ownerType": owner_type,
-            "page": page,
-            "pageSize": page_size,
-            "archiveStatus": archive_status,
-            "completionStatus": completion_status,
-            "readStatus": "All",
-            "markingStatus": "All",
-            "sortingCriteria": sorting_criteria,
-        }
-
-        # Add student GUID filter if provided (for parent accounts)
-        if student_guid:
-            payload["forStudentGuid"] = student_guid
+        payload = self._build_tasks_payload(
+            student_guid=student_guid,
+            page=page,
+            page_size=page_size,
+            completion_status=completion_status,
+            owner_type=owner_type,
+            archive_status=archive_status,
+            sorting_criteria=sorting_criteria,
+        )
 
         for attempt in range(MAX_RETRIES):
             try:
                 async with async_timeout.timeout(TIMEOUT_SECONDS):
-                    async with self._session.post(url, params=params, json=payload) as response:
+                    async with self._session.post(
+                        f"{self._host}/api/v2/taskListing/view/parent/tasks/all/filterBy",
+                        params={"ffauth_device_id": self._device_id, "ffauth_secret": self._secret},
+                        json=payload,
+                    ) as response:
                         if response.status == 401:
                             raise FireflyTokenExpiredError("Authentication token expired")
                         if response.status == 429:

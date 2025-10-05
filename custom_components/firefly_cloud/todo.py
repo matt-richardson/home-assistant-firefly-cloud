@@ -13,9 +13,7 @@ from homeassistant.components.todo.const import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
     CONF_CHILDREN_GUIDS,
@@ -24,6 +22,7 @@ from .const import (
     DOMAIN,
 )
 from .coordinator import FireflyUpdateCoordinator
+from .entity import FireflyBaseEntity
 
 
 async def async_setup_entry(
@@ -54,7 +53,7 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class FireflyTodoListEntity(CoordinatorEntity, TodoListEntity):  # pylint: disable=too-many-instance-attributes
+class FireflyTodoListEntity(FireflyBaseEntity, TodoListEntity):
     """Firefly todo list entity."""
 
     def __init__(
@@ -64,64 +63,28 @@ class FireflyTodoListEntity(CoordinatorEntity, TodoListEntity):  # pylint: disab
         child_guid: str,
     ) -> None:
         """Initialize the todo list entity."""
-        super().__init__(coordinator)
+        school_name = config_entry.data.get(CONF_SCHOOL_NAME, "firefly")
+        base_name = f"{school_name} Tasks"
+
+        super().__init__(coordinator, config_entry, child_guid, base_name)
+
         self._config_entry = config_entry
-        self._child_guid = child_guid
 
         # Generate unique entity ID
-        school_name = config_entry.data.get(CONF_SCHOOL_NAME, "firefly")
         self._attr_unique_id = f"{config_entry.entry_id}_todo_{child_guid}"
 
-        # Set entity properties - will be updated with child name when data is available
-        self._base_name = f"{school_name} Tasks"
-        self._attr_name = f"{self._base_name} ({child_guid[:8]})"
+        # Set entity properties
         self._attr_icon = "mdi:clipboard-check"
 
-        # Device info for grouping
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, config_entry.entry_id)},
-            name=f"Firefly Cloud - {school_name}",
-            manufacturer="Firefly Learning",
-            model="Firefly Cloud Integration",
-            sw_version="1.0.0",
-            configuration_url=config_entry.data.get("host"),
-        )
-
-        # Todo list features - Firefly is read-only, so we only support viewing  # pylint: disable=line-too-long
-        self._attr_supported_features = TodoListEntityFeature(0)  # Read-only
-
-    @property
-    def name(self) -> str:
-        """Return the display name of the todo list."""
-        if self.coordinator.data and self._child_guid in self.coordinator.data.get("children_data", {}):
-            child_data = self.coordinator.data["children_data"][self._child_guid]
-            child_name = child_data.get("name")
-            if child_name:
-                return f"{self._base_name} ({child_name})"
-        return self._attr_name or f"{self._base_name} ({self._child_guid[:8]})"
-
-    @property
-    def available(self) -> bool:
-        """Return True if entity is available."""
-        return (
-            self.coordinator.last_update_success
-            and self.coordinator.data is not None
-            and self._child_guid in self.coordinator.data.get("children_data", {})
-        )
+        # Firefly is read-only, so we only support viewing (no creation/editing/deletion)
+        self._attr_supported_features = TodoListEntityFeature(0)
 
     @property
     def todo_items(self) -> list[TodoItem] | None:
         """Return the todo items."""
-        if not self.coordinator.data:
+        child_data = self._get_child_data()
+        if not child_data:
             return None
-
-        # Get data for this specific child
-        children_data = self.coordinator.data.get("children_data", {})
-
-        if self._child_guid not in children_data:
-            return None
-
-        child_data = children_data[self._child_guid]
         tasks = child_data.get("tasks", {})
 
         # Use a dict to deduplicate tasks by their unique ID
