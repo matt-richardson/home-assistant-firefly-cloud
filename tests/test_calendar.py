@@ -7,6 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 from homeassistant.components.calendar import CalendarEvent
 from homeassistant.config_entries import ConfigEntry
+from conftest import create_config_entry_with_version_compat
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
 
@@ -295,7 +296,7 @@ async def test_calendar_name_fallback_to_guid(mock_config_entry):
 async def test_calendar_multiple_children_setup(hass: HomeAssistant):
     """Test calendar setup with multiple children."""
     # Create config entry with 2 children
-    config_entry = ConfigEntry(
+    config_entry = create_config_entry_with_version_compat(
         version=1,
         minor_version=1,
         domain=DOMAIN,
@@ -313,7 +314,6 @@ async def test_calendar_multiple_children_setup(hass: HomeAssistant):
         unique_id="test-unique-id-multiple-children",
         source="user",
         discovery_keys=MappingProxyType({}),
-        subentries_data={},
     )
 
     coordinator = MagicMock()

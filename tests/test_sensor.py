@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from homeassistant.config_entries import ConfigEntry
+from conftest import create_config_entry_with_version_compat
 from homeassistant.core import HomeAssistant
 
 from custom_components.firefly_cloud.const import (
@@ -628,7 +629,7 @@ async def test_sensor_coordinator_data_update(mock_coordinator, mock_config_entr
 async def test_async_setup_entry_no_children(hass: HomeAssistant):
     """Test sensor setup when no children data available."""
     # Create config entry with no children
-    config_entry = ConfigEntry(
+    config_entry = create_config_entry_with_version_compat(
         version=1,
         minor_version=1,
         domain=DOMAIN,
@@ -646,7 +647,6 @@ async def test_async_setup_entry_no_children(hass: HomeAssistant):
         unique_id="test-unique-id-no-children",
         source="user",
         discovery_keys=MappingProxyType({}),
-        subentries_data={},
     )
 
     coordinator = MagicMock()
@@ -673,7 +673,7 @@ async def test_async_setup_entry_no_children(hass: HomeAssistant):
 async def test_async_setup_entry_multiple_children(hass: HomeAssistant):
     """Test sensor setup with multiple children."""
     # Create config entry with 3 children
-    config_entry = ConfigEntry(
+    config_entry = create_config_entry_with_version_compat(
         version=1,
         minor_version=1,
         domain=DOMAIN,
@@ -691,7 +691,6 @@ async def test_async_setup_entry_multiple_children(hass: HomeAssistant):
         unique_id="test-unique-id-multiple-children",
         source="user",
         discovery_keys=MappingProxyType({}),
-        subentries_data={},
     )
 
     coordinator = MagicMock()
@@ -1118,7 +1117,7 @@ async def test_current_class_with_time_prefix_enabled(mock_coordinator):
     )
 
     # Create config entry with time prefix enabled
-    config_entry = ConfigEntry(
+    config_entry = create_config_entry_with_version_compat(
         version=1,
         minor_version=1,
         domain=DOMAIN,
@@ -1138,7 +1137,6 @@ async def test_current_class_with_time_prefix_enabled(mock_coordinator):
         unique_id="test-unique-id",
         source="user",
         discovery_keys=MappingProxyType({}),
-        subentries_data={},
     )
 
     # Mock current time to be during the Math class (9-10am)
@@ -1173,7 +1171,7 @@ async def test_current_class_with_time_prefix_disabled(mock_coordinator):
     )
 
     # Create config entry with time prefix disabled (default)
-    config_entry = ConfigEntry(
+    config_entry = create_config_entry_with_version_compat(
         version=1,
         minor_version=1,
         domain=DOMAIN,
@@ -1193,7 +1191,6 @@ async def test_current_class_with_time_prefix_disabled(mock_coordinator):
         unique_id="test-unique-id",
         source="user",
         discovery_keys=MappingProxyType({}),
-        subentries_data={},
     )
 
     # Mock current time to be during the Math class (9-10am)
@@ -1228,7 +1225,7 @@ async def test_current_class_none_no_time_prefix(mock_coordinator):
     )
 
     # Create config entry with time prefix enabled
-    config_entry = ConfigEntry(
+    config_entry = create_config_entry_with_version_compat(
         version=1,
         minor_version=1,
         domain=DOMAIN,
@@ -1248,7 +1245,6 @@ async def test_current_class_none_no_time_prefix(mock_coordinator):
         unique_id="test-unique-id",
         source="user",
         discovery_keys=MappingProxyType({}),
-        subentries_data={},
     )
 
     # Mock current time to be outside of class hours (8am, before 9am Math class)
@@ -1278,7 +1274,7 @@ async def test_next_class_with_time_prefix_enabled(mock_coordinator):
     )
 
     # Create config entry with time prefix enabled
-    config_entry = ConfigEntry(
+    config_entry = create_config_entry_with_version_compat(
         version=1,
         minor_version=1,
         domain=DOMAIN,
@@ -1298,7 +1294,6 @@ async def test_next_class_with_time_prefix_enabled(mock_coordinator):
         unique_id="test-unique-id",
         source="user",
         discovery_keys=MappingProxyType({}),
-        subentries_data={},
     )
 
     # Mock current time to be during the Math class (9-10am)
@@ -1337,7 +1332,7 @@ async def test_next_class_with_time_prefix_disabled(mock_coordinator):
     )
 
     # Create config entry with time prefix disabled
-    config_entry = ConfigEntry(
+    config_entry = create_config_entry_with_version_compat(
         version=1,
         minor_version=1,
         domain=DOMAIN,
@@ -1357,7 +1352,6 @@ async def test_next_class_with_time_prefix_disabled(mock_coordinator):
         unique_id="test-unique-id",
         source="user",
         discovery_keys=MappingProxyType({}),
-        subentries_data={},
     )
 
     # Mock current time to be during the Math class (9-10am)
@@ -1396,7 +1390,7 @@ async def test_next_class_in_class_no_upcoming_with_time_prefix(mock_coordinator
     )
 
     # Create config entry with time prefix enabled
-    config_entry = ConfigEntry(
+    config_entry = create_config_entry_with_version_compat(
         version=1,
         minor_version=1,
         domain=DOMAIN,
@@ -1416,7 +1410,6 @@ async def test_next_class_in_class_no_upcoming_with_time_prefix(mock_coordinator
         unique_id="test-unique-id",
         source="user",
         discovery_keys=MappingProxyType({}),
-        subentries_data={},
     )
 
     # Mock current time to be during Science (last class), 11-12pm
@@ -1454,7 +1447,7 @@ async def test_next_class_not_in_class_with_time_prefix(mock_coordinator):
     )
 
     # Create config entry with time prefix enabled
-    config_entry = ConfigEntry(
+    config_entry = create_config_entry_with_version_compat(
         version=1,
         minor_version=1,
         domain=DOMAIN,
@@ -1474,7 +1467,6 @@ async def test_next_class_not_in_class_with_time_prefix(mock_coordinator):
         unique_id="test-unique-id",
         source="user",
         discovery_keys=MappingProxyType({}),
-        subentries_data={},
     )
 
     # Mock current time to be between classes (10:30am)
@@ -1513,7 +1505,7 @@ async def test_class_times_show_local_timezone(mock_coordinator):
     from homeassistant.util import dt as dt_util
 
     # Create config entry with time prefix enabled
-    config_entry = ConfigEntry(
+    config_entry = create_config_entry_with_version_compat(
         version=1,
         minor_version=1,
         domain=DOMAIN,
@@ -1533,7 +1525,6 @@ async def test_class_times_show_local_timezone(mock_coordinator):
         unique_id="test-unique-id",
         source="user",
         discovery_keys=MappingProxyType({}),
-        subentries_data={},
     )
 
     # Create times in UTC: 9am UTC = 7pm AEST (Melbourne time, UTC+10)

@@ -1,5 +1,6 @@
 """Test configuration for Firefly Cloud integration."""
 
+import inspect
 from datetime import datetime, timedelta
 from types import MappingProxyType
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -20,6 +21,27 @@ from custom_components.firefly_cloud.const import (
     DEFAULT_TASK_LOOKAHEAD_DAYS,
     DOMAIN,
 )
+
+
+def create_config_entry_with_version_compat(**kwargs):
+    """Create a ConfigEntry with version-compatible parameters.
+
+    Home Assistant 2025.x requires 'subentries_data' parameter,
+    while older versions don't accept it.
+    """
+    # Check if ConfigEntry.__init__ accepts subentries_data parameter
+    sig = inspect.signature(ConfigEntry.__init__)
+    params = sig.parameters
+
+    if "subentries_data" in params:
+        # HA 2025.x and newer - subentries_data is required
+        if "subentries_data" not in kwargs:
+            kwargs["subentries_data"] = {}
+    else:
+        # Older HA versions - subentries_data doesn't exist
+        kwargs.pop("subentries_data", None)
+
+    return ConfigEntry(**kwargs)
 
 
 # Configure pytest for Home Assistant testing
@@ -82,7 +104,7 @@ async def hass():
 @pytest.fixture
 def mock_config_entry() -> ConfigEntry:
     """Return a mock config entry."""
-    return ConfigEntry(
+    return create_config_entry_with_version_compat(
         version=1,
         minor_version=1,
         domain=DOMAIN,
@@ -102,7 +124,6 @@ def mock_config_entry() -> ConfigEntry:
         unique_id="test-unique-id",
         source="user",
         discovery_keys=MappingProxyType({}),
-        subentries_data={},
     )
 
 
