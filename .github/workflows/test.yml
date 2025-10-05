@@ -63,6 +63,8 @@ jobs:
           pip install -r requirements-dev.txt
 
       - name: Run tests with coverage
+        env:
+          PYTHONPATH: ${{ github.workspace }}
         run: |
           pytest tests/ \
             --cov=custom_components/firefly_cloud \
