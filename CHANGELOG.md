@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.4.1](https://github.com/matt-richardson/home-assistant-firefly-cloud/compare/v0.4.0...v0.4.1) (2025-10-05)
+
+
+### Bug Fixes
+
+* fix mypy linting failure ([#7](https://github.com/matt-richardson/home-assistant-firefly-cloud/issues/7)) ([c9a3391](https://github.com/matt-richardson/home-assistant-firefly-cloud/commit/c9a3391f6f600cf165eb2db3717d8fb242c7236d))
+
 ## [0.4.0](https://github.com/matt-richardson/home-assistant-firefly-cloud/compare/v0.3.1...v0.4.0) (2025-10-05)
 
 
