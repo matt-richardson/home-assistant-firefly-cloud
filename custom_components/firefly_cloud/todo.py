@@ -63,8 +63,7 @@ class FireflyTodoListEntity(FireflyBaseEntity, TodoListEntity):
         child_guid: str,
     ) -> None:
         """Initialize the todo list entity."""
-        school_name = config_entry.data.get(CONF_SCHOOL_NAME, "firefly")
-        base_name = f"{school_name} Tasks"
+        base_name = "Tasks"
 
         super().__init__(coordinator, config_entry, child_guid, base_name)
 
