@@ -38,9 +38,8 @@ jobs:
       # - name: Run pylint
       #  run: pylint custom_components
 
-      # temporarily disabled until we can refactor
-      # - name: Run mypy
-      #  run: mypy custom_components
+      - name: Run mypy
+        run: mypy custom_components
 
   test:
     name: Test Python ${{ matrix.python-version }}

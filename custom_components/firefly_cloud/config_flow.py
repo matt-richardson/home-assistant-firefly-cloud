@@ -45,7 +45,7 @@ STEP_AUTH_DATA_SCHEMA = vol.Schema(
 )
 
 
-class FireflyCloudConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+class FireflyCloudConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
     """Handle a config flow for Firefly Cloud."""
 
     VERSION = 1
@@ -275,22 +275,18 @@ class FireflyCloudOptionsFlowHandler(config_entries.OptionsFlow):
 
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         """Initialize options flow."""
-        # Store config entry privately to avoid deprecation warning in newer HA versions
-        # while maintaining compatibility with older versions that don't auto-inject it
-        self._config_entry = config_entry
+        # Store config entry using the private attribute that HA's compatibility layer expects
+        # This works with both old HA versions (which need it) and new versions (which look for it)
+        super().__init__()
+        self._config_entry = config_entry  # type: ignore[misc]
 
-    @property
-    def config_entry(self) -> config_entries.ConfigEntry:
-        """Get the config entry.
+    # Only define config_entry property if the parent class doesn't have it (older HA versions)
+    # The conditional definition is needed for compatibility across HA versions
+    if not hasattr(config_entries.OptionsFlow, "config_entry"):
 
-        This property checks if config_entry is available from the parent class
-        (newer HA versions) or falls back to the stored value (older versions).
-        """
-        # Try to get from parent class first (newer HA versions inject it)
-        try:
-            return super().config_entry  # type: ignore[misc]
-        except AttributeError:
-            # Fall back to stored value for older HA versions
+        @property  # type: ignore[misc]
+        def config_entry(self) -> config_entries.ConfigEntry:
+            """Return the config entry for older HA versions that don't provide it."""
             return self._config_entry
 
     async def async_step_init(self, user_input: Optional[Dict[str, Any]] = None) -> FlowResult:
