@@ -43,6 +43,7 @@ A Home Assistant custom integration that connects to Firefly Cloud (school learn
 
 After setup, you can configure additional options by clicking "Configure" on the integration:
 
+- **Task Lookahead Days**: Number of days ahead to look for upcoming tasks (1-30 days). Default: 7 days.
 - **Show Class Times**: Display time prefixes for current and next class sensors (e.g., "09.00-10.00: Mathematics" instead of just "Mathematics"). Default: disabled.
 
 ## Entities Created
@@ -131,7 +132,7 @@ The dev container provides multiple approaches for manual testing:
 - Integration pre-installed and symlinked
 - Add Firefly Cloud through Settings > Devices & Services
 - Complete authentication flow with real Firefly credentials
-- Verify four sensors are created for each child
+- Verify five sensors are created for each child
 - Debug logging enabled for troubleshooting
 
 **3. VS Code Testing Features**
