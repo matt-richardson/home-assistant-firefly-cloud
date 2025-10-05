@@ -6,7 +6,6 @@ from unittest.mock import MagicMock
 
 import pytest
 from homeassistant.components.calendar import CalendarEvent
-from homeassistant.config_entries import ConfigEntry
 from conftest import create_config_entry_with_version_compat
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
