@@ -5,10 +5,6 @@
 
 A Home Assistant custom integration that connects to Firefly Cloud (school learning platform) to display children's school schedules and upcoming tasks on your smart home dashboard.
 
-## todo:
-
-* figure out if we can / should we try and ping phone showing the widgets to update at the start of every class?
-
 ## Features
 
 - **Upcoming Tasks**: Monitor homework, projects, and assignments with due dates
