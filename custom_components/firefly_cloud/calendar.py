@@ -88,7 +88,9 @@ class FireflyCalendar(FireflyBaseEntity, CalendarEntity):
         if not events:
             return None
 
-        now = dt_util.now()
+        from .const import get_offset_time
+
+        now = get_offset_time()
 
         # Find current event
         for event in events:

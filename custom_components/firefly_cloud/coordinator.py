@@ -342,7 +342,9 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
         day_end = day_start + timedelta(days=1)
 
         # For today, use the cached today events
-        today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        from .const import get_offset_time
+
+        today = get_offset_time().replace(hour=0, minute=0, second=0, microsecond=0)
         if day_start == today:
             return self.data["events"]["today"]
 
@@ -366,7 +368,9 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
 
     def get_special_requirements_today(self) -> List[str]:
         """Get special requirements for today (sports kit, equipment, etc.)."""
-        today_events = self.get_events_for_day(datetime.now())
+        from .const import get_offset_time
+
+        today_events = self.get_events_for_day(get_offset_time())
         requirements = []
 
         for event in today_events:
