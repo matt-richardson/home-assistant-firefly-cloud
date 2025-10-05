@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.4.2](https://github.com/matt-richardson/home-assistant-firefly-cloud/compare/v0.4.1...v0.4.2) (2025-10-05)
+
+
+### Bug Fixes
+
+* dont prefix sensors with school name ([#13](https://github.com/matt-richardson/home-assistant-firefly-cloud/issues/13)) ([3746d8f](https://github.com/matt-richardson/home-assistant-firefly-cloud/commit/3746d8f35bbfd8377fd90a0a9e478b9fb239e75c))
+* use local time for overdue tasks ([#12](https://github.com/matt-richardson/home-assistant-firefly-cloud/issues/12)) ([e3aaf3b](https://github.com/matt-richardson/home-assistant-firefly-cloud/commit/e3aaf3b5dc39df0f1c27b584f1632797e910eb3c))
+
 ## [0.4.1](https://github.com/matt-richardson/home-assistant-firefly-cloud/compare/v0.4.0...v0.4.1) (2025-10-05)
 
 
