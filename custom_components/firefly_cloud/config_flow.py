@@ -264,14 +264,34 @@ class FireflyCloudConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     @staticmethod
     @callback
     def async_get_options_flow(
-        config_entry: config_entries.ConfigEntry,  # pylint: disable=unused-argument
+        config_entry: config_entries.ConfigEntry,
     ) -> "FireflyCloudOptionsFlowHandler":
         """Get the options flow for this handler."""
-        return FireflyCloudOptionsFlowHandler()
+        return FireflyCloudOptionsFlowHandler(config_entry)
 
 
 class FireflyCloudOptionsFlowHandler(config_entries.OptionsFlow):
     """Handle Firefly Cloud options."""
+
+    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
+        """Initialize options flow."""
+        # Store config entry privately to avoid deprecation warning in newer HA versions
+        # while maintaining compatibility with older versions that don't auto-inject it
+        self._config_entry = config_entry
+
+    @property
+    def config_entry(self) -> config_entries.ConfigEntry:
+        """Get the config entry.
+
+        This property checks if config_entry is available from the parent class
+        (newer HA versions) or falls back to the stored value (older versions).
+        """
+        # Try to get from parent class first (newer HA versions inject it)
+        try:
+            return super().config_entry  # type: ignore[misc]
+        except AttributeError:
+            # Fall back to stored value for older HA versions
+            return self._config_entry
 
     async def async_step_init(self, user_input: Optional[Dict[str, Any]] = None) -> FlowResult:
         """Manage the options."""

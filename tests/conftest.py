@@ -82,6 +82,10 @@ async def hass():
         network_adapter.adapters = []
         hass.data["network"] = network_adapter
 
+        # Add issue registry to prevent KeyError in reauth flows
+        # This is required in older HA versions where it's not automatically initialized
+        hass.data["issue_registry"] = MagicMock()
+
         # Mock the integration registry and loader
         mock_integration = AsyncMock()
         mock_integration.domain = "firefly_cloud"
