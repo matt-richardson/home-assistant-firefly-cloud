@@ -159,8 +159,11 @@ class FireflySensor(FireflyBaseEntity, SensorEntity):
 
     def _get_upcoming_tasks_attributes(self, child_data: Dict[str, Any]) -> Dict[str, Any]:
         """Get attributes for upcoming tasks sensor."""
+        from .const import get_offset_time
+
         tasks = child_data.get("tasks", {}).get("upcoming", [])
         overdue_tasks = child_data.get("tasks", {}).get("overdue", [])
+        now = get_offset_time()
 
         # Group tasks by subject - simplified since the method doesn't exist
         tasks_by_subject: Dict[str, List[Dict[str, Any]]] = {}
@@ -194,7 +197,7 @@ class FireflySensor(FireflyBaseEntity, SensorEntity):
                     "due_date_formatted": (task["due_date"].strftime("%A, %d %B %Y") if task["due_date"] else None),
                     "task_type": task["task_type"],
                     "days_until_due": (
-                        (task["due_date"].date() - datetime.now().date()).days if task["due_date"] else None
+                        (task["due_date"].date() - now.date()).days if task["due_date"] else None
                     ),
                     "setter": task["setter"],
                 }
@@ -220,7 +223,7 @@ class FireflySensor(FireflyBaseEntity, SensorEntity):
                     "title": task["title"],
                     "subject": task.get("subject", "Unknown"),
                     "due_date_formatted": (task["due_date"].strftime("%A, %d %B %Y") if task["due_date"] else None),
-                    "days_overdue": ((datetime.now().date() - task["due_date"].date()).days if task["due_date"] else 0),
+                    "days_overdue": ((now.date() - task["due_date"].date()).days if task["due_date"] else 0),
                 }
                 for task in overdue_tasks
             ],
@@ -269,7 +272,10 @@ class FireflySensor(FireflyBaseEntity, SensorEntity):
 
     def _get_overdue_tasks_attributes(self, child_data: Dict[str, Any]) -> Dict[str, Any]:
         """Get attributes for overdue tasks sensor."""
+        from .const import get_offset_time
+
         tasks = child_data.get("tasks", {}).get("overdue", [])
+        now = get_offset_time()
 
         return {
             "tasks": [
@@ -279,7 +285,7 @@ class FireflySensor(FireflyBaseEntity, SensorEntity):
                     "due_date": task["due_date"].isoformat() if task["due_date"] else None,
                     "due_date_formatted": (task["due_date"].strftime("%A, %d %B %Y") if task["due_date"] else None),
                     "task_type": task["task_type"],
-                    "days_overdue": ((datetime.now().date() - task["due_date"].date()).days if task["due_date"] else 0),
+                    "days_overdue": ((now.date() - task["due_date"].date()).days if task["due_date"] else 0),
                     "setter": task["setter"],
                     "description": (
                         task["description"][:100] + "..."
