@@ -866,9 +866,14 @@ async def test_form_school_disabled(hass: HomeAssistant, mock_setup_entry) -> No
         "device_id": "test-device-123",
     }
 
-    with patch(
-        "custom_components.firefly_cloud.api.FireflyAPIClient.get_school_info",
-        return_value=mock_school_info,
+    with (
+        patch(
+            "homeassistant.helpers.aiohttp_client.async_get_clientsession",
+        ),
+        patch(
+            "custom_components.firefly_cloud.api.FireflyAPIClient.get_school_info",
+            return_value=mock_school_info,
+        ),
     ):
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"],

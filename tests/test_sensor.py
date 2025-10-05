@@ -817,13 +817,19 @@ async def test_sensor_extra_state_attributes_no_data(mock_config_entry):
 @pytest.mark.asyncio
 async def test_current_class_sensor_no_class(mock_coordinator, mock_config_entry):
     """Test current class sensor when no class is active."""
-    sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_CURRENT_CLASS, "test-child-123")
+    from custom_components.firefly_cloud.const import get_offset_time
 
-    assert "Current Class" in sensor.name
-    assert sensor.unique_id == f"{mock_config_entry.entry_id}_{SENSOR_CURRENT_CLASS}_test-child-123"
-    assert sensor.icon == "mdi:school"
-    assert sensor.native_value == "None"  # No current class
-    assert sensor.native_unit_of_measurement is None
+    # Mock current time to be outside of class hours (8am, before the 9-10am Math class)
+    now = get_offset_time().replace(hour=8, minute=0, second=0, microsecond=0)
+
+    with patch("custom_components.firefly_cloud.const.get_offset_time", return_value=now):
+        sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_CURRENT_CLASS, "test-child-123")
+
+        assert "Current Class" in sensor.name
+        assert sensor.unique_id == f"{mock_config_entry.entry_id}_{SENSOR_CURRENT_CLASS}_test-child-123"
+        assert sensor.icon == "mdi:school"
+        assert sensor.native_value == "None"  # No current class
+        assert sensor.native_unit_of_measurement is None
 
 
 @pytest.mark.asyncio
@@ -902,12 +908,18 @@ async def test_current_class_attributes(mock_coordinator, mock_config_entry):
 @pytest.mark.asyncio
 async def test_current_class_attributes_no_class(mock_coordinator, mock_config_entry):
     """Test current class sensor attributes when no class is active."""
-    sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_CURRENT_CLASS, "test-child-123")
+    from custom_components.firefly_cloud.const import get_offset_time
 
-    attributes = sensor.extra_state_attributes
-    assert "status" in attributes
-    assert attributes["status"] == "no_current_class"
-    assert "current_time" in attributes
+    # Mock current time to be outside of class hours (8am, before the 9-10am Math class)
+    now = get_offset_time().replace(hour=8, minute=0, second=0, microsecond=0)
+
+    with patch("custom_components.firefly_cloud.const.get_offset_time", return_value=now):
+        sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_CURRENT_CLASS, "test-child-123")
+
+        attributes = sensor.extra_state_attributes
+        assert "status" in attributes
+        assert attributes["status"] == "no_current_class"
+        assert "current_time" in attributes
 
 
 @pytest.mark.asyncio
