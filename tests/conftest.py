@@ -1,6 +1,7 @@
 """Test configuration for Firefly Cloud integration."""
 
 import inspect
+from contextlib import ExitStack
 from datetime import datetime, timedelta
 from types import MappingProxyType
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -26,13 +27,15 @@ from custom_components.firefly_cloud.const import (
 def create_config_entry_with_version_compat(**kwargs):
     """Create a ConfigEntry with version-compatible parameters.
 
-    Home Assistant 2025.x requires 'subentries_data' parameter,
-    while older versions don't accept it.
+    Home Assistant versions have different required/optional parameters:
+    - 2025.x: requires 'subentries_data', has 'discovery_keys'
+    - Older: doesn't have 'subentries_data' or 'discovery_keys'
     """
-    # Check if ConfigEntry.__init__ accepts subentries_data parameter
+    # Check if ConfigEntry.__init__ accepts parameters
     sig = inspect.signature(ConfigEntry.__init__)
     params = sig.parameters
 
+    # Handle subentries_data (required in 2025.x, doesn't exist in older)
     if "subentries_data" in params:
         # HA 2025.x and newer - subentries_data is required
         if "subentries_data" not in kwargs:
@@ -40,6 +43,11 @@ def create_config_entry_with_version_compat(**kwargs):
     else:
         # Older HA versions - subentries_data doesn't exist
         kwargs.pop("subentries_data", None)
+
+    # Handle discovery_keys (exists in newer versions, not in older)
+    if "discovery_keys" not in params:
+        # Older HA versions don't have discovery_keys parameter
+        kwargs.pop("discovery_keys", None)
 
     return ConfigEntry(**kwargs)
 
@@ -84,9 +92,20 @@ async def hass():
         mock_integration.file_path = temp_dir + "/custom_components/firefly_cloud"
 
         # Setup required Home Assistant components and register config flow
+        # Check if report_usage exists before patching (it doesn't in older HA versions)
+        import homeassistant.helpers.frame as frame_module
+
+        frame_patches = []
+        if hasattr(frame_module, "report_usage"):
+            frame_patches.append(patch("homeassistant.helpers.frame.report_usage"))
+
         with patch("homeassistant.loader.async_get_integration", return_value=mock_integration):
             with patch("homeassistant.helpers.integration_platform.async_process_integration_platforms"):
-                with patch("homeassistant.helpers.frame.report_usage"):
+                # Apply frame patches only if they exist
+                with ExitStack() as stack:
+                    for frame_patch in frame_patches:
+                        stack.enter_context(frame_patch)
+
                     # Import and register the config flow handler manually
                     from homeassistant.config_entries import HANDLERS
 
