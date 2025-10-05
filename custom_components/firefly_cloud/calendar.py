@@ -7,7 +7,6 @@ from homeassistant.components.calendar import CalendarEntity, CalendarEvent
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.util import dt as dt_util
 
 from .const import (
     CONF_CHILDREN_GUIDS,
@@ -88,7 +87,9 @@ class FireflyCalendar(FireflyBaseEntity, CalendarEntity):
         if not events:
             return None
 
-        now = dt_util.now()
+        from .const import get_offset_time
+
+        now = get_offset_time()
 
         # Find current event
         for event in events:
