@@ -69,7 +69,7 @@ class FireflySensor(FireflyBaseEntity, SensorEntity):
     ) -> None:
         """Initialize the sensor."""
         sensor_config = SENSOR_TYPES[sensor_type]
-        base_name = sensor_config['name']
+        base_name = sensor_config["name"]
 
         super().__init__(coordinator, config_entry, child_guid, base_name)
 
