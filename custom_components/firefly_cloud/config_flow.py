@@ -280,6 +280,15 @@ class FireflyCloudOptionsFlowHandler(config_entries.OptionsFlow):
         super().__init__()
         self._config_entry = config_entry  # type: ignore[misc]
 
+    # Only define config_entry property if the parent class doesn't have it (older HA versions)
+    # The conditional definition is needed for compatibility across HA versions
+    if not hasattr(config_entries.OptionsFlow, "config_entry"):
+
+        @property  # type: ignore[misc]
+        def config_entry(self) -> config_entries.ConfigEntry:
+            """Return the config entry for older HA versions that don't provide it."""
+            return self._config_entry
+
     async def async_step_init(self, user_input: Optional[Dict[str, Any]] = None) -> FlowResult:
         """Manage the options."""
         if user_input is not None:
