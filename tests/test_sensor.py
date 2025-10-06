@@ -452,9 +452,6 @@ async def test_sensor_attributes_tasks_due_today(mock_coordinator, mock_config_e
 
     attributes = sensor.extra_state_attributes
     assert "tasks" in attributes
-    assert "homework_count" in attributes
-    assert "project_count" in attributes
-    assert "test_count" in attributes
     assert "last_updated" in attributes
 
     # Check task details

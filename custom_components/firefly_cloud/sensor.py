@@ -170,7 +170,6 @@ class FireflySensor(FireflyBaseEntity, SensorEntity):
                     "subject": task.get("subject", "Unknown"),
                     "due_date": task["due_date"].isoformat() if task["due_date"] else None,
                     "due_date_formatted": (task["due_date"].strftime("%A, %d %B %Y") if task["due_date"] else None),
-                    "task_type": task["task_type"],
                     "days_until_due": ((task["due_date"].date() - now.date()).days if task["due_date"] else None),
                     "setter": task["setter"],
                 }
@@ -192,17 +191,11 @@ class FireflySensor(FireflyBaseEntity, SensorEntity):
         """Get attributes for tasks due today sensor."""
         tasks = child_data.get("tasks", {}).get("due_today", [])
 
-        # Categorize by urgency/type
-        urgent_tasks = [
-            task for task in tasks if task["task_type"] in ["test", "project"] or "urgent" in task["title"].lower()
-        ]
-
         return {
             "tasks": [
                 {
                     "title": task["title"],
                     "subject": task.get("subject", "Unknown"),
-                    "task_type": task["task_type"],
                     "setter": task["setter"],
                     "description": (
                         task["description"][:100] + "..."
@@ -212,17 +205,6 @@ class FireflySensor(FireflyBaseEntity, SensorEntity):
                 }
                 for task in tasks
             ],
-            "urgent_tasks": [
-                {
-                    "title": task["title"],
-                    "subject": task.get("subject", "Unknown"),
-                    "task_type": task["task_type"],
-                }
-                for task in urgent_tasks
-            ],
-            "homework_count": len([t for t in tasks if t["task_type"] == "homework"]),
-            "project_count": len([t for t in tasks if t["task_type"] == "project"]),
-            "test_count": len([t for t in tasks if t["task_type"] == "test"]),
         }
 
     def _get_overdue_tasks_attributes(self, child_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -239,7 +221,6 @@ class FireflySensor(FireflyBaseEntity, SensorEntity):
                     "subject": task.get("subject", "Unknown"),
                     "due_date": task["due_date"].isoformat() if task["due_date"] else None,
                     "due_date_formatted": (task["due_date"].strftime("%A, %d %B %Y") if task["due_date"] else None),
-                    "task_type": task["task_type"],
                     "days_overdue": ((now.date() - task["due_date"].date()).days if task["due_date"] else 0),
                     "setter": task["setter"],
                     "description": (
