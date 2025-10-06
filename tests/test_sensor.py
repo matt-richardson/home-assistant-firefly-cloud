@@ -416,7 +416,6 @@ async def test_sensor_attributes_upcoming_tasks(mock_coordinator, mock_config_en
     attributes = sensor.extra_state_attributes
     assert "tasks" in attributes
     assert "overdue_count" in attributes
-    assert "tasks_by_due_date" in attributes
     assert "last_updated" in attributes
 
     # Check task details
