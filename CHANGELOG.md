@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.5.0](https://github.com/matt-richardson/home-assistant-firefly-cloud/compare/v0.4.2...v0.5.0) (2025-10-06)
+
+
+### Features
+
+* removed of guessed task attributes ([#20](https://github.com/matt-richardson/home-assistant-firefly-cloud/issues/20)) ([a644657](https://github.com/matt-richardson/home-assistant-firefly-cloud/commit/a6446578b8b44055a1d849e63c074ee872d7cdc3))
+
 ## [0.4.2](https://github.com/matt-richardson/home-assistant-firefly-cloud/compare/v0.4.1...v0.4.2) (2025-10-05)
 
 
