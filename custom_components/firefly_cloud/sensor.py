@@ -163,29 +163,6 @@ class FireflySensor(FireflyBaseEntity, SensorEntity):
         overdue_tasks = child_data.get("tasks", {}).get("overdue", [])
         now = get_offset_time()
 
-        # Group tasks by subject - simplified since the method doesn't exist
-        tasks_by_subject: Dict[str, List[Dict[str, Any]]] = {}
-        for task in tasks:
-            subject = task.get("subject", "Unknown")
-            if subject not in tasks_by_subject:
-                tasks_by_subject[subject] = []
-            tasks_by_subject[subject].append(task)
-
-        # Group tasks by due date
-        tasks_by_due_date: Dict[str, List[Dict[str, Any]]] = {}
-        for task in tasks:
-            if task["due_date"]:
-                due_date_str = task["due_date"].strftime("%Y-%m-%d")
-                if due_date_str not in tasks_by_due_date:
-                    tasks_by_due_date[due_date_str] = []
-                tasks_by_due_date[due_date_str].append(
-                    {
-                        "title": task["title"],
-                        "subject": task.get("subject", "Unknown"),
-                        "task_type": task["task_type"],
-                    }
-                )
-
         return {
             "tasks": [
                 {
@@ -199,20 +176,6 @@ class FireflySensor(FireflyBaseEntity, SensorEntity):
                 }
                 for task in tasks
             ],
-            "tasks_by_subject": {
-                subject: [
-                    {
-                        "title": task["title"],
-                        "due_date_formatted": (
-                            task["due_date"].strftime("%A, %d %B") if task["due_date"] else "No due date"
-                        ),
-                        "task_type": task["task_type"],
-                    }
-                    for task in subject_tasks
-                ]
-                for subject, subject_tasks in tasks_by_subject.items()
-            },
-            "tasks_by_due_date": tasks_by_due_date,
             "overdue_count": len(overdue_tasks),
             "overdue_tasks": [
                 {
@@ -257,10 +220,6 @@ class FireflySensor(FireflyBaseEntity, SensorEntity):
                 }
                 for task in urgent_tasks
             ],
-            "tasks_by_subject": {
-                subject: len([t for t in tasks if t.get("subject", "Unknown") == subject])
-                for subject in set(task.get("subject", "Unknown") for task in tasks)
-            },
             "homework_count": len([t for t in tasks if t["task_type"] == "homework"]),
             "project_count": len([t for t in tasks if t["task_type"] == "project"]),
             "test_count": len([t for t in tasks if t["task_type"] == "test"]),
