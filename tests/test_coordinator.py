@@ -2,7 +2,7 @@
 
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 from homeassistant.core import HomeAssistant
@@ -1203,80 +1203,6 @@ async def test_coordinator_get_events_for_day_with_data(hass: HomeAssistant, moc
     tomorrow_events = coordinator.get_events_for_day(tomorrow)
     assert len(tomorrow_events) == 1
     assert tomorrow_events[0]["subject"] == "Tomorrow's Event"
-
-
-@pytest.mark.asyncio
-async def test_coordinator_get_tasks_by_subject_no_data(hass: HomeAssistant, mock_api):
-    """Test get_tasks_by_subject with no data."""
-    coordinator = FireflyUpdateCoordinator(
-        hass=hass,
-        api=mock_api,
-        task_lookahead_days=7,
-    )
-
-    # Test with no data
-    result = coordinator.get_tasks_by_subject()
-    assert result == {}
-
-
-@pytest.mark.asyncio
-async def test_coordinator_get_tasks_by_subject_with_data(hass: HomeAssistant, mock_api):
-    """Test get_tasks_by_subject with actual data."""
-    coordinator = FireflyUpdateCoordinator(
-        hass=hass,
-        api=mock_api,
-        task_lookahead_days=7,
-    )
-
-    # Mock data structure
-    coordinator.data = {
-        "tasks": {
-            "upcoming": [
-                {"subject": "Math", "title": "Math Homework"},
-                {"subject": "Science", "title": "Lab Report"},
-                {"subject": "Math", "title": "Math Test"},
-            ]
-        }
-    }
-
-    result = coordinator.get_tasks_by_subject()
-
-    assert "Math" in result
-    assert "Science" in result
-    assert len(result["Math"]) == 2
-    assert len(result["Science"]) == 1
-    assert result["Math"][0]["title"] == "Math Homework"
-    assert result["Math"][1]["title"] == "Math Test"
-    assert result["Science"][0]["title"] == "Lab Report"
-
-
-@pytest.mark.asyncio
-async def test_coordinator_get_special_requirements_today(hass: HomeAssistant, mock_api):
-    """Test get_special_requirements_today."""
-    coordinator = FireflyUpdateCoordinator(
-        hass=hass,
-        api=mock_api,
-        task_lookahead_days=7,
-    )
-
-    now = datetime.now()
-
-    # Mock today's events with special requirements
-    events_with_requirements = [
-        {"start": now, "subject": "PE", "description": None},
-        {"start": now, "subject": "Art", "description": "Bring special equipment for painting"},
-        {"start": now, "subject": "Games", "description": "Sports kit required for outdoor activities"},
-    ]
-
-    # Patch get_events_for_day to return our mock events
-    with patch.object(coordinator, "get_events_for_day", return_value=events_with_requirements):
-        requirements = coordinator.get_special_requirements_today()
-
-        assert "Sports kit required" in requirements
-        assert "Special equipment for Art" in requirements
-        # Should deduplicate sports kit requirement
-        sports_kit_count = sum(1 for req in requirements if "Sports kit required" in req)
-        assert sports_kit_count == 1
 
 
 @pytest.mark.asyncio

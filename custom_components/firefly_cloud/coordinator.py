@@ -238,7 +238,6 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
                     "due_date": due_date,
                     "set_date": set_date,
                     "subject": subject,
-                    "task_type": self._determine_task_type(task),
                     "completion_status": task.get("completionStatus", "Unknown"),
                     "setter": (
                         task.get("setter", {}).get("name", "Unknown")
@@ -253,20 +252,6 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
                 continue
 
         return processed_tasks
-
-    def _determine_task_type(self, task: Dict[str, Any]) -> str:
-        """Determine task type from task data."""
-        title = task.get("title", "").lower()
-        description = task.get("description", "").lower()
-
-        # Simple classification based on keywords
-        if any(keyword in title for keyword in ["test", "exam", "assessment"]):
-            return "test"
-        if any(keyword in title for keyword in ["project", "assignment"]):
-            return "project"
-        if any(keyword in description for keyword in ["permission", "slip", "form"]):
-            return "permission_slip"
-        return "homework"
 
     def _filter_tasks_by_date(
         self, tasks: List[Dict[str, Any]], start: datetime, end: datetime
@@ -351,41 +336,6 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
         # For other days in the week, filter from week events
         week_events = self.data["events"]["week"]
         return [event for event in week_events if day_start <= event["start"] < day_end]
-
-    def get_tasks_by_subject(self) -> Dict[str, List[Dict[str, Any]]]:
-        """Group tasks by subject."""
-        if not self.data or "tasks" not in self.data:
-            return {}
-
-        tasks_by_subject: Dict[str, List[Dict[str, Any]]] = {}
-        for task in self.data["tasks"]["upcoming"]:
-            subject = task["subject"]
-            if subject not in tasks_by_subject:
-                tasks_by_subject[subject] = []
-            tasks_by_subject[subject].append(task)
-
-        return tasks_by_subject
-
-    def get_special_requirements_today(self) -> List[str]:
-        """Get special requirements for today (sports kit, equipment, etc.)."""
-        from .const import get_offset_time
-
-        today_events = self.get_events_for_day(get_offset_time())
-        requirements = []
-
-        for event in today_events:
-            subject = event["subject"].lower()
-            description = (event["description"] or "").lower()
-
-            # Check for sports/PE requirements
-            if any(keyword in subject for keyword in ["pe", "sport", "games", "physical"]):
-                requirements.append("Sports kit required")
-
-            # Check for equipment mentions in description
-            if any(keyword in description for keyword in ["equipment", "kit", "uniform"]):
-                requirements.append(f"Special equipment for {event['subject']}")
-
-        return list(set(requirements))  # Remove duplicates
 
     def _extract_child_name(self, child_guid: str) -> Optional[str]:
         """Extract child name from user info or children info."""
