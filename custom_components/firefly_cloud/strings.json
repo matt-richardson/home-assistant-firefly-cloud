@@ -50,5 +50,27 @@
         }
       }
     }
+  },
+  "issues": {
+    "authentication_error": {
+      "title": "Authentication Failed",
+      "description": "Your Firefly credentials are invalid or have expired. Please reconfigure the integration."
+    },
+    "connection_error": {
+      "title": "Connection Error",
+      "description": "Failed to connect to Firefly after {consecutive_failures} attempts. Check your network connection and Firefly server status."
+    },
+    "rate_limit_error": {
+      "title": "Rate Limit Exceeded",
+      "description": "Too many requests to Firefly API. Consider increasing the update interval to {update_interval} minutes or higher."
+    },
+    "data_error": {
+      "title": "Data Processing Error",
+      "description": "Error processing data from Firefly: {error_message}. This may indicate a change in the API format."
+    },
+    "unexpected_error": {
+      "title": "Unexpected Error",
+      "description": "An unexpected error occurred while updating Firefly data: {error_message}. Please check the logs for more details."
+    }
   }
 }
