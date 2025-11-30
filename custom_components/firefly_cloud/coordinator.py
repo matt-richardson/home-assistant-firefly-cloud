@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import FireflyAPIClient
@@ -16,6 +17,7 @@ from .const import (
 from .exceptions import (
     FireflyAuthenticationError,
     FireflyConnectionError,
+    FireflyDataError,
     FireflyRateLimitError,
     FireflyTokenExpiredError,
 )
@@ -23,7 +25,7 @@ from .exceptions import (
 _LOGGER = logging.getLogger(__name__)
 
 
-class FireflyUpdateCoordinator(DataUpdateCoordinator):
+class FireflyUpdateCoordinator(DataUpdateCoordinator):  # pylint: disable=too-many-instance-attributes
     """Class to manage fetching Firefly data."""
 
     def __init__(
@@ -46,8 +48,27 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
         self._user_info: Optional[Dict[str, Any]] = None
         self._children_info: Optional[List[Dict[str, Any]]] = None
 
-    async def _async_update_data(self) -> Dict[str, Any]:
+        # Failure tracking for issue registry
+        self.consecutive_failures = 0
+        self.consecutive_data_errors = 0
+
+        # Statistics tracking
+        self.statistics: Dict[str, Any] = {
+            "total_updates": 0,
+            "successful_updates": 0,
+            "failed_updates": 0,
+            "last_update_time": None,
+            "last_success_time": None,
+            "last_failure_time": None,
+            "error_counts": {},  # Track errors by type
+        }
+
+    async def _async_update_data(self) -> Dict[str, Any]:  # pylint: disable=too-many-statements
         """Fetch data from Firefly API."""
+        update_time = datetime.now(timezone.utc).isoformat()
+        self.statistics["total_updates"] += 1
+        self.statistics["last_update_time"] = update_time
+
         try:
             await self._ensure_user_and_children_info()
 
@@ -72,22 +93,90 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
             }
 
             self._log_update_statistics(target_guids, children_data)
+
+            # Update succeeded - reset counters and dismiss issues
+            self._handle_update_success(update_time)
+
             return data
 
         except FireflyTokenExpiredError as err:
+            self._track_failure("FireflyTokenExpiredError")
             _LOGGER.warning("Firefly authentication token expired, reauthentication required")
+            # Token expired - immediate notification
+            self._create_issue(
+                "authentication_error",
+                "authentication_error",
+                severity=ir.IssueSeverity.ERROR,
+            )
             raise UpdateFailed("Authentication token expired") from err
         except FireflyAuthenticationError as err:
+            self._track_failure("FireflyAuthenticationError")
             _LOGGER.error("Firefly authentication error: %s", err)
+            # Authentication error - immediate notification
+            self._create_issue(
+                "authentication_error",
+                "authentication_error",
+                severity=ir.IssueSeverity.ERROR,
+            )
             raise UpdateFailed(f"Authentication error: {err}") from err
         except FireflyConnectionError as err:
-            _LOGGER.warning("Connection error while updating Firefly data: %s", err)
+            self._track_failure("FireflyConnectionError")
+            self.consecutive_failures += 1
+            _LOGGER.warning(
+                "Connection error while updating Firefly data: %s (failure %d)", err, self.consecutive_failures
+            )
+
+            # Only notify after 3 consecutive failures
+            if self.consecutive_failures >= 3:
+                self._create_issue(
+                    "connection_error",
+                    "connection_error",
+                    severity=ir.IssueSeverity.WARNING,
+                    translation_placeholders={"consecutive_failures": str(self.consecutive_failures)},
+                )
+
             raise UpdateFailed(f"Connection error: {err}") from err
         except FireflyRateLimitError as err:
+            self._track_failure("FireflyRateLimitError")
             _LOGGER.warning("Rate limit error while updating Firefly data: %s", err)
+            # Rate limit - immediate notification with interval suggestion
+            update_interval_minutes = int(DEFAULT_SCAN_INTERVAL.total_seconds() / 60) + 5
+            self._create_issue(
+                "rate_limit_error",
+                "rate_limit_error",
+                severity=ir.IssueSeverity.WARNING,
+                translation_placeholders={"update_interval": str(update_interval_minutes)},
+            )
             raise UpdateFailed("Rate limit exceeded") from err
+        except FireflyDataError as err:
+            self._track_failure("FireflyDataError")
+            self.consecutive_data_errors += 1
+            _LOGGER.error("Data processing error: %s (error %d)", err, self.consecutive_data_errors)
+
+            # Only notify after 2 consecutive data errors
+            if self.consecutive_data_errors >= 2:
+                self._create_issue(
+                    "data_error",
+                    "data_error",
+                    severity=ir.IssueSeverity.WARNING,
+                    translation_placeholders={"error_message": str(err)},
+                )
+
+            raise UpdateFailed(f"Data processing error: {err}") from err
         except Exception as err:
-            _LOGGER.exception("Unexpected error updating Firefly data")
+            self._track_failure("UnexpectedError")
+            self.consecutive_failures += 1
+            _LOGGER.exception("Unexpected error updating Firefly data (failure %d)", self.consecutive_failures)
+
+            # Only notify after 2 consecutive unexpected errors
+            if self.consecutive_failures >= 2:
+                self._create_issue(
+                    "unexpected_error",
+                    "unexpected_error",
+                    severity=ir.IssueSeverity.ERROR,
+                    translation_placeholders={"error_message": str(err)},
+                )
+
             raise UpdateFailed(f"Unexpected error: {err}") from err
 
     async def _ensure_user_and_children_info(self) -> None:
@@ -355,3 +444,51 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
 
         # Final fallback to GUID
         return child_guid
+
+    def _create_issue(
+        self,
+        issue_id: str,
+        translation_key: str,
+        severity: ir.IssueSeverity = ir.IssueSeverity.ERROR,
+        translation_placeholders: Optional[Dict[str, str]] = None,
+    ) -> None:
+        """Create or update an issue in the issue registry."""
+        ir.async_create_issue(
+            self.hass,
+            DOMAIN,
+            issue_id,
+            is_fixable=False,
+            severity=severity,
+            translation_key=translation_key,
+            translation_placeholders=translation_placeholders or {},
+        )
+
+    def _dismiss_issue(self, issue_id: str) -> None:
+        """Dismiss an issue from the issue registry."""
+        ir.async_delete_issue(self.hass, DOMAIN, issue_id)
+
+    def _handle_update_success(self, update_time: str) -> None:
+        """Handle successful update."""
+        self.consecutive_failures = 0
+        self.consecutive_data_errors = 0
+
+        # Update statistics
+        self.statistics["successful_updates"] += 1
+        self.statistics["last_success_time"] = update_time
+
+        # Dismiss any existing issues
+        self._dismiss_issue("connection_error")
+        self._dismiss_issue("authentication_error")
+        self._dismiss_issue("rate_limit_error")
+        self._dismiss_issue("data_error")
+        self._dismiss_issue("unexpected_error")
+
+    def _track_failure(self, error_type: str) -> None:
+        """Track update failure statistics."""
+        self.statistics["failed_updates"] += 1
+        self.statistics["last_failure_time"] = datetime.now(timezone.utc).isoformat()
+
+        # Track error counts by type
+        if error_type not in self.statistics["error_counts"]:
+            self.statistics["error_counts"][error_type] = 0
+        self.statistics["error_counts"][error_type] += 1

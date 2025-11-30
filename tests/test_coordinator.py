@@ -1421,3 +1421,475 @@ async def test_coordinator_process_tasks_subject_string(hass):
 
     assert len(processed) == 1
     assert processed[0]["subject"] == "Mathematics"
+
+
+# Issue Registry Tests
+
+
+@pytest.mark.asyncio
+async def test_coordinator_issue_registry_dismissal_on_success(hass: HomeAssistant, mock_api):
+    """Test that issues are dismissed on successful update."""
+    from unittest.mock import patch
+
+    coordinator = FireflyUpdateCoordinator(
+        hass=hass,
+        api=mock_api,
+        task_lookahead_days=7,
+    )
+
+    with patch("custom_components.firefly_cloud.coordinator.ir") as mock_ir:
+        # Perform successful update
+        await coordinator._async_update_data()
+
+        # Verify all issues were dismissed
+        assert mock_ir.async_delete_issue.call_count == 5
+        mock_ir.async_delete_issue.assert_any_call(hass, "firefly_cloud", "connection_error")
+        mock_ir.async_delete_issue.assert_any_call(hass, "firefly_cloud", "authentication_error")
+        mock_ir.async_delete_issue.assert_any_call(hass, "firefly_cloud", "rate_limit_error")
+        mock_ir.async_delete_issue.assert_any_call(hass, "firefly_cloud", "data_error")
+        mock_ir.async_delete_issue.assert_any_call(hass, "firefly_cloud", "unexpected_error")
+
+
+@pytest.mark.asyncio
+async def test_coordinator_issue_creation_authentication_error(hass: HomeAssistant, mock_api):
+    """Test issue creation on authentication error."""
+    from unittest.mock import patch
+
+    mock_api.get_user_info.side_effect = FireflyAuthenticationError("Auth failed")
+
+    coordinator = FireflyUpdateCoordinator(
+        hass=hass,
+        api=mock_api,
+        task_lookahead_days=7,
+    )
+
+    with patch("custom_components.firefly_cloud.coordinator.ir") as mock_ir:
+        with pytest.raises(UpdateFailed, match="Authentication error"):
+            await coordinator._async_update_data()
+
+        # Verify issue was created immediately
+        mock_ir.async_create_issue.assert_called_once()
+        call_args = mock_ir.async_create_issue.call_args
+        assert call_args[0][1] == "firefly_cloud"
+        assert call_args[0][2] == "authentication_error"
+        assert call_args[1]["translation_key"] == "authentication_error"
+
+
+@pytest.mark.asyncio
+async def test_coordinator_issue_creation_token_expired(hass: HomeAssistant, mock_api):
+    """Test issue creation on token expired error."""
+    from unittest.mock import patch
+
+    mock_api.get_user_info.side_effect = FireflyTokenExpiredError("Token expired")
+
+    coordinator = FireflyUpdateCoordinator(
+        hass=hass,
+        api=mock_api,
+        task_lookahead_days=7,
+    )
+
+    with patch("custom_components.firefly_cloud.coordinator.ir") as mock_ir:
+        with pytest.raises(UpdateFailed, match="Authentication token expired"):
+            await coordinator._async_update_data()
+
+        # Verify issue was created immediately
+        mock_ir.async_create_issue.assert_called_once()
+        call_args = mock_ir.async_create_issue.call_args
+        assert call_args[0][2] == "authentication_error"
+
+
+@pytest.mark.asyncio
+async def test_coordinator_connection_error_threshold(hass: HomeAssistant, mock_api):
+    """Test that connection errors only create issue after 3 failures."""
+    from unittest.mock import patch
+
+    mock_api.get_user_info.side_effect = FireflyConnectionError("Connection failed")
+
+    coordinator = FireflyUpdateCoordinator(
+        hass=hass,
+        api=mock_api,
+        task_lookahead_days=7,
+    )
+
+    with patch("custom_components.firefly_cloud.coordinator.ir") as mock_ir:
+        # First failure - no issue created
+        with pytest.raises(UpdateFailed):
+            await coordinator._async_update_data()
+        assert coordinator.consecutive_failures == 1
+        mock_ir.async_create_issue.assert_not_called()
+
+        # Second failure - still no issue created
+        mock_ir.reset_mock()
+        with pytest.raises(UpdateFailed):
+            await coordinator._async_update_data()
+        assert coordinator.consecutive_failures == 2
+        mock_ir.async_create_issue.assert_not_called()
+
+        # Third failure - issue should be created
+        mock_ir.reset_mock()
+        with pytest.raises(UpdateFailed):
+            await coordinator._async_update_data()
+        assert coordinator.consecutive_failures == 3
+        mock_ir.async_create_issue.assert_called_once()
+
+        call_args = mock_ir.async_create_issue.call_args
+        assert call_args[0][2] == "connection_error"
+        assert call_args[1]["translation_placeholders"]["consecutive_failures"] == "3"
+
+
+@pytest.mark.asyncio
+async def test_coordinator_rate_limit_immediate_issue(hass: HomeAssistant, mock_api):
+    """Test that rate limit errors create issue immediately."""
+    from unittest.mock import patch
+    from custom_components.firefly_cloud.exceptions import FireflyRateLimitError
+
+    mock_api.get_user_info.side_effect = FireflyRateLimitError("Rate limited")
+
+    coordinator = FireflyUpdateCoordinator(
+        hass=hass,
+        api=mock_api,
+        task_lookahead_days=7,
+    )
+
+    with patch("custom_components.firefly_cloud.coordinator.ir") as mock_ir:
+        with pytest.raises(UpdateFailed, match="Rate limit exceeded"):
+            await coordinator._async_update_data()
+
+        # Verify issue was created immediately
+        mock_ir.async_create_issue.assert_called_once()
+        call_args = mock_ir.async_create_issue.call_args
+        assert call_args[0][2] == "rate_limit_error"
+        assert "update_interval" in call_args[1]["translation_placeholders"]
+        # Should suggest 20 minutes (15 + 5)
+        assert call_args[1]["translation_placeholders"]["update_interval"] == "20"
+
+
+@pytest.mark.asyncio
+async def test_coordinator_data_error_threshold(hass: HomeAssistant, mock_api):
+    """Test that data errors only create issue after 2 failures."""
+    from unittest.mock import patch
+    from custom_components.firefly_cloud.exceptions import FireflyDataError
+
+    mock_api.get_user_info.side_effect = FireflyDataError("Data processing failed")
+
+    coordinator = FireflyUpdateCoordinator(
+        hass=hass,
+        api=mock_api,
+        task_lookahead_days=7,
+    )
+
+    with patch("custom_components.firefly_cloud.coordinator.ir") as mock_ir:
+        # First failure - no issue created
+        with pytest.raises(UpdateFailed):
+            await coordinator._async_update_data()
+        assert coordinator.consecutive_data_errors == 1
+        mock_ir.async_create_issue.assert_not_called()
+
+        # Second failure - issue should be created
+        mock_ir.reset_mock()
+        with pytest.raises(UpdateFailed):
+            await coordinator._async_update_data()
+        assert coordinator.consecutive_data_errors == 2
+        mock_ir.async_create_issue.assert_called_once()
+
+        call_args = mock_ir.async_create_issue.call_args
+        assert call_args[0][2] == "data_error"
+        assert "error_message" in call_args[1]["translation_placeholders"]
+
+
+@pytest.mark.asyncio
+async def test_coordinator_unexpected_error_threshold(hass: HomeAssistant, mock_api):
+    """Test that unexpected errors only create issue after 2 failures."""
+    from unittest.mock import patch
+
+    mock_api.get_user_info.side_effect = ValueError("Unexpected error")
+
+    coordinator = FireflyUpdateCoordinator(
+        hass=hass,
+        api=mock_api,
+        task_lookahead_days=7,
+    )
+
+    with patch("custom_components.firefly_cloud.coordinator.ir") as mock_ir:
+        # First failure - no issue created
+        with pytest.raises(UpdateFailed):
+            await coordinator._async_update_data()
+        assert coordinator.consecutive_failures == 1
+        mock_ir.async_create_issue.assert_not_called()
+
+        # Second failure - issue should be created
+        mock_ir.reset_mock()
+        with pytest.raises(UpdateFailed):
+            await coordinator._async_update_data()
+        assert coordinator.consecutive_failures == 2
+        mock_ir.async_create_issue.assert_called_once()
+
+        call_args = mock_ir.async_create_issue.call_args
+        assert call_args[0][2] == "unexpected_error"
+        assert "error_message" in call_args[1]["translation_placeholders"]
+
+
+@pytest.mark.asyncio
+async def test_coordinator_failure_counter_reset_on_success(hass: HomeAssistant, mock_api):
+    """Test that failure counters reset after successful update."""
+    from unittest.mock import patch
+
+    coordinator = FireflyUpdateCoordinator(
+        hass=hass,
+        api=mock_api,
+        task_lookahead_days=7,
+    )
+
+    # Simulate previous failures
+    coordinator.consecutive_failures = 5
+    coordinator.consecutive_data_errors = 3
+
+    with patch("custom_components.firefly_cloud.coordinator.ir"):
+        # Successful update
+        await coordinator._async_update_data()
+
+        # Verify counters are reset
+        assert coordinator.consecutive_failures == 0
+        assert coordinator.consecutive_data_errors == 0
+
+
+@pytest.mark.asyncio
+async def test_coordinator_connection_error_counter_increments(hass: HomeAssistant, mock_api):
+    """Test that connection error counter increments properly."""
+    mock_api.get_user_info.side_effect = FireflyConnectionError("Connection failed")
+
+    coordinator = FireflyUpdateCoordinator(
+        hass=hass,
+        api=mock_api,
+        task_lookahead_days=7,
+    )
+
+    assert coordinator.consecutive_failures == 0
+
+    # First failure
+    with pytest.raises(UpdateFailed):
+        await coordinator._async_update_data()
+    assert coordinator.consecutive_failures == 1
+
+    # Second failure
+    with pytest.raises(UpdateFailed):
+        await coordinator._async_update_data()
+    assert coordinator.consecutive_failures == 2
+
+    # Third failure
+    with pytest.raises(UpdateFailed):
+        await coordinator._async_update_data()
+    assert coordinator.consecutive_failures == 3
+
+
+@pytest.mark.asyncio
+async def test_coordinator_issue_severity_levels(hass: HomeAssistant, mock_api):
+    """Test that different errors use appropriate severity levels."""
+    from unittest.mock import patch
+    from homeassistant.helpers import issue_registry as ir
+
+    coordinator = FireflyUpdateCoordinator(
+        hass=hass,
+        api=mock_api,
+        task_lookahead_days=7,
+    )
+
+    # Store the actual severity enum before patching
+    severity_error = ir.IssueSeverity.ERROR
+    severity_warning = ir.IssueSeverity.WARNING
+
+    with patch("custom_components.firefly_cloud.coordinator.ir") as mock_ir:
+        # Make the patched ir module return the real severity values
+        mock_ir.IssueSeverity.ERROR = severity_error
+        mock_ir.IssueSeverity.WARNING = severity_warning
+
+        # Authentication error - should be ERROR
+        mock_api.get_user_info.side_effect = FireflyAuthenticationError("Auth failed")
+        with pytest.raises(UpdateFailed):
+            await coordinator._async_update_data()
+
+        call_args = mock_ir.async_create_issue.call_args
+        assert call_args[1]["severity"] == severity_error
+
+        # Reset for next test
+        mock_ir.reset_mock()
+        mock_api.get_user_info.side_effect = None
+
+        # Rate limit error - should be WARNING
+        from custom_components.firefly_cloud.exceptions import FireflyRateLimitError
+
+        mock_api.get_user_info.side_effect = FireflyRateLimitError("Rate limited")
+        with pytest.raises(UpdateFailed):
+            await coordinator._async_update_data()
+
+        call_args = mock_ir.async_create_issue.call_args
+        assert call_args[1]["severity"] == severity_warning
+
+
+# Statistics Tracking Tests
+
+
+@pytest.mark.asyncio
+async def test_coordinator_statistics_initialization(hass: HomeAssistant, mock_api):
+    """Test that statistics are properly initialized."""
+    coordinator = FireflyUpdateCoordinator(
+        hass=hass,
+        api=mock_api,
+        task_lookahead_days=7,
+    )
+
+    assert coordinator.statistics["total_updates"] == 0
+    assert coordinator.statistics["successful_updates"] == 0
+    assert coordinator.statistics["failed_updates"] == 0
+    assert coordinator.statistics["last_update_time"] is None
+    assert coordinator.statistics["last_success_time"] is None
+    assert coordinator.statistics["last_failure_time"] is None
+    assert coordinator.statistics["error_counts"] == {}
+
+
+@pytest.mark.asyncio
+async def test_coordinator_statistics_successful_update(hass: HomeAssistant, mock_api):
+    """Test that statistics are updated on successful update."""
+    coordinator = FireflyUpdateCoordinator(
+        hass=hass,
+        api=mock_api,
+        task_lookahead_days=7,
+    )
+
+    await coordinator._async_update_data()
+
+    assert coordinator.statistics["total_updates"] == 1
+    assert coordinator.statistics["successful_updates"] == 1
+    assert coordinator.statistics["failed_updates"] == 0
+    assert coordinator.statistics["last_update_time"] is not None
+    assert coordinator.statistics["last_success_time"] is not None
+    assert coordinator.statistics["last_failure_time"] is None
+    assert coordinator.statistics["error_counts"] == {}
+
+
+@pytest.mark.asyncio
+async def test_coordinator_statistics_failed_update(hass: HomeAssistant, mock_api):
+    """Test that statistics are updated on failed update."""
+    mock_api.get_user_info.side_effect = FireflyConnectionError("Connection failed")
+
+    coordinator = FireflyUpdateCoordinator(
+        hass=hass,
+        api=mock_api,
+        task_lookahead_days=7,
+    )
+
+    with pytest.raises(UpdateFailed):
+        await coordinator._async_update_data()
+
+    assert coordinator.statistics["total_updates"] == 1
+    assert coordinator.statistics["successful_updates"] == 0
+    assert coordinator.statistics["failed_updates"] == 1
+    assert coordinator.statistics["last_update_time"] is not None
+    assert coordinator.statistics["last_success_time"] is None
+    assert coordinator.statistics["last_failure_time"] is not None
+    assert "FireflyConnectionError" in coordinator.statistics["error_counts"]
+    assert coordinator.statistics["error_counts"]["FireflyConnectionError"] == 1
+
+
+@pytest.mark.asyncio
+async def test_coordinator_statistics_multiple_failures(hass: HomeAssistant, mock_api):
+    """Test that statistics track multiple failures correctly."""
+    mock_api.get_user_info.side_effect = FireflyConnectionError("Connection failed")
+
+    coordinator = FireflyUpdateCoordinator(
+        hass=hass,
+        api=mock_api,
+        task_lookahead_days=7,
+    )
+
+    # First failure
+    with pytest.raises(UpdateFailed):
+        await coordinator._async_update_data()
+
+    # Second failure
+    with pytest.raises(UpdateFailed):
+        await coordinator._async_update_data()
+
+    # Third failure
+    with pytest.raises(UpdateFailed):
+        await coordinator._async_update_data()
+
+    assert coordinator.statistics["total_updates"] == 3
+    assert coordinator.statistics["successful_updates"] == 0
+    assert coordinator.statistics["failed_updates"] == 3
+    assert coordinator.statistics["error_counts"]["FireflyConnectionError"] == 3
+
+
+@pytest.mark.asyncio
+async def test_coordinator_statistics_mixed_results(hass: HomeAssistant, mock_api):
+    """Test statistics with mixed success and failure updates."""
+    coordinator = FireflyUpdateCoordinator(
+        hass=hass,
+        api=mock_api,
+        task_lookahead_days=7,
+    )
+
+    # Successful update
+    await coordinator._async_update_data()
+
+    assert coordinator.statistics["total_updates"] == 1
+    assert coordinator.statistics["successful_updates"] == 1
+    assert coordinator.statistics["failed_updates"] == 0
+
+    # Failed update - clear cached user info so it tries to fetch again
+    coordinator._user_info = None
+    mock_api.get_user_info.side_effect = FireflyConnectionError("Connection failed")
+    with pytest.raises(UpdateFailed):
+        await coordinator._async_update_data()
+
+    assert coordinator.statistics["total_updates"] == 2
+    assert coordinator.statistics["successful_updates"] == 1
+    assert coordinator.statistics["failed_updates"] == 1
+
+    # Another successful update - clear the exception and set return value
+    mock_api.get_user_info.side_effect = None
+    mock_api.get_user_info.return_value = {
+        "username": "john.doe",
+        "fullname": "John Doe",
+        "guid": "test-user-123",
+    }
+    await coordinator._async_update_data()
+
+    assert coordinator.statistics["total_updates"] == 3
+    assert coordinator.statistics["successful_updates"] == 2
+    assert coordinator.statistics["failed_updates"] == 1
+
+
+@pytest.mark.asyncio
+async def test_coordinator_statistics_error_type_tracking(hass: HomeAssistant, mock_api):
+    """Test that different error types are tracked separately."""
+    coordinator = FireflyUpdateCoordinator(
+        hass=hass,
+        api=mock_api,
+        task_lookahead_days=7,
+    )
+
+    # Connection error
+    mock_api.get_user_info.side_effect = FireflyConnectionError("Connection failed")
+    with pytest.raises(UpdateFailed):
+        await coordinator._async_update_data()
+
+    assert "FireflyConnectionError" in coordinator.statistics["error_counts"]
+    assert coordinator.statistics["error_counts"]["FireflyConnectionError"] == 1
+
+    # Authentication error
+    mock_api.get_user_info.side_effect = FireflyAuthenticationError("Auth failed")
+    with pytest.raises(UpdateFailed):
+        await coordinator._async_update_data()
+
+    assert "FireflyAuthenticationError" in coordinator.statistics["error_counts"]
+    assert coordinator.statistics["error_counts"]["FireflyAuthenticationError"] == 1
+    assert coordinator.statistics["error_counts"]["FireflyConnectionError"] == 1
+
+    # Another connection error
+    mock_api.get_user_info.side_effect = FireflyConnectionError("Connection failed again")
+    with pytest.raises(UpdateFailed):
+        await coordinator._async_update_data()
+
+    assert coordinator.statistics["error_counts"]["FireflyConnectionError"] == 2
+    assert coordinator.statistics["error_counts"]["FireflyAuthenticationError"] == 1
