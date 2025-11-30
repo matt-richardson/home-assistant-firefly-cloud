@@ -25,7 +25,7 @@ from .exceptions import (
 _LOGGER = logging.getLogger(__name__)
 
 
-class FireflyUpdateCoordinator(DataUpdateCoordinator):
+class FireflyUpdateCoordinator(DataUpdateCoordinator):  # pylint: disable=too-many-instance-attributes
     """Class to manage fetching Firefly data."""
 
     def __init__(
@@ -52,8 +52,23 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
         self.consecutive_failures = 0
         self.consecutive_data_errors = 0
 
-    async def _async_update_data(self) -> Dict[str, Any]:
+        # Statistics tracking
+        self.statistics: Dict[str, Any] = {
+            "total_updates": 0,
+            "successful_updates": 0,
+            "failed_updates": 0,
+            "last_update_time": None,
+            "last_success_time": None,
+            "last_failure_time": None,
+            "error_counts": {},  # Track errors by type
+        }
+
+    async def _async_update_data(self) -> Dict[str, Any]:  # pylint: disable=too-many-statements
         """Fetch data from Firefly API."""
+        update_time = datetime.now(timezone.utc).isoformat()
+        self.statistics["total_updates"] += 1
+        self.statistics["last_update_time"] = update_time
+
         try:
             await self._ensure_user_and_children_info()
 
@@ -80,11 +95,12 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
             self._log_update_statistics(target_guids, children_data)
 
             # Update succeeded - reset counters and dismiss issues
-            self._handle_update_success()
+            self._handle_update_success(update_time)
 
             return data
 
         except FireflyTokenExpiredError as err:
+            self._track_failure("FireflyTokenExpiredError")
             _LOGGER.warning("Firefly authentication token expired, reauthentication required")
             # Token expired - immediate notification
             self._create_issue(
@@ -94,6 +110,7 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
             )
             raise UpdateFailed("Authentication token expired") from err
         except FireflyAuthenticationError as err:
+            self._track_failure("FireflyAuthenticationError")
             _LOGGER.error("Firefly authentication error: %s", err)
             # Authentication error - immediate notification
             self._create_issue(
@@ -103,6 +120,7 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
             )
             raise UpdateFailed(f"Authentication error: {err}") from err
         except FireflyConnectionError as err:
+            self._track_failure("FireflyConnectionError")
             self.consecutive_failures += 1
             _LOGGER.warning(
                 "Connection error while updating Firefly data: %s (failure %d)", err, self.consecutive_failures
@@ -119,6 +137,7 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
 
             raise UpdateFailed(f"Connection error: {err}") from err
         except FireflyRateLimitError as err:
+            self._track_failure("FireflyRateLimitError")
             _LOGGER.warning("Rate limit error while updating Firefly data: %s", err)
             # Rate limit - immediate notification with interval suggestion
             update_interval_minutes = int(DEFAULT_SCAN_INTERVAL.total_seconds() / 60) + 5
@@ -130,6 +149,7 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
             )
             raise UpdateFailed("Rate limit exceeded") from err
         except FireflyDataError as err:
+            self._track_failure("FireflyDataError")
             self.consecutive_data_errors += 1
             _LOGGER.error("Data processing error: %s (error %d)", err, self.consecutive_data_errors)
 
@@ -144,6 +164,7 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
 
             raise UpdateFailed(f"Data processing error: {err}") from err
         except Exception as err:
+            self._track_failure("UnexpectedError")
             self.consecutive_failures += 1
             _LOGGER.exception("Unexpected error updating Firefly data (failure %d)", self.consecutive_failures)
 
@@ -446,10 +467,14 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
         """Dismiss an issue from the issue registry."""
         ir.async_delete_issue(self.hass, DOMAIN, issue_id)
 
-    def _handle_update_success(self) -> None:
+    def _handle_update_success(self, update_time: str) -> None:
         """Handle successful update."""
         self.consecutive_failures = 0
         self.consecutive_data_errors = 0
+
+        # Update statistics
+        self.statistics["successful_updates"] += 1
+        self.statistics["last_success_time"] = update_time
 
         # Dismiss any existing issues
         self._dismiss_issue("connection_error")
@@ -457,3 +482,13 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):
         self._dismiss_issue("rate_limit_error")
         self._dismiss_issue("data_error")
         self._dismiss_issue("unexpected_error")
+
+    def _track_failure(self, error_type: str) -> None:
+        """Track update failure statistics."""
+        self.statistics["failed_updates"] += 1
+        self.statistics["last_failure_time"] = datetime.now(timezone.utc).isoformat()
+
+        # Track error counts by type
+        if error_type not in self.statistics["error_counts"]:
+            self.statistics["error_counts"][error_type] = 0
+        self.statistics["error_counts"][error_type] += 1

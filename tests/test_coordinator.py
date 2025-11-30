@@ -1724,3 +1724,172 @@ async def test_coordinator_issue_severity_levels(hass: HomeAssistant, mock_api):
 
         call_args = mock_ir.async_create_issue.call_args
         assert call_args[1]["severity"] == severity_warning
+
+
+# Statistics Tracking Tests
+
+
+@pytest.mark.asyncio
+async def test_coordinator_statistics_initialization(hass: HomeAssistant, mock_api):
+    """Test that statistics are properly initialized."""
+    coordinator = FireflyUpdateCoordinator(
+        hass=hass,
+        api=mock_api,
+        task_lookahead_days=7,
+    )
+
+    assert coordinator.statistics["total_updates"] == 0
+    assert coordinator.statistics["successful_updates"] == 0
+    assert coordinator.statistics["failed_updates"] == 0
+    assert coordinator.statistics["last_update_time"] is None
+    assert coordinator.statistics["last_success_time"] is None
+    assert coordinator.statistics["last_failure_time"] is None
+    assert coordinator.statistics["error_counts"] == {}
+
+
+@pytest.mark.asyncio
+async def test_coordinator_statistics_successful_update(hass: HomeAssistant, mock_api):
+    """Test that statistics are updated on successful update."""
+    coordinator = FireflyUpdateCoordinator(
+        hass=hass,
+        api=mock_api,
+        task_lookahead_days=7,
+    )
+
+    await coordinator._async_update_data()
+
+    assert coordinator.statistics["total_updates"] == 1
+    assert coordinator.statistics["successful_updates"] == 1
+    assert coordinator.statistics["failed_updates"] == 0
+    assert coordinator.statistics["last_update_time"] is not None
+    assert coordinator.statistics["last_success_time"] is not None
+    assert coordinator.statistics["last_failure_time"] is None
+    assert coordinator.statistics["error_counts"] == {}
+
+
+@pytest.mark.asyncio
+async def test_coordinator_statistics_failed_update(hass: HomeAssistant, mock_api):
+    """Test that statistics are updated on failed update."""
+    mock_api.get_user_info.side_effect = FireflyConnectionError("Connection failed")
+
+    coordinator = FireflyUpdateCoordinator(
+        hass=hass,
+        api=mock_api,
+        task_lookahead_days=7,
+    )
+
+    with pytest.raises(UpdateFailed):
+        await coordinator._async_update_data()
+
+    assert coordinator.statistics["total_updates"] == 1
+    assert coordinator.statistics["successful_updates"] == 0
+    assert coordinator.statistics["failed_updates"] == 1
+    assert coordinator.statistics["last_update_time"] is not None
+    assert coordinator.statistics["last_success_time"] is None
+    assert coordinator.statistics["last_failure_time"] is not None
+    assert "FireflyConnectionError" in coordinator.statistics["error_counts"]
+    assert coordinator.statistics["error_counts"]["FireflyConnectionError"] == 1
+
+
+@pytest.mark.asyncio
+async def test_coordinator_statistics_multiple_failures(hass: HomeAssistant, mock_api):
+    """Test that statistics track multiple failures correctly."""
+    mock_api.get_user_info.side_effect = FireflyConnectionError("Connection failed")
+
+    coordinator = FireflyUpdateCoordinator(
+        hass=hass,
+        api=mock_api,
+        task_lookahead_days=7,
+    )
+
+    # First failure
+    with pytest.raises(UpdateFailed):
+        await coordinator._async_update_data()
+
+    # Second failure
+    with pytest.raises(UpdateFailed):
+        await coordinator._async_update_data()
+
+    # Third failure
+    with pytest.raises(UpdateFailed):
+        await coordinator._async_update_data()
+
+    assert coordinator.statistics["total_updates"] == 3
+    assert coordinator.statistics["successful_updates"] == 0
+    assert coordinator.statistics["failed_updates"] == 3
+    assert coordinator.statistics["error_counts"]["FireflyConnectionError"] == 3
+
+
+@pytest.mark.asyncio
+async def test_coordinator_statistics_mixed_results(hass: HomeAssistant, mock_api):
+    """Test statistics with mixed success and failure updates."""
+    coordinator = FireflyUpdateCoordinator(
+        hass=hass,
+        api=mock_api,
+        task_lookahead_days=7,
+    )
+
+    # Successful update
+    await coordinator._async_update_data()
+
+    assert coordinator.statistics["total_updates"] == 1
+    assert coordinator.statistics["successful_updates"] == 1
+    assert coordinator.statistics["failed_updates"] == 0
+
+    # Failed update - clear cached user info so it tries to fetch again
+    coordinator._user_info = None
+    mock_api.get_user_info.side_effect = FireflyConnectionError("Connection failed")
+    with pytest.raises(UpdateFailed):
+        await coordinator._async_update_data()
+
+    assert coordinator.statistics["total_updates"] == 2
+    assert coordinator.statistics["successful_updates"] == 1
+    assert coordinator.statistics["failed_updates"] == 1
+
+    # Another successful update - clear the exception and set return value
+    mock_api.get_user_info.side_effect = None
+    mock_api.get_user_info.return_value = {
+        "username": "john.doe",
+        "fullname": "John Doe",
+        "guid": "test-user-123",
+    }
+    await coordinator._async_update_data()
+
+    assert coordinator.statistics["total_updates"] == 3
+    assert coordinator.statistics["successful_updates"] == 2
+    assert coordinator.statistics["failed_updates"] == 1
+
+
+@pytest.mark.asyncio
+async def test_coordinator_statistics_error_type_tracking(hass: HomeAssistant, mock_api):
+    """Test that different error types are tracked separately."""
+    coordinator = FireflyUpdateCoordinator(
+        hass=hass,
+        api=mock_api,
+        task_lookahead_days=7,
+    )
+
+    # Connection error
+    mock_api.get_user_info.side_effect = FireflyConnectionError("Connection failed")
+    with pytest.raises(UpdateFailed):
+        await coordinator._async_update_data()
+
+    assert "FireflyConnectionError" in coordinator.statistics["error_counts"]
+    assert coordinator.statistics["error_counts"]["FireflyConnectionError"] == 1
+
+    # Authentication error
+    mock_api.get_user_info.side_effect = FireflyAuthenticationError("Auth failed")
+    with pytest.raises(UpdateFailed):
+        await coordinator._async_update_data()
+
+    assert "FireflyAuthenticationError" in coordinator.statistics["error_counts"]
+    assert coordinator.statistics["error_counts"]["FireflyAuthenticationError"] == 1
+    assert coordinator.statistics["error_counts"]["FireflyConnectionError"] == 1
+
+    # Another connection error
+    mock_api.get_user_info.side_effect = FireflyConnectionError("Connection failed again")
+    with pytest.raises(UpdateFailed):
+        await coordinator._async_update_data()
+
+    assert coordinator.statistics["error_counts"]["FireflyConnectionError"] == 2
+    assert coordinator.statistics["error_counts"]["FireflyAuthenticationError"] == 1
