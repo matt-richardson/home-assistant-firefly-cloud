@@ -54,7 +54,13 @@ Comprehensive mocking required for:
 - Coordinator update cycles
 - Error scenarios (network failures, auth expiry, rate limiting)
 
-Target test structure in `tests/` with fixtures in `tests/fixtures/`.
+Target test structure in `tests/` with fixtures in `tests/conftest.py`.
+
+**For detailed testing guidance**, see [docs/testing.md](docs/testing.md) which covers:
+- Running tests and coverage reports
+- Version compatibility across Home Assistant versions
+- Writing new tests with proper fixtures
+- Common testing patterns and troubleshooting
 
 ## Development Workflow
 
