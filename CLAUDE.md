@@ -35,7 +35,7 @@ This integration targets Home Assistant Silver tier certification, requiring:
 - Proper error handling and entity unavailable states
 - Modern Python async patterns (3.11+)
 
-See `firefly-cloud-technical-spec.md` for complete Bronze + Silver tier checklist.
+See [firefly-cloud-technical-spec.md](docs/firefly-cloud-technical-spec.md) for complete Bronze + Silver tier checklist.
 
 ## Data Models
 
