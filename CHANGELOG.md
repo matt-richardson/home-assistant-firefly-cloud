@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.6.0](https://github.com/matt-richardson/home-assistant-firefly-cloud/compare/v0.5.0...v0.6.0) (2025-12-01)
+
+
+### Features
+
+* add statistics tracking and diagnostics platform ([#22](https://github.com/matt-richardson/home-assistant-firefly-cloud/issues/22)) ([806eaa9](https://github.com/matt-richardson/home-assistant-firefly-cloud/commit/806eaa9a0fd4ec1e6cef7d83527417b839a8f1e3))
+
 ## [0.5.0](https://github.com/matt-richardson/home-assistant-firefly-cloud/compare/v0.4.2...v0.5.0) (2025-10-06)
 
 
