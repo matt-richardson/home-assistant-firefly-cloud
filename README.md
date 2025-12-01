@@ -182,8 +182,13 @@ If not using the dev container, you'll need:
    source venv/bin/activate
    ```
 3. **Dependencies**: `pip install homeassistant aiohttp lxml python-dateutil voluptuous`
-4. **Development Tools**: `pip install pytest pytest-asyncio pytest-cov black flake8 mypy pylint`
-5. **Testing**: Run `pytest tests/` from the project root
+4. **Development Tools**: `pip install pytest pytest-asyncio pytest-cov black flake8 mypy pylint pre-commit`
+5. **Pre-commit Hooks** (recommended):
+   ```bash
+   ./setup-pre-commit.sh
+   ```
+   This installs git hooks that automatically run code quality checks (black, isort, flake8, mypy) before each commit.
+6. **Testing**: Run `pytest tests/` from the project root
 
 ### CI/CD Pipeline
 
