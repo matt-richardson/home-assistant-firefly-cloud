@@ -204,7 +204,6 @@ This project uses GitHub Actions for continuous integration and testing:
 **Branch Protection**
 - Main branch is protected with required status checks
 - PRs (including release PRs) cannot be merged until all tests pass
-- See `.github/BRANCH_PROTECTION.md` for setup instructions
 
 ### Contributing
 
@@ -248,12 +247,12 @@ BREAKING CHANGE: The old API endpoints have been removed."
 1. Commits following conventional format are pushed to `main`
 2. Release-please automatically creates/updates a release PR
 3. Merge the release PR to publish a new release
-4. Versions are automatically bumped in `manifest.json` and `CHANGELOG.md`
+4. Versions are automatically bumped in [manifest.json](./custom_components/firefly_cloud/manifest.json) and [CHANGELOG.md](./CHANGELOG.md)
 
 A git commit-msg hook is included to validate commit messages locally.
 
 ### Additional Resources
 
-- `CLAUDE.md` - Development guidance and architecture overview
-- `firefly-cloud-technical-spec.md` - Detailed technical specifications
-- `.devcontainer/README.md` - Complete dev container documentation
+- [CLAUDE.md](./CLAUDE.md) - Development guidance and architecture overview
+- [firefly-cloud-technical-spec.md](./docs/firefly-cloud-technical-spec.md) - Detailed technical specifications
+- [.devcontainer/README.md](./.devcontainer/README.md) - Complete dev container documentation
