@@ -1,20 +1,20 @@
 # Development requirements for Firefly Cloud Home Assistant integration
-# Requires Python 3.13+
+# Requires Python 3.11+
 
 # Home Assistant core
-homeassistant>=2024.1.0
+# Different versions based on Python version:
+# - Python 3.13: Requires 2025.12+ for aiodns 3.6.1 with Python 3.13 support
+# - Python 3.11-3.12: Use 2024.3.x (last version before 3.12+ requirement)
+homeassistant>=2025.12.0; python_version >= "3.13"
+homeassistant>=2024.3.0,<2024.4.0; python_version < "3.13"
 
-# Core dependencies with compatibility fixes
+# Core dependencies
 aiohttp>=3.8.0
 lxml>=4.9.0
 lxml-stubs  # Type stubs for lxml
 python-dateutil>=2.8.0
 voluptuous
 async-timeout
-
-# Compatibility fixes for josepy/acme conflict
-josepy<1.14.0
-acme>=1.21.0
 
 # Development tools
 black
