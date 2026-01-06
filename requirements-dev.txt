@@ -6,6 +6,7 @@ homeassistant>=2024.1.0
 
 # Core dependencies with compatibility fixes
 aiohttp>=3.8.0
+aiodns==3.1.1  # Pin to 3.1.1 for Python 3.13 compatibility (3.2.0 has type hint issues)
 lxml>=4.9.0
 lxml-stubs  # Type stubs for lxml
 python-dateutil>=2.8.0
