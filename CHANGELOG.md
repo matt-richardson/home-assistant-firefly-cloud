@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.6.1](https://github.com/matt-richardson/home-assistant-firefly-cloud/compare/v0.6.0...v0.6.1) (2026-01-06)
+
+
+### Bug Fixes
+
+* resolve Python 3.13 CI failures with version-specific dependencies ([#29](https://github.com/matt-richardson/home-assistant-firefly-cloud/issues/29)) ([52f8163](https://github.com/matt-richardson/home-assistant-firefly-cloud/commit/52f8163e4dd9848cfbcd4cef7602af0b3304c6dc))
+* trigger reauthentication flow on token expiration ([#28](https://github.com/matt-richardson/home-assistant-firefly-cloud/issues/28)) ([89aa481](https://github.com/matt-richardson/home-assistant-firefly-cloud/commit/89aa4816758a93fb99f0475e6dda03f38b792338))
+
 ## [0.6.0](https://github.com/matt-richardson/home-assistant-firefly-cloud/compare/v0.5.0...v0.6.0) (2025-12-01)
 
 
