@@ -2,8 +2,11 @@
 # Requires Python 3.11+
 
 # Home Assistant core
-# Requires >=2025.12.0 for Python 3.13 support (aiodns 3.6.1)
-homeassistant>=2025.12.0
+# Different versions based on Python version:
+# - Python 3.13: Requires 2025.12+ for aiodns 3.6.1 with Python 3.13 support
+# - Python 3.11-3.12: Use 2024.3.x (last version before 3.12+ requirement)
+homeassistant>=2025.12.0; python_version >= "3.13"
+homeassistant>=2024.3.0,<2024.4.0; python_version < "3.13"
 
 # Core dependencies
 aiohttp>=3.8.0
