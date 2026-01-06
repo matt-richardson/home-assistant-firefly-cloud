@@ -5,15 +5,12 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import FireflyAPIClient
-from .const import (
-    DEFAULT_SCAN_INTERVAL,
-    DEFAULT_TASK_LOOKAHEAD_DAYS,
-    DOMAIN,
-)
+from .const import DEFAULT_SCAN_INTERVAL, DEFAULT_TASK_LOOKAHEAD_DAYS, DOMAIN
 from .exceptions import (
     FireflyAuthenticationError,
     FireflyConnectionError,
@@ -108,7 +105,7 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):  # pylint: disable=too-ma
                 "authentication_error",
                 severity=ir.IssueSeverity.ERROR,
             )
-            raise UpdateFailed("Authentication token expired") from err
+            raise ConfigEntryAuthFailed("Authentication token expired") from err
         except FireflyAuthenticationError as err:
             self._track_failure("FireflyAuthenticationError")
             _LOGGER.error("Firefly authentication error: %s", err)
@@ -118,7 +115,7 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):  # pylint: disable=too-ma
                 "authentication_error",
                 severity=ir.IssueSeverity.ERROR,
             )
-            raise UpdateFailed(f"Authentication error: {err}") from err
+            raise ConfigEntryAuthFailed(f"Authentication error: {err}") from err
         except FireflyConnectionError as err:
             self._track_failure("FireflyConnectionError")
             self.consecutive_failures += 1

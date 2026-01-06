@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from custom_components.firefly_cloud.coordinator import FireflyUpdateCoordinator
@@ -254,7 +255,7 @@ async def test_coordinator_authentication_error(hass: HomeAssistant, mock_api):
         task_lookahead_days=7,
     )
 
-    with pytest.raises(UpdateFailed, match="Authentication error"):
+    with pytest.raises(ConfigEntryAuthFailed, match="Authentication error"):
         await coordinator._async_update_data()
 
 
@@ -269,7 +270,7 @@ async def test_coordinator_token_expired_error(hass: HomeAssistant, mock_api):
         task_lookahead_days=7,
     )
 
-    with pytest.raises(UpdateFailed, match="Authentication token expired"):
+    with pytest.raises(ConfigEntryAuthFailed, match="Authentication token expired"):
         await coordinator._async_update_data()
 
 
@@ -1364,9 +1365,10 @@ async def test_coordinator_filter_overdue_tasks_naive_due_date(hass: HomeAssista
 @pytest.mark.asyncio
 async def test_coordinator_process_tasks_subject_dict(hass):
     """Test coordinator handles task with subject as dict."""
+    from unittest.mock import AsyncMock
+
     from custom_components.firefly_cloud.api import FireflyAPIClient
     from custom_components.firefly_cloud.coordinator import FireflyUpdateCoordinator
-    from unittest.mock import AsyncMock
 
     # Create mock API client
     mock_api = AsyncMock(spec=FireflyAPIClient)
@@ -1395,9 +1397,10 @@ async def test_coordinator_process_tasks_subject_dict(hass):
 @pytest.mark.asyncio
 async def test_coordinator_process_tasks_subject_string(hass):
     """Test coordinator handles task with subject as string."""
+    from unittest.mock import AsyncMock
+
     from custom_components.firefly_cloud.api import FireflyAPIClient
     from custom_components.firefly_cloud.coordinator import FireflyUpdateCoordinator
-    from unittest.mock import AsyncMock
 
     # Create mock API client
     mock_api = AsyncMock(spec=FireflyAPIClient)
@@ -1464,7 +1467,7 @@ async def test_coordinator_issue_creation_authentication_error(hass: HomeAssista
     )
 
     with patch("custom_components.firefly_cloud.coordinator.ir") as mock_ir:
-        with pytest.raises(UpdateFailed, match="Authentication error"):
+        with pytest.raises(ConfigEntryAuthFailed, match="Authentication error"):
             await coordinator._async_update_data()
 
         # Verify issue was created immediately
@@ -1489,7 +1492,7 @@ async def test_coordinator_issue_creation_token_expired(hass: HomeAssistant, moc
     )
 
     with patch("custom_components.firefly_cloud.coordinator.ir") as mock_ir:
-        with pytest.raises(UpdateFailed, match="Authentication token expired"):
+        with pytest.raises(ConfigEntryAuthFailed, match="Authentication token expired"):
             await coordinator._async_update_data()
 
         # Verify issue was created immediately
@@ -1541,6 +1544,7 @@ async def test_coordinator_connection_error_threshold(hass: HomeAssistant, mock_
 async def test_coordinator_rate_limit_immediate_issue(hass: HomeAssistant, mock_api):
     """Test that rate limit errors create issue immediately."""
     from unittest.mock import patch
+
     from custom_components.firefly_cloud.exceptions import FireflyRateLimitError
 
     mock_api.get_user_info.side_effect = FireflyRateLimitError("Rate limited")
@@ -1568,6 +1572,7 @@ async def test_coordinator_rate_limit_immediate_issue(hass: HomeAssistant, mock_
 async def test_coordinator_data_error_threshold(hass: HomeAssistant, mock_api):
     """Test that data errors only create issue after 2 failures."""
     from unittest.mock import patch
+
     from custom_components.firefly_cloud.exceptions import FireflyDataError
 
     mock_api.get_user_info.side_effect = FireflyDataError("Data processing failed")
@@ -1686,6 +1691,7 @@ async def test_coordinator_connection_error_counter_increments(hass: HomeAssista
 async def test_coordinator_issue_severity_levels(hass: HomeAssistant, mock_api):
     """Test that different errors use appropriate severity levels."""
     from unittest.mock import patch
+
     from homeassistant.helpers import issue_registry as ir
 
     coordinator = FireflyUpdateCoordinator(
@@ -1705,7 +1711,7 @@ async def test_coordinator_issue_severity_levels(hass: HomeAssistant, mock_api):
 
         # Authentication error - should be ERROR
         mock_api.get_user_info.side_effect = FireflyAuthenticationError("Auth failed")
-        with pytest.raises(UpdateFailed):
+        with pytest.raises(ConfigEntryAuthFailed):
             await coordinator._async_update_data()
 
         call_args = mock_ir.async_create_issue.call_args
@@ -1879,7 +1885,7 @@ async def test_coordinator_statistics_error_type_tracking(hass: HomeAssistant, m
 
     # Authentication error
     mock_api.get_user_info.side_effect = FireflyAuthenticationError("Auth failed")
-    with pytest.raises(UpdateFailed):
+    with pytest.raises(ConfigEntryAuthFailed):
         await coordinator._async_update_data()
 
     assert "FireflyAuthenticationError" in coordinator.statistics["error_counts"]
