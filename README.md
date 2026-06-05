@@ -1,7 +1,6 @@
 # Home Assistant Firefly Cloud Integration
 
 [![Test](https://github.com/matt-richardson/home-assistant-firefly-cloud/actions/workflows/test.yml/badge.svg)](https://github.com/matt-richardson/home-assistant-firefly-cloud/actions/workflows/test.yml)
-[![codecov](https://codecov.io/gh/matt-richardson/home-assistant-firefly-cloud/branch/main/graph/badge.svg)](https://codecov.io/gh/matt-richardson/home-assistant-firefly-cloud)
 
 A Home Assistant custom integration that connects to Firefly Cloud (school learning platform) to display children's school schedules and upcoming tasks on your smart home dashboard.
 
