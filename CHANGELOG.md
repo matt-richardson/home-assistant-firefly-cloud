@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.6.2](https://github.com/matt-richardson/home-assistant-firefly-cloud/compare/v0.6.1...v0.6.2) (2026-06-20)
+
+
+### Miscellaneous Chores
+
+* force release 0.6.2 ([#33](https://github.com/matt-richardson/home-assistant-firefly-cloud/issues/33)) ([4b27560](https://github.com/matt-richardson/home-assistant-firefly-cloud/commit/4b275608700c1cc592f5753a925df6a1a7cd9f07))
+
 ## [0.6.1](https://github.com/matt-richardson/home-assistant-firefly-cloud/compare/v0.6.0...v0.6.1) (2026-01-06)
 
 
