@@ -255,3 +255,7 @@ A git commit-msg hook is included to validate commit messages locally.
 - [CLAUDE.md](./CLAUDE.md) - Development guidance and architecture overview
 - [firefly-cloud-technical-spec.md](./docs/firefly-cloud-technical-spec.md) - Detailed technical specifications
 - [.devcontainer/README.md](./.devcontainer/README.md) - Complete dev container documentation
+
+## License
+
+Released under the [MIT License](LICENSE).
