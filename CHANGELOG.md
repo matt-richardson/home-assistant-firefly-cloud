@@ -7,7 +7,8 @@ All notable changes to this project will be documented in this file. See [Conven
 
 ### Miscellaneous Chores
 
-* force release 0.6.2 ([#33](https://github.com/matt-richardson/home-assistant-firefly-cloud/issues/33)) ([4b27560](https://github.com/matt-richardson/home-assistant-firefly-cloud/commit/4b275608700c1cc592f5753a925df6a1a7cd9f07))
+* add MIT License ([#32](https://github.com/matt-richardson/home-assistant-firefly-cloud/issues/32)) ([bfdd117](https://github.com/matt-richardson/home-assistant-firefly-cloud/commit/bfdd1174233bd44204556f6f4c94be01899f7a43))
+* remove Codecov from CI ([#31](https://github.com/matt-richardson/home-assistant-firefly-cloud/issues/31)) ([e650e9e](https://github.com/matt-richardson/home-assistant-firefly-cloud/commit/e650e9e86068b8af907fe01b20f4f35056327f0c))
 
 ## [0.6.1](https://github.com/matt-richardson/home-assistant-firefly-cloud/compare/v0.6.0...v0.6.1) (2026-01-06)
 
