@@ -14,6 +14,11 @@ A Home Assistant custom integration that connects to Firefly Cloud (school learn
 - **Todo Integration**: Interactive todo list for managing school tasks
 - **Multi-Child Support**: Family dashboard view or individual child dashboards
 
+## Supported versions
+
+Tested in CI on **Python 3.11–3.14** against **Home Assistant 2024.3 through 2026.6+**
+(HA 2024.3.x on Python 3.11/3.12; current HA on Python 3.13/3.14).
+
 ## Installation
 
 ### HACS (Recommended)
@@ -195,7 +200,7 @@ This project uses GitHub Actions for continuous integration and testing:
 
 **Automated Testing**
 - Tests run on every pull request and push to main
-- Multi-version testing: Python 3.11, 3.12, and 3.13
+- Multi-version testing: Python 3.11, 3.12, 3.13, and 3.14
 - Code coverage requirement: >95%
 - Linting: black, flake8, pylint, mypy
 - Integration validation: HACS and Hassfest
