@@ -1,6 +1,8 @@
 """Firefly Cloud API client."""
 
 import asyncio
+import html
+import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 from urllib.parse import quote
@@ -31,7 +33,31 @@ from .exceptions import (
     FireflyRateLimitError,
     FireflySchoolNotFoundError,
     FireflyTokenExpiredError,
+    FireflyUnexpectedResponseError,
 )
+
+_LOGGER = logging.getLogger(__name__)
+
+
+def _extract_token_xml(raw: str) -> str:
+    """Normalise whatever the user pasted into the token XML document.
+
+    Handles surrounding quotes, backslash-escaped quotes, HTML-escaped markup
+    (e.g. copied from view-source) and any text around the <token> element
+    (e.g. a browser's "This XML file does not appear to have any style
+    information" preface).
+    """
+    text = raw.strip()
+    if text.startswith('"') and text.endswith('"'):
+        text = text[1:-1]
+    text = text.replace('\\"', '"').replace("\\\\", "\\")
+    if "<" not in text and "&lt;" in text:
+        text = html.unescape(text)
+    start = text.find("<token")
+    end = text.rfind("</token>")
+    if start != -1 and end != -1:
+        text = text[start : end + len("</token>")]
+    return text
 
 
 class FireflyAPIClient:
@@ -168,16 +194,23 @@ class FireflyAPIClient:
             async with async_timeout.timeout(TIMEOUT_SECONDS):
                 async with self._session.get(url, params=params) as response:
                     if response.status == 401:
+                        _LOGGER.debug("Token verification returned HTTP 401")
                         return False
                     response.raise_for_status()
-                    data = await response.json()
-                    return data.get("valid", False)
+                    data = await response.json(content_type=None)
+                    valid = bool(data.get("valid", False))
+                    if not valid:
+                        _LOGGER.debug("Token verification response did not report a valid token: %s", data)
+                    return valid
         except asyncio.TimeoutError as err:
             raise FireflyConnectionError("Timeout verifying credentials") from err
         except aiohttp.ClientResponseError as err:
             if err.status == 401:
                 return False
-            raise FireflyAuthenticationError(f"Authentication error: {err}") from err
+            _LOGGER.debug("Token verification failed with HTTP %s: %s", err.status, err.message)
+            raise FireflyUnexpectedResponseError(
+                f"Unexpected response verifying credentials: {err}", err.status
+            ) from err
         except aiohttp.ClientError as err:
             raise FireflyConnectionError(f"Error verifying credentials: {err}") from err
 
@@ -186,11 +219,7 @@ class FireflyAPIClient:
         if not xml_response:
             raise FireflyAuthenticationError("Empty authentication response")
 
-        # Clean up the response (remove quotes and escape characters)
-        xml_response = xml_response.strip()
-        if xml_response.startswith('"') and xml_response.endswith('"'):
-            xml_response = xml_response[1:-1]
-        xml_response = xml_response.replace('\\"', '"').replace("\\\\", "\\")
+        xml_response = _extract_token_xml(xml_response)
 
         try:
             token_elem = etree.fromstring(xml_response.encode())
@@ -198,13 +227,14 @@ class FireflyAPIClient:
             if token_elem is None:
                 raise FireflyAuthenticationError("Invalid authentication response")
 
-            secret_elem = token_elem.find("secret")
-            user_elem = token_elem.find("user")
+            secret_elem = token_elem.find(".//secret")
+            user_elem = token_elem.find(".//user")
 
             if secret_elem is None or user_elem is None:
                 raise FireflyAuthenticationError("Missing authentication data")
 
-            if secret_elem.text is None:
+            secret = (secret_elem.text or "").strip()
+            if not secret:
                 raise FireflyAuthenticationError("Empty secret in authentication response")
 
             user_info = {
@@ -215,11 +245,11 @@ class FireflyAPIClient:
                 "guid": user_elem.get("guid"),
             }
 
-            self._secret = secret_elem.text
+            self._secret = secret
             self._user_info = user_info
 
             return {
-                "secret": secret_elem.text,
+                "secret": secret,
                 "user": user_info,
             }
 
@@ -352,6 +382,7 @@ class FireflyAPIClient:
     ) -> List[Dict[str, Any]]:
         """Filter events to only include those within the date range and remove duplicates."""
         import logging
+
         from homeassistant.util import dt as dt_util
 
         logger = logging.getLogger(__name__)

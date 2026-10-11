@@ -28,6 +28,7 @@ from .exceptions import (
     FireflyAuthenticationError,
     FireflyConnectionError,
     FireflySchoolNotFoundError,
+    FireflyUnexpectedResponseError,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -61,6 +62,7 @@ class FireflyCloudConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type:
         """Initialize the config flow."""
         self._school_info: Optional[Dict[str, Any]] = None
         self._api_client: Optional[FireflyAPIClient] = None
+        self._error_status_code = ""
 
     async def async_step_user(self, user_input: Optional[Dict[str, Any]] = None):  # type: ignore[override]
         """Handle the initial step."""
@@ -125,6 +127,7 @@ class FireflyCloudConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type:
 
                     # Verify credentials work
                     if not await self._api_client.verify_credentials():
+                        _LOGGER.warning("Firefly rejected the pasted token (credential verification failed)")
                         errors["base"] = "invalid_auth"
                     else:
                         # Get user info to validate
@@ -152,10 +155,16 @@ class FireflyCloudConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type:
                             },
                         )
 
-                except FireflyAuthenticationError:
+                except FireflyAuthenticationError as exc:
+                    _LOGGER.warning("Firefly authentication failed: %s", exc)
                     errors["base"] = "invalid_auth"
-                except FireflyConnectionError:
+                except FireflyConnectionError as exc:
+                    _LOGGER.warning("Could not connect to Firefly during authentication: %s", exc)
                     errors["base"] = "cannot_connect"
+                except FireflyUnexpectedResponseError as exc:
+                    _LOGGER.warning("Firefly returned HTTP %s during authentication: %s", exc.status_code, exc)
+                    errors["base"] = "unexpected_response"
+                    self._error_status_code = str(exc.status_code)
                 except Exception:  # pylint: disable=broad-except
                     _LOGGER.exception("Unexpected error during authentication")
                     errors["base"] = "unknown"
@@ -172,6 +181,7 @@ class FireflyCloudConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type:
             description_placeholders={
                 "auth_url": auth_url,
                 "device_id": self._school_info["device_id"],
+                "status_code": self._error_status_code,
             },
             last_step=False,
         )
@@ -217,6 +227,7 @@ class FireflyCloudConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type:
 
             # Verify credentials work
             if not await self._api_client.verify_credentials():
+                _LOGGER.warning("Firefly rejected the pasted token during reauthentication")
                 errors["base"] = "invalid_auth"
                 return errors
 
@@ -239,10 +250,16 @@ class FireflyCloudConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type:
             # Reload the integration
             await self.hass.config_entries.async_reload(entry_id)
 
-        except FireflyAuthenticationError:
+        except FireflyAuthenticationError as exc:
+            _LOGGER.warning("Firefly reauthentication failed: %s", exc)
             errors["base"] = "invalid_auth"
-        except FireflyConnectionError:
+        except FireflyConnectionError as exc:
+            _LOGGER.warning("Could not connect to Firefly during reauthentication: %s", exc)
             errors["base"] = "cannot_connect"
+        except FireflyUnexpectedResponseError as exc:
+            _LOGGER.warning("Firefly returned HTTP %s during reauthentication: %s", exc.status_code, exc)
+            errors["base"] = "unexpected_response"
+            self._error_status_code = str(exc.status_code)
         except Exception:  # pylint: disable=broad-except
             _LOGGER.exception("Unexpected error during reauthentication")
             errors["base"] = "unknown"
@@ -273,6 +290,7 @@ class FireflyCloudConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type:
             description_placeholders={
                 "auth_url": auth_url,
                 "device_id": self._school_info["device_id"],
+                "status_code": self._error_status_code,
             },
         )
 

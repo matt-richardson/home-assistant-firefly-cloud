@@ -28,6 +28,7 @@
       "school_not_found": "School not found. Please check your school code and try again.",
       "school_disabled": "This school's Firefly Cloud integration is not enabled. Please contact your school administrator.",
       "invalid_auth": "Authentication failed. Please ensure you copied the complete authentication response and try again.",
+      "unexpected_response": "Firefly returned an unexpected response (HTTP {status_code}) while verifying your login. Please try again later.",
       "unknown": "An unexpected error occurred. Please try again."
     },
     "abort": {

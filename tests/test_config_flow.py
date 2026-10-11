@@ -13,6 +13,7 @@ from custom_components.firefly_cloud.exceptions import (
     FireflyAuthenticationError,
     FireflyConnectionError,
     FireflySchoolNotFoundError,
+    FireflyUnexpectedResponseError,
 )
 
 
@@ -182,7 +183,7 @@ async def test_form_auth_step_success(hass: HomeAssistant, mock_setup_entry) -> 
 
 
 @pytest.mark.asyncio
-async def test_form_auth_invalid_response(hass: HomeAssistant) -> None:
+async def test_form_auth_invalid_response(hass: HomeAssistant, caplog: pytest.LogCaptureFixture) -> None:
     """Test invalid authentication response."""
     # Start flow and get to auth step
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
@@ -220,10 +221,11 @@ async def test_form_auth_invalid_response(hass: HomeAssistant) -> None:
     assert result2["type"] == FlowResultType.FORM
     assert result2["step_id"] == "auth"
     assert result2["errors"] == {"base": "invalid_auth"}
+    assert "Firefly authentication failed: Invalid response" in caplog.text
 
 
 @pytest.mark.asyncio
-async def test_form_auth_credentials_verification_failed(hass: HomeAssistant) -> None:
+async def test_form_auth_credentials_verification_failed(hass: HomeAssistant, caplog: pytest.LogCaptureFixture) -> None:
     """Test credentials verification failure."""
     # Start flow and get to auth step
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
@@ -278,6 +280,54 @@ async def test_form_auth_credentials_verification_failed(hass: HomeAssistant) ->
     assert result2["type"] == FlowResultType.FORM
     assert result2["step_id"] == "auth"
     assert result2["errors"] == {"base": "invalid_auth"}
+    assert "Firefly rejected the pasted token" in caplog.text
+    assert "test-secret" not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_form_auth_unexpected_response_shows_status_code(hass: HomeAssistant) -> None:
+    """Test a non-401 HTTP error during verification surfaces the status code."""
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
+
+    mock_school_info = {
+        "enabled": True,
+        "name": "Test School",
+        "host": "testschool.fireflycloud.net",
+        "url": "https://testschool.fireflycloud.net",
+        "device_id": "test-device-123",
+    }
+
+    with (
+        patch(
+            "custom_components.firefly_cloud.config_flow.FireflyAPIClient.get_school_info",
+            return_value=mock_school_info,
+        ),
+        patch("homeassistant.helpers.aiohttp_client.async_get_clientsession"),
+    ):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {"school_code": "testschool"},
+        )
+
+    with (
+        patch(
+            "custom_components.firefly_cloud.config_flow.FireflyAPIClient.parse_authentication_response",
+            return_value={"secret": "test-secret", "user": {}},
+        ),
+        patch(
+            "custom_components.firefly_cloud.config_flow.FireflyAPIClient.verify_credentials",
+            side_effect=FireflyUnexpectedResponseError("Unexpected response", 503),
+        ),
+    ):
+        result2 = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {"auth_response": "mock_auth_response"},
+        )
+
+    assert result2["type"] == FlowResultType.FORM
+    assert result2["step_id"] == "auth"
+    assert result2["errors"] == {"base": "unexpected_response"}
+    assert result2["description_placeholders"]["status_code"] == "503"
 
 
 @pytest.mark.asyncio
@@ -455,6 +505,40 @@ async def test_reauth_flow_invalid_auth(hass: HomeAssistant, mock_config_entry) 
     assert result2["type"] == FlowResultType.FORM
     assert result2["step_id"] == "reauth_confirm"
     assert result2["errors"] == {"base": "invalid_auth"}
+
+
+@pytest.mark.asyncio
+async def test_reauth_flow_unexpected_response_shows_status_code(hass: HomeAssistant, mock_config_entry) -> None:
+    """Test reauthentication surfaces the HTTP status code of an unexpected response."""
+    hass.config_entries._entries[mock_config_entry.entry_id] = mock_config_entry
+
+    with (
+        patch("homeassistant.helpers.aiohttp_client.async_get_clientsession"),
+        patch.object(hass.config_entries, "async_get_entry", return_value=mock_config_entry),
+        patch(
+            "custom_components.firefly_cloud.config_flow.FireflyAPIClient.parse_authentication_response",
+            return_value={"secret": "test-secret", "user": {}},
+        ),
+        patch(
+            "custom_components.firefly_cloud.config_flow.FireflyAPIClient.verify_credentials",
+            side_effect=FireflyUnexpectedResponseError("Unexpected response", 403),
+        ),
+    ):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN,
+            context={"source": config_entries.SOURCE_REAUTH, "entry_id": mock_config_entry.entry_id},
+            data=mock_config_entry.data,
+        )
+
+        result2 = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {"auth_response": "mock_auth_response"},
+        )
+
+    assert result2["type"] == FlowResultType.FORM
+    assert result2["step_id"] == "reauth_confirm"
+    assert result2["errors"] == {"base": "unexpected_response"}
+    assert result2["description_placeholders"]["status_code"] == "403"
 
 
 @pytest.mark.asyncio

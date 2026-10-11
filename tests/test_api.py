@@ -14,6 +14,7 @@ from custom_components.firefly_cloud.exceptions import (
     FireflyRateLimitError,
     FireflySchoolNotFoundError,
     FireflyTokenExpiredError,
+    FireflyUnexpectedResponseError,
 )
 
 
@@ -880,20 +881,22 @@ async def test_verify_credentials_client_response_error_401(api_client, mock_aio
 
 
 @pytest.mark.asyncio
-async def test_verify_credentials_client_response_error_other(api_client, mock_aiohttp_session):
-    """Test credential verification with non-401 client response error."""
+@pytest.mark.parametrize("status", [403, 500, 503])
+async def test_verify_credentials_client_response_error_other(api_client, mock_aiohttp_session, status):
+    """Test credential verification with non-401 client response error keeps the status code."""
     import aiohttp
 
     from tests.conftest import mock_http_response
 
     mock_aiohttp_session._mock_responses["get"] = mock_http_response(
         raise_for_status_exception=aiohttp.ClientResponseError(
-            request_info=AsyncMock(), history=(), status=500, message="Server Error"
+            request_info=AsyncMock(), history=(), status=status, message="Server Error"
         )
     )
 
-    with pytest.raises(FireflyAuthenticationError, match="Authentication error"):
+    with pytest.raises(FireflyUnexpectedResponseError, match="Unexpected response") as exc_info:
         await api_client.verify_credentials()
+    assert exc_info.value.status_code == status
 
 
 @pytest.mark.asyncio
@@ -1130,3 +1133,71 @@ async def test_get_events_rest_api_date_filtering(api_client, mock_aiohttp_sessi
     assert len(result) == 2
     assert result[0]["subject"] == "In Range 1"
     assert result[1]["subject"] == "In Range 2"
+
+
+_TOKEN_XML = (
+    "<token><secret>abc123</secret>"
+    '<user username="u" fullname="F L" email="e@test.com" role="parent" guid="g-1"/>'
+    '<installation name="Firefly 6" version="6.136.10"/></token>'
+)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "pasted",
+    [
+        pytest.param(_TOKEN_XML, id="plain"),
+        pytest.param('<?xml version="1.0" encoding="utf-8"?>' + _TOKEN_XML, id="xml-declaration"),
+        pytest.param("﻿" + _TOKEN_XML, id="byte-order-mark"),
+        pytest.param(_TOKEN_XML.replace("><", ">\n  <"), id="indented"),
+        pytest.param('"' + _TOKEN_XML.replace('"', '\\"') + '"', id="quoted-and-escaped"),
+        pytest.param(_TOKEN_XML.replace("<", "&lt;").replace(">", "&gt;"), id="html-escaped"),
+        pytest.param(
+            "This XML file does not appear to have any style information associated with it.\n"
+            "The document tree is shown below.\n" + _TOKEN_XML,
+            id="browser-preface",
+        ),
+        pytest.param(_TOKEN_XML.replace("abc123", "\n  abc123 \n"), id="secret-whitespace"),
+        pytest.param(
+            _TOKEN_XML.replace("<user", "<data><user").replace("/><installation", "/></data><installation"),
+            id="nested-user",
+        ),
+    ],
+)
+async def test_parse_authentication_response_tolerates_paste_variants(api_client, pasted):
+    """Pasting the token from different browser views should still authenticate."""
+    result = await api_client.parse_authentication_response(pasted)
+
+    assert result["secret"] == "abc123"
+    assert result["user"]["guid"] == "g-1"
+
+
+@pytest.mark.asyncio
+async def test_parse_authentication_response_whitespace_only_secret(api_client):
+    """A secret containing only whitespace is treated as empty."""
+    xml_response = _TOKEN_XML.replace("abc123", "   ")
+
+    with pytest.raises(FireflyAuthenticationError, match="Empty secret"):
+        await api_client.parse_authentication_response(xml_response)
+
+
+@pytest.mark.asyncio
+async def test_verify_credentials_accepts_non_json_content_type(api_client, mock_aiohttp_session):
+    """The verify endpoint's body is parsed as JSON whatever its content type."""
+    from tests.conftest import mock_http_response
+
+    response = mock_http_response(json_data={"valid": True}, status=200)
+    mock_aiohttp_session._mock_responses["get"] = response
+
+    assert await api_client.verify_credentials() is True
+    response.json.assert_awaited_once_with(content_type=None)
+
+
+@pytest.mark.asyncio
+async def test_verify_credentials_not_valid(api_client, mock_aiohttp_session):
+    """A 200 response reporting valid=false is a failed verification."""
+    from tests.conftest import mock_http_response
+
+    mock_aiohttp_session._mock_responses["get"] = mock_http_response(json_data={"valid": False}, status=200)
+
+    assert await api_client.verify_credentials() is False

@@ -31,6 +31,15 @@ class FireflyAPIError(FireflyException):
     """API returned an error response."""
 
 
+class FireflyUnexpectedResponseError(FireflyException):
+    """Firefly returned an unexpected HTTP status."""
+
+    def __init__(self, message: str, status_code: int) -> None:
+        """Initialise with the HTTP status code Firefly returned."""
+        super().__init__(message)
+        self.status_code = status_code
+
+
 class FireflyTokenExpiredError(FireflyAuthenticationError):
     """Authentication token has expired."""
 
