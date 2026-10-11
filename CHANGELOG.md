@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.6.3](https://github.com/matt-richardson/home-assistant-firefly-cloud/compare/v0.6.2...v0.6.3) (2026-10-11)
+
+
+### Bug Fixes
+
+* log authentication failures, tolerate more token paste formats, and show HTTP status on verification errors ([#38](https://github.com/matt-richardson/home-assistant-firefly-cloud/issues/38)) ([8d4ed7c](https://github.com/matt-richardson/home-assistant-firefly-cloud/commit/8d4ed7c8da3ee0a2f17d97e8e78924490e32089a)), closes [#37](https://github.com/matt-richardson/home-assistant-firefly-cloud/issues/37)
+
 ## [0.6.2](https://github.com/matt-richardson/home-assistant-firefly-cloud/compare/v0.6.1...v0.6.2) (2026-06-20)
 
 
