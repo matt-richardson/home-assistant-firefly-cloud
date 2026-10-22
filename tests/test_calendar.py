@@ -5,15 +5,12 @@ from types import MappingProxyType
 from unittest.mock import MagicMock
 
 import pytest
-from homeassistant.components.calendar import CalendarEvent
 from conftest import create_config_entry_with_version_compat
+from homeassistant.components.calendar import CalendarEvent
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
 
-from custom_components.firefly_cloud.calendar import (
-    FireflyCalendar,
-    async_setup_entry,
-)
+from custom_components.firefly_cloud.calendar import FireflyCalendar, async_setup_entry
 from custom_components.firefly_cloud.const import (
     CONF_CHILDREN_GUIDS,
     CONF_DEVICE_ID,

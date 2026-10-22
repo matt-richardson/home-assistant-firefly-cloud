@@ -528,12 +528,13 @@ async def test_async_setup_entry_creates_api_client_correctly(
 @pytest.mark.asyncio
 async def test_async_migrate_entry_version_1(hass: HomeAssistant):
     """Test migration of config entry at version 1 (no-op)."""
-    from custom_components.firefly_cloud import async_migrate_entry
-    from conftest import create_config_entry_with_version_compat
-
-    # Create a config entry at version 1
     from types import MappingProxyType
 
+    from conftest import create_config_entry_with_version_compat
+
+    from custom_components.firefly_cloud import async_migrate_entry
+
+    # Create a config entry at version 1
     config_entry = create_config_entry_with_version_compat(
         domain=DOMAIN,
         title="Test School - User",

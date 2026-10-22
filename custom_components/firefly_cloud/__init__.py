@@ -20,11 +20,7 @@ from .const import (
     DOMAIN,
 )
 from .coordinator import FireflyUpdateCoordinator
-from .exceptions import (
-    FireflyAuthenticationError,
-    FireflyConnectionError,
-    FireflyTokenExpiredError,
-)
+from .exceptions import FireflyAuthenticationError, FireflyConnectionError, FireflyTokenExpiredError
 
 _LOGGER = logging.getLogger(__name__)
 

@@ -8,11 +8,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import (
-    CONF_CHILDREN_GUIDS,
-    CONF_USER_GUID,
-    DOMAIN,
-)
+from .const import CONF_CHILDREN_GUIDS, CONF_USER_GUID, DOMAIN
 from .coordinator import FireflyUpdateCoordinator
 from .entity import FireflyBaseEntity
 
