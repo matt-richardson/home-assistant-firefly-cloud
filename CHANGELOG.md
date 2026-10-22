@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.7.0](https://github.com/matt-richardson/home-assistant-firefly-cloud/compare/v0.6.3...v0.7.0) (2026-10-22)
+
+
+### Features
+
+* Add local brand assets ([#40](https://github.com/matt-richardson/home-assistant-firefly-cloud/issues/40)) ([b3bbaff](https://github.com/matt-richardson/home-assistant-firefly-cloud/commit/b3bbaff58a10539ae67816cbfe8df86fc84ce853))
+
 ## [0.6.3](https://github.com/matt-richardson/home-assistant-firefly-cloud/compare/v0.6.2...v0.6.3) (2026-10-11)
 
 
