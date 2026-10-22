@@ -121,6 +121,7 @@ def get_offset_time() -> "datetime.datetime":
         datetime: Current UTC time with TIME_OFFSET_DAYS and TIME_OFFSET_HOURS applied.
     """
     from datetime import timedelta
+
     from homeassistant.util import dt as dt_util
 
     base_time = dt_util.now()

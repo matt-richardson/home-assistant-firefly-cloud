@@ -23,10 +23,7 @@ from custom_components.firefly_cloud.const import (
     SENSOR_TYPES,
     SENSOR_UPCOMING_TASKS,
 )
-from custom_components.firefly_cloud.sensor import (
-    FireflySensor,
-    async_setup_entry,
-)
+from custom_components.firefly_cloud.sensor import FireflySensor, async_setup_entry
 
 
 @pytest.fixture
@@ -970,6 +967,7 @@ async def test_class_sensors_with_no_events(mock_coordinator, mock_config_entry)
 async def test_next_class_during_last_class_of_day(mock_coordinator, mock_config_entry):
     """Test next class sensor shows None when in the last class of the day."""
     from datetime import timedelta
+
     from custom_components.firefly_cloud.const import get_offset_time
 
     # Mock current time to be in the last class (Science 11am-12pm)
@@ -1021,6 +1019,7 @@ async def test_next_class_during_last_class_of_day(mock_coordinator, mock_config
 async def test_next_class_after_school_hours_shows_tomorrow(mock_coordinator, mock_config_entry):
     """Test next class sensor shows tomorrow's first class after school hours."""
     from datetime import timedelta
+
     from custom_components.firefly_cloud.const import get_offset_time
 
     # Mock current time to be after school (6pm)
@@ -1497,6 +1496,8 @@ async def test_next_class_not_in_class_with_time_prefix(mock_coordinator):
 @pytest.mark.asyncio
 async def test_class_times_show_local_timezone(mock_coordinator):
     """Test that class times are shown in local timezone, not UTC."""
+    from homeassistant.util import dt as dt_util
+
     from custom_components.firefly_cloud.const import (
         CONF_CHILDREN_GUIDS,
         CONF_DEVICE_ID,
@@ -1509,7 +1510,6 @@ async def test_class_times_show_local_timezone(mock_coordinator):
         DEFAULT_TASK_LOOKAHEAD_DAYS,
         DOMAIN,
     )
-    from homeassistant.util import dt as dt_util
 
     # Create config entry with time prefix enabled
     config_entry = create_config_entry_with_version_compat(
