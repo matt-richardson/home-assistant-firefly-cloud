@@ -2,7 +2,6 @@
 
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List
-from unittest.mock import AsyncMock
 
 import pytest
 from freezegun import freeze_time
@@ -17,53 +16,6 @@ from custom_components.firefly_cloud.exceptions import (
     FireflyTokenExpiredError,
 )
 from tests.conftest import firefly_due
-
-
-@pytest.fixture
-def mock_api():
-    """Return a mock API client."""
-    api = AsyncMock()
-
-    # Mock user info
-    api.get_user_info.return_value = {
-        "username": "john.doe",
-        "fullname": "John Doe",
-        "email": "john.doe@test.com",
-        "role": "student",
-        "guid": "test-user-123",
-    }
-
-    # Mock events - use offset time for consistency with coordinator
-    from custom_components.firefly_cloud.const import get_offset_time
-
-    now = get_offset_time().replace(tzinfo=None)  # Match test expectation format
-    api.get_events.return_value = [
-        {
-            "start": now.replace(hour=9, minute=0, second=0, microsecond=0).isoformat() + "Z",
-            "end": now.replace(hour=10, minute=0, second=0, microsecond=0).isoformat() + "Z",
-            "subject": "Mathematics",
-            "location": "Room 101",
-            "description": "Algebra lesson",
-            "guild": None,
-            "attendees": [],
-        }
-    ]
-
-    # Mock tasks
-    api.get_tasks.return_value = [
-        {
-            "guid": "task-1",
-            "title": "Math Homework",
-            "description": "Complete exercises 1-10",
-            "dueDate": firefly_due(2),
-            "setDate": (now - timedelta(days=1)).isoformat() + "Z",
-            "subject": {"name": "Mathematics"},
-            "completionStatus": "Todo",
-            "setter": {"name": "Mr. Smith"},
-        }
-    ]
-
-    return api
 
 
 @pytest.mark.asyncio
@@ -1850,9 +1802,6 @@ def test_overdue_handles_null_completion_status(date_coordinator):
     """A task with a null completionStatus is treated as not completed, without raising."""
     task = _task("2026-11-01T00:00:00") | {"completionStatus": None}
     assert len(date_coordinator._filter_overdue_tasks([task], date(2026, 11, 14))) == 1
-
-
-# --- Subjects from the timetable ----------------------------------------------
 
 
 def _week_event(code, subject):

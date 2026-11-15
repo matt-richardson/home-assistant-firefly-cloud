@@ -70,6 +70,60 @@ The entities provide rich data perfect for Home Assistant dashboard cards:
 - Calendar view of school events and deadlines
 - Interactive todo lists for task management
 
+## Dashboard cards
+
+The integration ships two dashboard cards. There's nothing extra to install: add them from the card picker (search "Firefly") or in YAML. Use one of each per child.
+
+### Tasks card
+
+<img src="docs/images/tasks-card.png" alt="Tasks card with overdue, due this week and later counts, and tasks showing dashboard and school date changes" width="440"> <img src="docs/images/task-dialog.png" alt="Change dialog for a task: Firefly's date, a new due date, a reason with quick reasons, and the task's history" width="420">
+
+Lists the child's open tasks with counts (overdue, due this week, later), the subject, teacher and how late or how far away each one is.
+
+Tap a task to change its due date or add a note, with an optional reason (quick reasons such as "Doing it in class today" are offered). The change counts straight away in the card and the sensors, and is always marked on the task. Firefly itself isn't changed: if the school later changes the date in Firefly, the school's date wins and the change moves into the task's history. Undo is kept in the history too.
+
+```yaml
+type: custom:firefly-tasks-card
+entity: todo.example_school_tasks_alex
+title: Alex's tasks          # optional
+changed_by_label: Alex       # optional: tags read "Alex moved from…" instead of "Changed on dashboard from…"
+```
+
+### Upcoming classes card
+
+<img src="docs/images/classes-card.png" alt="Upcoming classes card showing Monday's lessons with PE and Sport highlighted, and a strip of the school week with kit days and tasks due" width="440">
+
+Shows the next school day's lessons with times and rooms, with kit lessons such as PE highlighted. After the last lesson, at weekends and in holidays it moves on to the next day with lessons. A strip underneath shows the coming school days, with kit days and tasks due; tap a day to see it.
+
+```yaml
+type: custom:firefly-classes-card
+entity: todo.example_school_tasks_alex
+kit_subjects:                 # optional; default: PE, Physical Education, Sport, Games, Swimming
+  - PE
+  - Sport
+hide_subjects:                # optional; default: hide nothing
+  - Middle School Pastoral Program
+```
+
+### Services
+
+The tasks card uses these services, which you can also call from scripts and automations:
+
+- `firefly_cloud.set_task_due_date`: target the child's Firefly tasks list, and give `task_id` and a new `due_date` and/or a `reason`. A reason without a date is saved as a note.
+- `firefly_cloud.clear_task_due_date`: target the tasks list and give `task_id`. Undoes the change (kept in the history).
+
+```yaml
+action: firefly_cloud.set_task_due_date
+target:
+  entity_id: todo.example_school_tasks_alex
+data:
+  task_id: "69040"
+  due_date: "2026-11-18"
+  reason: Extended in class
+```
+
+Sensor task attributes include `firefly_due_date`, `due_date_changed` and `due_date_change_reason`; `due_date` is the date in force.
+
 ## Target Quality
 
 This integration is designed to meet Home Assistant's Silver-tier quality standards, including:

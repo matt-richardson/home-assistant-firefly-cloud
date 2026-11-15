@@ -20,6 +20,7 @@ from .exceptions import (
     FireflyTokenExpiredError,
 )
 from .subjects import class_subjects, with_subjects
+from .task_changes import TaskChangeStore, apply_changes, change_fields, firefly_task_id
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -27,12 +28,16 @@ _LOGGER = logging.getLogger(__name__)
 class FireflyUpdateCoordinator(DataUpdateCoordinator):  # pylint: disable=too-many-instance-attributes
     """Class to manage fetching Firefly data."""
 
+    # Declared so type checkers without Home Assistant's types know it (the rebuild assigns it directly)
+    data: Dict[str, Any]
+
     def __init__(
         self,
         hass: HomeAssistant,
         api: FireflyAPIClient,
         task_lookahead_days: int = DEFAULT_TASK_LOOKAHEAD_DAYS,
         children_guids: Optional[List[str]] = None,
+        change_store: Optional[TaskChangeStore] = None,
     ) -> None:
         """Initialize the coordinator."""
         super().__init__(
@@ -46,6 +51,10 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):  # pylint: disable=too-ma
         self.children_guids = children_guids or []
         self._user_info: Optional[Dict[str, Any]] = None
         self._children_info: Optional[List[Dict[str, Any]]] = None
+        self.change_store = change_store
+        # Raw Firefly data from the last successful fetch, per child, so dashboard
+        # changes can be re-applied without calling Firefly again
+        self._last_raw: Dict[str, Dict[str, Any]] = {}
 
         # Failure tracking for issue registry
         self.consecutive_failures = 0
@@ -203,28 +212,39 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):  # pylint: disable=too-ma
     async def _fetch_all_children_data(
         self, target_guids: List[str], date_ranges: Dict[str, datetime], now: datetime
     ) -> Dict[str, Dict[str, Any]]:
-        """Fetch data for all children."""
-        children_data = {}
+        """Fetch data for all children, then build it.
 
-        for child_guid in target_guids:
-            children_data[child_guid] = await self._fetch_child_data(child_guid, date_ranges, now)
-
+        Every child is fetched before any is built, so a failure part way through
+        leaves the stored dashboard changes and the last fetch exactly as they were.
+        """
+        raw_by_child = {guid: await self._fetch_child_raw(guid, date_ranges) for guid in target_guids}
+        children_data = {guid: self._build_child_data(guid, raw, now) for guid, raw in raw_by_child.items()}
+        self._last_raw = raw_by_child
         return children_data
 
-    async def _fetch_child_data(
-        self, child_guid: str, date_ranges: Dict[str, datetime], now: datetime
-    ) -> Dict[str, Any]:
-        """Fetch data for a single child."""
-        events_today = await self.api.get_events(date_ranges["today_start"], date_ranges["today_end"], child_guid)
-        events_calendar = await self.api.get_events(date_ranges["week_start"], date_ranges["calendar_end"], child_guid)
-        # Firefly tasks carry no subject; find it from the class they were set for
-        tasks = with_subjects(await self.api.get_tasks(student_guid=child_guid), class_subjects(events_calendar))
+    async def _fetch_child_raw(self, child_guid: str, date_ranges: Dict[str, datetime]) -> Dict[str, Any]:
+        """Fetch a single child's raw Firefly data."""
+        return {
+            "events_today": await self.api.get_events(date_ranges["today_start"], date_ranges["today_end"], child_guid),
+            "events_week": await self.api.get_events(
+                date_ranges["week_start"], date_ranges["calendar_end"], child_guid
+            ),
+            "tasks": await self.api.get_tasks(student_guid=child_guid),
+        }
+
+    def _build_child_data(self, child_guid: str, raw: Dict[str, Any], now: datetime) -> Dict[str, Any]:
+        """Build a child's data from raw Firefly data, applying dashboard due date changes."""
+        by_class = class_subjects(raw["events_week"])
+        if self.change_store is not None:
+            # Remembered, so tasks keep their subjects through holidays when the timetable is empty
+            by_class = self.change_store.remember_class_subjects(child_guid, by_class)
+        tasks = apply_changes(self.change_store, child_guid, with_subjects(raw["tasks"], by_class), now)
         today = now.date()
 
         return {
             "events": {
-                "today": self._process_events(events_today),
-                "week": self._process_events(events_calendar),
+                "today": self._process_events(raw["events_today"]),
+                "week": self._process_events(raw["events_week"]),
             },
             "tasks": {
                 "all": self._process_tasks(tasks),
@@ -234,6 +254,20 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):  # pylint: disable=too-ma
             },
             "name": self._extract_child_name(child_guid),
         }
+
+    async def async_rebuild_from_last_fetch(self) -> None:
+        """Re-apply dashboard changes to the last fetched data and push it out, without calling Firefly."""
+        if not self.data or not self._last_raw:
+            return
+        from .const import get_offset_time
+
+        now = get_offset_time()
+        children_data = {guid: self._build_child_data(guid, raw, now) for guid, raw in self._last_raw.items()}
+        # Update the entities without async_set_updated_data, which would reschedule the next
+        # Firefly poll (so every save would push it back) and, during an outage, mark the
+        # stale data as a successful update
+        self.data = {**self.data, "children_data": children_data}
+        self.async_update_listeners()
 
     def _log_update_statistics(self, target_guids: List[str], children_data: Dict[str, Dict[str, Any]]) -> None:
         """Log statistics about the update."""
@@ -314,7 +348,7 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):  # pylint: disable=too-ma
                         subject = subject_data
 
                 processed_task = {
-                    "id": task.get("guid", task.get("id", "unknown")),
+                    "id": firefly_task_id(task),
                     "title": task.get("title", "Untitled Task"),
                     "description": task.get("description", ""),
                     "due_date": due_date,
@@ -327,6 +361,7 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):  # pylint: disable=too-ma
                         else task.get("setter", "Unknown")
                     ),
                     "raw_data": task,  # Keep raw data for debugging
+                    **change_fields(task),
                 }
                 processed_tasks.append(processed_task)
             except (KeyError, TypeError) as err:

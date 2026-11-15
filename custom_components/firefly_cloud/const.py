@@ -20,6 +20,13 @@ CONF_SHOW_CLASS_TIMES = "show_class_times"
 # Defaults
 DEFAULT_SCAN_INTERVAL = timedelta(minutes=15)
 DEFAULT_TASK_LOOKAHEAD_DAYS = 7
+
+# Websocket command for the dashboard cards
+WS_TYPE_CHILD_OVERVIEW = f"{DOMAIN}/child_overview"
+
+# Dashboard cards, served by the integration
+FRONTEND_URL_BASE = "/firefly_cloud_frontend"
+CARD_FILENAME = "firefly-cards.js"
 DEFAULT_SHOW_CLASS_TIMES = False
 DEFAULT_APP_ID = "Home Assistant Firefly Cloud Integration"
 

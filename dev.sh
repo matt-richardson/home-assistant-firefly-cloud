@@ -11,6 +11,18 @@ case "$1" in
         echo "🧪 Running tests with coverage..."
         pytest tests/ --cov=custom_components.firefly_cloud --cov-report=html --cov-report=term-missing --cov-fail-under=95
         ;;
+    "node-setup")
+        echo "📦 Installing Node 22 into the venv (nodeenv)..."
+        nodeenv -p --node=22.23.5
+        ;;
+    "test-js")
+        if ! command -v node >/dev/null 2>&1; then
+            echo "❌ node not found. Activate the venv and run: ./dev.sh node-setup"
+            exit 1
+        fi
+        echo "🧪 Running card JavaScript tests..."
+        node --test "tests/js/**/*.test.mjs"
+        ;;
     "test-single")
         if [ -z "$2" ]; then
             echo "Usage: ./dev.sh test-single <test_function>"
@@ -88,6 +100,8 @@ case "$1" in
         echo "  test         - Run all tests"
         echo "  test-cov     - Run tests with coverage report (Silver tier: 95%+)"
         echo "  test-single  - Run a single test function"
+        echo "  node-setup   - Install Node 22 into the venv (for test-js)"
+        echo "  test-js      - Run the dashboard cards' JavaScript tests"
         echo "  lint         - Run all linting tools"
         echo "  format       - Format code with black and isort"
         echo "  ha-test      - Start Home Assistant test instance"

@@ -1573,3 +1573,61 @@ async def test_class_times_show_local_timezone(mock_coordinator):
             assert time_part.startswith(
                 expected_start
             ), f"Expected time to start with {expected_start} (local), but got {time_part}"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("sensor_type", "bucket", "list_key"),
+    [
+        (SENSOR_UPCOMING_TASKS, "upcoming", "tasks"),
+        (SENSOR_UPCOMING_TASKS, "overdue", "overdue_tasks"),
+        (SENSOR_TASKS_DUE_TODAY, "due_today", "tasks"),
+        (SENSOR_OVERDUE_TASKS, "overdue", "tasks"),
+    ],
+)
+async def test_task_attributes_include_change_fields(
+    mock_coordinator, mock_config_entry, sensor_type, bucket, list_key
+):
+    """Every task list shows Firefly's date and any dashboard change, but not the history."""
+    from datetime import date
+
+    from custom_components.firefly_cloud.const import get_offset_time
+
+    now = get_offset_time()
+    mock_coordinator.data["children_data"]["test-child-123"]["tasks"][bucket] = [
+        {
+            "id": "1",
+            "title": "Moved",
+            "description": "",
+            "due_date": now + timedelta(days=3),
+            "subject": "Design",
+            "setter": "Ms Rivera",
+            "firefly_due_date": date(2026, 11, 11),
+            "due_date_changed": True,
+            "due_date_change_reason": "Extended in class",
+            "change": {"active": {}, "ended": [], "school_changes": []},
+        }
+    ]
+
+    sensor = FireflySensor(mock_coordinator, mock_config_entry, sensor_type, "test-child-123")
+    [task] = sensor.extra_state_attributes[list_key]
+
+    assert task["firefly_due_date"] == "2026-11-11"
+    assert task["due_date_changed"] is True
+    assert task["due_date_change_reason"] == "Extended in class"
+    assert "change" not in task
+
+
+@pytest.mark.asyncio
+async def test_task_attributes_without_change_fields(mock_coordinator, mock_config_entry):
+    """Tasks processed without a change store report no change."""
+    from custom_components.firefly_cloud.const import get_offset_time
+
+    mock_coordinator.data["children_data"]["test-child-123"]["tasks"]["overdue"] = [
+        {"id": "1", "title": "Plain", "description": "", "due_date": get_offset_time(), "subject": "X", "setter": "Y"}
+    ]
+    sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_OVERDUE_TASKS, "test-child-123")
+    [task] = sensor.extra_state_attributes["tasks"]
+    assert task["firefly_due_date"] is None
+    assert task["due_date_changed"] is False
+    assert task["due_date_change_reason"] is None

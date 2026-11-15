@@ -56,6 +56,16 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
+def _change_attributes(task: Dict[str, Any]) -> Dict[str, Any]:
+    """Return a task's dashboard due date change fields for entity attributes (no history)."""
+    firefly_due = task.get("firefly_due_date")
+    return {
+        "firefly_due_date": firefly_due.isoformat() if firefly_due else None,
+        "due_date_changed": bool(task.get("due_date_changed")),
+        "due_date_change_reason": task.get("due_date_change_reason"),
+    }
+
+
 class FireflySensor(FireflyBaseEntity, SensorEntity):
     """Base Firefly sensor."""
 
@@ -168,6 +178,7 @@ class FireflySensor(FireflyBaseEntity, SensorEntity):
                 {
                     "title": task["title"],
                     "subject": task.get("subject", "Unknown"),
+                    **_change_attributes(task),
                     "due_date": task["due_date"].isoformat() if task["due_date"] else None,
                     "due_date_formatted": (task["due_date"].strftime("%A, %d %B %Y") if task["due_date"] else None),
                     "days_until_due": ((task["due_date"].date() - now.date()).days if task["due_date"] else None),
@@ -180,6 +191,7 @@ class FireflySensor(FireflyBaseEntity, SensorEntity):
                 {
                     "title": task["title"],
                     "subject": task.get("subject", "Unknown"),
+                    **_change_attributes(task),
                     "due_date_formatted": (task["due_date"].strftime("%A, %d %B %Y") if task["due_date"] else None),
                     "days_overdue": ((now.date() - task["due_date"].date()).days if task["due_date"] else 0),
                 }
@@ -196,6 +208,7 @@ class FireflySensor(FireflyBaseEntity, SensorEntity):
                 {
                     "title": task["title"],
                     "subject": task.get("subject", "Unknown"),
+                    **_change_attributes(task),
                     "setter": task["setter"],
                     "description": (
                         task["description"][:100] + "..."
@@ -219,6 +232,7 @@ class FireflySensor(FireflyBaseEntity, SensorEntity):
                 {
                     "title": task["title"],
                     "subject": task.get("subject", "Unknown"),
+                    **_change_attributes(task),
                     "due_date": task["due_date"].isoformat() if task["due_date"] else None,
                     "due_date_formatted": (task["due_date"].strftime("%A, %d %B %Y") if task["due_date"] else None),
                     "days_overdue": ((now.date() - task["due_date"].date()).days if task["due_date"] else 0),

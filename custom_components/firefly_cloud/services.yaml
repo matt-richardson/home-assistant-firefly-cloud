@@ -1,0 +1,32 @@
+set_task_due_date:
+  target:
+    entity:
+      integration: firefly_cloud
+      domain: todo
+  fields:
+    task_id:
+      required: true
+      example: "69040"
+      selector:
+        text:
+    due_date:
+      required: false
+      selector:
+        date:
+    reason:
+      required: false
+      example: "Doing it in class today"
+      selector:
+        text:
+
+clear_task_due_date:
+  target:
+    entity:
+      integration: firefly_cloud
+      domain: todo
+  fields:
+    task_id:
+      required: true
+      example: "69040"
+      selector:
+        text:

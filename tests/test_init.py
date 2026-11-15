@@ -30,6 +30,13 @@ from custom_components.firefly_cloud.exceptions import (
 )
 
 
+@pytest.fixture(autouse=True)
+def mock_register_frontend():
+    """Setup tests run without an HTTP server; card serving is covered in test_frontend.py."""
+    with patch("custom_components.firefly_cloud.async_register_frontend", new=AsyncMock()) as register:
+        yield register
+
+
 @pytest.mark.asyncio
 async def test_async_setup_entry_success(
     hass: HomeAssistant,
@@ -564,3 +571,115 @@ async def test_async_migrate_entry_version_1(hass: HomeAssistant):
     assert result is True
     # Version should still be 1
     assert config_entry.version == 1
+
+
+@pytest.mark.asyncio
+async def test_setup_loads_change_store_and_passes_it(
+    hass: HomeAssistant,
+    mock_config_entry: ConfigEntry,
+    mock_firefly_api: AsyncMock,
+) -> None:
+    """Setup loads the entry's task change store and gives it to the coordinator."""
+    with (
+        patch("custom_components.firefly_cloud.FireflyAPIClient", return_value=mock_firefly_api),
+        patch("custom_components.firefly_cloud.FireflyUpdateCoordinator") as mock_coordinator_class,
+        patch("custom_components.firefly_cloud.TaskChangeStore") as mock_store_class,
+        patch("homeassistant.helpers.aiohttp_client.async_get_clientsession"),
+        patch.object(hass.config_entries, "async_forward_entry_setups", return_value=True),
+    ):
+        mock_coordinator_class.return_value = AsyncMock()
+        mock_store_class.return_value.async_load = AsyncMock()
+
+        assert await async_setup_entry(hass, mock_config_entry) is True
+
+    mock_store_class.assert_called_once_with(hass, mock_config_entry.entry_id)
+    mock_store_class.return_value.async_load.assert_awaited_once()
+    assert mock_coordinator_class.call_args.kwargs["change_store"] is mock_store_class.return_value
+
+
+@pytest.mark.asyncio
+async def test_remove_entry_removes_store(hass: HomeAssistant, mock_config_entry: ConfigEntry) -> None:
+    """Removing the config entry deletes its saved task changes."""
+    from custom_components.firefly_cloud import async_remove_entry
+
+    with patch("custom_components.firefly_cloud.TaskChangeStore") as mock_store_class:
+        mock_store_class.return_value.async_remove = AsyncMock()
+        await async_remove_entry(hass, mock_config_entry)
+
+    mock_store_class.assert_called_once_with(hass, mock_config_entry.entry_id)
+    mock_store_class.return_value.async_remove.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_setup_registers_services_and_last_unload_removes_them(
+    hass: HomeAssistant,
+    mock_config_entry: ConfigEntry,
+    mock_firefly_api: AsyncMock,
+) -> None:
+    """The due date services exist while an entry is loaded and go when the last one unloads."""
+    with (
+        patch("custom_components.firefly_cloud.FireflyAPIClient", return_value=mock_firefly_api),
+        patch("custom_components.firefly_cloud.FireflyUpdateCoordinator", return_value=AsyncMock()),
+        patch("custom_components.firefly_cloud.TaskChangeStore") as mock_store_class,
+        patch("homeassistant.helpers.aiohttp_client.async_get_clientsession"),
+        patch.object(hass.config_entries, "async_forward_entry_setups", return_value=True),
+    ):
+        mock_store_class.return_value.async_load = AsyncMock()
+        await async_setup_entry(hass, mock_config_entry)
+
+    assert hass.services.has_service(DOMAIN, "set_task_due_date")
+    assert hass.services.has_service(DOMAIN, "clear_task_due_date")
+
+    with patch.object(hass.config_entries, "async_unload_platforms", return_value=True):
+        await async_unload_entry(hass, mock_config_entry)
+
+    assert not hass.services.has_service(DOMAIN, "set_task_due_date")
+
+
+@pytest.mark.asyncio
+async def test_setup_registers_frontend(
+    hass: HomeAssistant,
+    mock_config_entry: ConfigEntry,
+    mock_firefly_api: AsyncMock,
+    mock_register_frontend: AsyncMock,
+) -> None:
+    """Setup serves and registers the dashboard cards."""
+    with (
+        patch("custom_components.firefly_cloud.FireflyAPIClient", return_value=mock_firefly_api),
+        patch("custom_components.firefly_cloud.FireflyUpdateCoordinator", return_value=AsyncMock()),
+        patch("custom_components.firefly_cloud.TaskChangeStore") as mock_store_class,
+        patch("homeassistant.helpers.aiohttp_client.async_get_clientsession"),
+        patch.object(hass.config_entries, "async_forward_entry_setups", return_value=True),
+    ):
+        mock_store_class.return_value.async_load = AsyncMock()
+        await async_setup_entry(hass, mock_config_entry)
+
+    mock_register_frontend.assert_awaited_once_with(hass)
+
+
+@pytest.mark.asyncio
+async def test_unload_flushes_pending_changes(hass: HomeAssistant, mock_config_entry: ConfigEntry) -> None:
+    """Unloading writes any pending task change save before the entry goes away."""
+    coordinator = AsyncMock()
+    coordinator.change_store.async_flush = AsyncMock()
+    hass.data.setdefault(DOMAIN, {})[mock_config_entry.entry_id] = coordinator
+
+    with patch.object(hass.config_entries, "async_unload_platforms", return_value=True):
+        assert await async_unload_entry(hass, mock_config_entry) is True
+
+    coordinator.change_store.async_flush.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_unload_stops_coordinator_before_flushing(hass: HomeAssistant, mock_config_entry: ConfigEntry) -> None:
+    """The coordinator is shut down before the final save, so no poll can save after it."""
+    calls = []
+    coordinator = AsyncMock()
+    coordinator.async_shutdown = AsyncMock(side_effect=lambda: calls.append("shutdown"))
+    coordinator.change_store.async_flush = AsyncMock(side_effect=lambda: calls.append("flush"))
+    hass.data.setdefault(DOMAIN, {})[mock_config_entry.entry_id] = coordinator
+
+    with patch.object(hass.config_entries, "async_unload_platforms", return_value=True):
+        await async_unload_entry(hass, mock_config_entry)
+
+    assert calls == ["shutdown", "flush"]

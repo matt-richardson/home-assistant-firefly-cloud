@@ -425,6 +425,53 @@ def mock_aiohttp_session():
     return session
 
 
+@pytest.fixture
+def mock_api():
+    """Return a mock Firefly API client for coordinator tests."""
+    api = AsyncMock()
+
+    # Mock user info
+    api.get_user_info.return_value = {
+        "username": "john.doe",
+        "fullname": "John Doe",
+        "email": "john.doe@test.com",
+        "role": "student",
+        "guid": "test-user-123",
+    }
+
+    # Mock events - use offset time for consistency with coordinator
+    from custom_components.firefly_cloud.const import get_offset_time
+
+    now = get_offset_time().replace(tzinfo=None)  # Match test expectation format
+    api.get_events.return_value = [
+        {
+            "start": now.replace(hour=9, minute=0, second=0, microsecond=0).isoformat() + "Z",
+            "end": now.replace(hour=10, minute=0, second=0, microsecond=0).isoformat() + "Z",
+            "subject": "Mathematics",
+            "location": "Room 101",
+            "description": "Algebra lesson",
+            "guild": None,
+            "attendees": [],
+        }
+    ]
+
+    # Mock tasks
+    api.get_tasks.return_value = [
+        {
+            "guid": "task-1",
+            "title": "Math Homework",
+            "description": "Complete exercises 1-10",
+            "dueDate": firefly_due(2),
+            "setDate": (now - timedelta(days=1)).isoformat() + "Z",
+            "subject": {"name": "Mathematics"},
+            "completionStatus": "Todo",
+            "setter": {"name": "Mr. Smith"},
+        }
+    ]
+
+    return api
+
+
 def _use_time_zone(name: str):
     """Set Home Assistant's default time zone, restoring the previous one afterwards."""
     previous = dt_util.DEFAULT_TIME_ZONE
