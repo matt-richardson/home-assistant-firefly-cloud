@@ -320,7 +320,7 @@ async def test_todo_items_with_mixed_completion_status():
                             "description": "This is done",
                             "dueDate": "2023-12-31T23:59:59Z",
                             "subject": {"name": "Math"},
-                            "completionStatus": "Done",  # Completed
+                            "completion_status": "Completed",
                         },
                         {
                             "id": "pending456",
@@ -328,7 +328,7 @@ async def test_todo_items_with_mixed_completion_status():
                             "description": "Still to do",
                             "dueDate": "2023-12-25T12:00:00Z",
                             "subject": {"name": "English"},
-                            "completionStatus": "Todo",  # Not completed
+                            "completion_status": "Todo",
                         },
                     ],
                     "overdue": [],
