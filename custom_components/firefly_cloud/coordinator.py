@@ -1,7 +1,7 @@
 """Data update coordinator for Firefly Cloud integration."""
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from homeassistant.core import HomeAssistant
@@ -11,6 +11,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from .api import FireflyAPIClient
 from .const import DEFAULT_SCAN_INTERVAL, DEFAULT_TASK_LOOKAHEAD_DAYS, DOMAIN
+from .dates import local_midnight, parse_due_date
 from .exceptions import (
     FireflyAuthenticationError,
     FireflyConnectionError,
@@ -196,7 +197,6 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):  # pylint: disable=too-ma
             "today_end": today_start + timedelta(days=1),
             "week_start": today_start,
             "calendar_end": today_start + timedelta(days=30),
-            "task_end": today_start + timedelta(days=self.task_lookahead_days),
         }
 
     async def _fetch_all_children_data(
@@ -217,6 +217,7 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):  # pylint: disable=too-ma
         events_today = await self.api.get_events(date_ranges["today_start"], date_ranges["today_end"], child_guid)
         events_calendar = await self.api.get_events(date_ranges["week_start"], date_ranges["calendar_end"], child_guid)
         tasks = await self.api.get_tasks(student_guid=child_guid)
+        today = now.date()
 
         return {
             "events": {
@@ -225,9 +226,9 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):  # pylint: disable=too-ma
             },
             "tasks": {
                 "all": self._process_tasks(tasks),
-                "due_today": self._filter_tasks_by_date(tasks, date_ranges["today_start"], date_ranges["today_end"]),
-                "upcoming": self._filter_tasks_by_date(tasks, now, date_ranges["task_end"]),
-                "overdue": self._filter_overdue_tasks(tasks, now),
+                "due_today": self._filter_tasks_by_date(tasks, today, today + timedelta(days=1)),
+                "upcoming": self._filter_tasks_by_date(tasks, today, today + timedelta(days=self.task_lookahead_days)),
+                "overdue": self._filter_overdue_tasks(tasks, today),
             },
             "name": self._extract_child_name(child_guid),
         }
@@ -287,17 +288,10 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):  # pylint: disable=too-ma
 
         for task in tasks:
             try:
-                due_date_str = task.get("dueDate")
                 set_date_str = task.get("setDate")
 
-                # Handle due date parsing with fallback for invalid dates
-                due_date = None
-                if due_date_str:
-                    try:
-                        due_date = datetime.fromisoformat(due_date_str.replace("Z", "+00:00"))
-                    except (ValueError, TypeError):
-                        _LOGGER.debug("Invalid due date format: %s", due_date_str)
-                        due_date = None
+                due_day = parse_due_date(task.get("dueDate"))
+                due_date = local_midnight(due_day) if due_day else None
 
                 # Handle set date parsing with fallback
                 set_date = None
@@ -339,69 +333,24 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):  # pylint: disable=too-ma
 
         return processed_tasks
 
-    def _filter_tasks_by_date(
-        self, tasks: List[Dict[str, Any]], start: datetime, end: datetime
-    ) -> List[Dict[str, Any]]:
-        """Filter tasks by date range."""
+    def _filter_tasks_by_date(self, tasks: List[Dict[str, Any]], start: date, end: date) -> List[Dict[str, Any]]:
+        """Return processed tasks whose local due date is in [start, end)."""
         filtered_tasks = []
-
-        # Ensure start and end are timezone-aware for comparison
-        if start.tzinfo is None:
-            start = start.replace(tzinfo=timezone.utc)
-        if end.tzinfo is None:
-            end = end.replace(tzinfo=timezone.utc)
-
         for task in tasks:
-            due_date_str = task.get("dueDate")
-            if not due_date_str:
-                continue
-
-            try:
-                # Parse the due date and ensure it's timezone-aware
-                if due_date_str.endswith("Z"):
-                    due_date = datetime.fromisoformat(due_date_str.replace("Z", "+00:00"))
-                else:
-                    # If no timezone info, parse as naive then add UTC timezone
-                    due_date = datetime.fromisoformat(due_date_str)
-                    if due_date.tzinfo is None:
-                        due_date = due_date.replace(tzinfo=timezone.utc)
-
-                if start <= due_date < end:
-                    filtered_tasks.append(task)
-            except ValueError:
-                continue
-
+            due_day = parse_due_date(task.get("dueDate"))
+            if due_day is not None and start <= due_day < end:
+                filtered_tasks.append(task)
         return self._process_tasks(filtered_tasks)
 
-    def _filter_overdue_tasks(self, tasks: List[Dict[str, Any]], now: datetime) -> List[Dict[str, Any]]:
-        """Filter overdue tasks."""
+    def _filter_overdue_tasks(self, tasks: List[Dict[str, Any]], today: date) -> List[Dict[str, Any]]:
+        """Return processed, uncompleted tasks whose local due date is before today."""
         overdue_tasks = []
-
         for task in tasks:
-            due_date_str = task.get("dueDate")
-            completion_status = task.get("completionStatus", "")
-
-            if not due_date_str or completion_status.lower() == "completed":
+            if (task.get("completionStatus") or "").lower() == "completed":
                 continue
-
-            try:
-                if due_date_str.endswith("Z"):
-                    due_date = datetime.fromisoformat(due_date_str.replace("Z", "+00:00"))
-                else:
-                    # If no timezone info, parse as naive then add UTC timezone
-                    due_date = datetime.fromisoformat(due_date_str)
-                    if due_date.tzinfo is None:
-                        due_date = due_date.replace(tzinfo=timezone.utc)
-
-                # Ensure now is timezone-aware
-                if now.tzinfo is None:
-                    now = now.replace(tzinfo=timezone.utc)
-
-                if due_date < now:
-                    overdue_tasks.append(task)
-            except ValueError:
-                continue
-
+            due_day = parse_due_date(task.get("dueDate"))
+            if due_day is not None and due_day < today:
+                overdue_tasks.append(task)
         return self._process_tasks(overdue_tasks)
 
     def get_events_for_day(self, target_date: datetime) -> List[Dict[str, Any]]:

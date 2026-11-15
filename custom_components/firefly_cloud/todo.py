@@ -110,15 +110,14 @@ class FireflyTodoListEntity(FireflyBaseEntity, TodoListEntity):
         title = task_data.get("title", "Untitled Task")
         summary = title
 
-        # Handle due date - convert date to datetime if needed
+        # Due dates are calendar dates (local midnight), so report a date with no time
         due = None
         if task_data.get("due_date"):
             due_date = task_data["due_date"]
             if isinstance(due_date, datetime):
-                due = due_date
+                due = due_date.date()
             elif isinstance(due_date, date):
-                # Convert date to datetime at midnight
-                due = datetime.combine(due_date, datetime.min.time())
+                due = due_date
 
         # Create description with additional details
         description_parts = []

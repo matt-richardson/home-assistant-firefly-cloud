@@ -1,6 +1,6 @@
 """Test the Firefly Cloud todo platform."""
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from unittest.mock import Mock
 
 import pytest
@@ -10,6 +10,7 @@ from homeassistant.core import HomeAssistant
 
 from custom_components.firefly_cloud.const import CONF_SCHOOL_NAME, CONF_USER_GUID, DOMAIN
 from custom_components.firefly_cloud.coordinator import FireflyUpdateCoordinator
+from custom_components.firefly_cloud.dates import local_midnight
 from custom_components.firefly_cloud.todo import FireflyTodoListEntity
 
 
@@ -156,11 +157,20 @@ class TestFireflyTodoListEntity:
 
         assert item.summary == "Science Project"
         assert item.status == TodoItemStatus.NEEDS_ACTION
-        assert item.due == datetime(2023, 12, 25, 9, 0, 0, tzinfo=timezone.utc)
+        assert item.due == date(2023, 12, 25)
         assert "Type: project" in item.description
         assert "Set by: Ms. Johnson" in item.description
         assert "Build a volcano model" in item.description
         assert len(item.uid) <= 50  # Ensure UID is within limits
+
+    def test_todo_due_is_date(self, todo_entity, melbourne):
+        """The todo due is the local calendar date, with no time."""
+        task_data = {"id": "1", "title": "T", "due_date": local_midnight(date(2026, 11, 20))}
+
+        item = todo_entity._create_todo_item(task_data, TodoItemStatus.NEEDS_ACTION)
+
+        assert item.due == date(2026, 11, 20)
+        assert not isinstance(item.due, datetime)
 
     def test_create_todo_item_minimal_data(self, todo_entity):
         """Test creating todo item with minimal data."""

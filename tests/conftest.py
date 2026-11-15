@@ -1,6 +1,7 @@
 """Test configuration for Firefly Cloud integration."""
 
 import inspect
+import zoneinfo
 from contextlib import ExitStack
 from datetime import datetime, timedelta
 from types import MappingProxyType
@@ -9,6 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 import pytest_asyncio
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.util import dt as dt_util
 
 from custom_components.firefly_cloud.const import (
     CONF_CHILDREN_GUIDS,
@@ -22,6 +24,13 @@ from custom_components.firefly_cloud.const import (
     DEFAULT_TASK_LOOKAHEAD_DAYS,
     DOMAIN,
 )
+
+
+def firefly_due(days_from_today: int) -> str:
+    """Return a due date as Firefly sends it: a local calendar date with no timezone."""
+    from custom_components.firefly_cloud.const import get_offset_time
+
+    return f"{(get_offset_time().date() + timedelta(days=days_from_today)).isoformat()}T00:00:00"
 
 
 def create_config_entry_with_version_compat(**kwargs):
@@ -218,15 +227,13 @@ def mock_events():
 def mock_tasks():
     """Return mock task data."""
     now = datetime.now()
-    tomorrow = now + timedelta(days=1)
-    next_week = now + timedelta(days=7)
 
     return [
         {
             "guid": "task-1",
             "title": "Math Homework - Chapter 5",
             "description": "Complete exercises 1-20 from Chapter 5",
-            "dueDate": tomorrow.isoformat() + "Z",
+            "dueDate": firefly_due(1),
             "setDate": (now - timedelta(days=1)).isoformat() + "Z",
             "subject": {"name": "Mathematics"},
             "completionStatus": "Todo",
@@ -236,7 +243,7 @@ def mock_tasks():
             "guid": "task-2",
             "title": "History Essay - World War II",
             "description": "Write a 1000-word essay on WWII causes",
-            "dueDate": next_week.isoformat() + "Z",
+            "dueDate": firefly_due(7),
             "setDate": (now - timedelta(days=3)).isoformat() + "Z",
             "subject": {"name": "History"},
             "completionStatus": "Todo",
@@ -246,7 +253,7 @@ def mock_tasks():
             "guid": "task-3",
             "title": "Science Test Preparation",
             "description": "Study for chemistry test",
-            "dueDate": (now + timedelta(days=3)).isoformat() + "Z",
+            "dueDate": firefly_due(3),
             "setDate": now.isoformat() + "Z",
             "subject": {"name": "Science"},
             "completionStatus": "Todo",
@@ -416,3 +423,25 @@ def mock_aiohttp_session():
     session.post = MagicMock(side_effect=create_context_manager_for_post)
 
     return session
+
+
+def _use_time_zone(name: str):
+    """Set Home Assistant's default time zone, restoring the previous one afterwards."""
+    previous = dt_util.DEFAULT_TIME_ZONE
+    dt_util.set_default_time_zone(zoneinfo.ZoneInfo(name))
+    try:
+        yield
+    finally:
+        dt_util.set_default_time_zone(previous)
+
+
+@pytest.fixture
+def melbourne():
+    """Run the test with Home Assistant set to Australia/Melbourne."""
+    yield from _use_time_zone("Australia/Melbourne")
+
+
+@pytest.fixture
+def new_york():
+    """Run the test with Home Assistant set to America/New_York."""
+    yield from _use_time_zone("America/New_York")
