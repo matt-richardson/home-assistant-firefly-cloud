@@ -9,8 +9,9 @@ from homeassistant.components import websocket_api
 from homeassistant.config_entries import SOURCE_REAUTH, ConfigEntryState
 from homeassistant.core import HomeAssistant, callback
 
+from . import dates
 from .child_lookup import firefly_todo_child, resolve_child
-from .const import DOMAIN, WS_TYPE_CHILD_OVERVIEW, get_offset_time
+from .const import DOMAIN, WS_TYPE_CHILD_OVERVIEW
 from .overview import build_overview
 
 DATA_REGISTERED = f"{DOMAIN}_websocket_registered"
@@ -46,7 +47,7 @@ def ws_child_overview(hass: HomeAssistant, connection: websocket_api.ActiveConne
     if child_data is None:
         connection.send_error(msg["id"], ERROR_NOT_READY, "Firefly data isn't loaded yet")
         return
-    today = get_offset_time().date()
+    today = dates.get_offset_time().date()
     connection.send_result(msg["id"], build_overview(child_data, today, coordinator.task_lookahead_days))
 
 

@@ -9,6 +9,7 @@ from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
+from . import dates
 from .api import FireflyAPIClient
 from .const import DEFAULT_SCAN_INTERVAL, DEFAULT_TASK_LOOKAHEAD_DAYS, DOMAIN
 from .dates import local_midnight, parse_due_date
@@ -81,9 +82,7 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):  # pylint: disable=too-ma
             await self._ensure_user_and_children_info()
 
             # Calculate date ranges and fetch data
-            from .const import get_offset_time
-
-            now = get_offset_time()
+            now = dates.get_offset_time()
             date_ranges = self._calculate_date_ranges(now)
             # _ensure_user_and_children_info guarantees _user_info is not None
             assert self._user_info is not None
@@ -259,9 +258,7 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):  # pylint: disable=too-ma
         """Re-apply dashboard changes to the last fetched data and push it out, without calling Firefly."""
         if not self.data or not self._last_raw:
             return
-        from .const import get_offset_time
-
-        now = get_offset_time()
+        now = dates.get_offset_time()
         children_data = {guid: self._build_child_data(guid, raw, now) for guid, raw in self._last_raw.items()}
         # Update the entities without async_set_updated_data, which would reschedule the next
         # Firefly poll (so every save would push it back) and, during an outage, mark the

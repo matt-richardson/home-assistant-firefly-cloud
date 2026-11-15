@@ -8,9 +8,11 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import CONF_CHILDREN_GUIDS, CONF_USER_GUID, DOMAIN
+from . import dates
+from .const import DOMAIN
 from .coordinator import FireflyUpdateCoordinator
 from .entity import FireflyBaseEntity
+from .entry_config import child_guids
 
 
 async def async_setup_entry(
@@ -21,15 +23,10 @@ async def async_setup_entry(
     """Set up Firefly Cloud calendar platform."""
     coordinator: FireflyUpdateCoordinator = hass.data[DOMAIN][config_entry.entry_id]
 
-    # Get children GUIDs from config or use user GUID if no children
-    children_guids = config_entry.data.get(CONF_CHILDREN_GUIDS, [])
-    if not children_guids:
-        children_guids = [config_entry.data[CONF_USER_GUID]]
-
     # Create calendar entities for each child
     entities: List[CalendarEntity] = []
 
-    for child_guid in children_guids:
+    for child_guid in child_guids(config_entry):
         entities.append(
             FireflyCalendar(
                 coordinator=coordinator,
@@ -81,9 +78,7 @@ class FireflyCalendar(FireflyBaseEntity, CalendarEntity):  # pylint: disable=abs
         if not events:
             return None
 
-        from .const import get_offset_time
-
-        now = get_offset_time()
+        now = dates.get_offset_time()
 
         # Find current event
         for event in events:

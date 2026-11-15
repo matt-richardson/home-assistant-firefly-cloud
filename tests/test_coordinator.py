@@ -131,7 +131,7 @@ async def test_coordinator_process_tasks(hass: HomeAssistant, mock_api):
 async def test_coordinator_filter_tasks_due_today(hass: HomeAssistant, mock_api):
     """Test filtering tasks due today."""
     # Mock task due today - use offset time to match coordinator behavior
-    from custom_components.firefly_cloud.const import get_offset_time
+    from custom_components.firefly_cloud.dates import get_offset_time
 
     now_utc = get_offset_time()
     task_due_today = {
@@ -166,7 +166,7 @@ async def test_coordinator_filter_tasks_due_today(hass: HomeAssistant, mock_api)
 async def test_coordinator_filter_overdue_tasks(hass: HomeAssistant, mock_api):
     """Test filtering overdue tasks."""
     # Mock overdue task - use offset time to match coordinator behavior
-    from custom_components.firefly_cloud.const import get_offset_time
+    from custom_components.firefly_cloud.dates import get_offset_time
 
     now_utc = get_offset_time()
     overdue_task = {
@@ -278,7 +278,7 @@ async def test_coordinator_partial_failure_recovery(hass: HomeAssistant, mock_ap
 async def test_coordinator_task_lookahead_filtering(hass: HomeAssistant, mock_api):
     """Test task filtering based on lookahead days."""
     # Use offset time to match coordinator behavior
-    from custom_components.firefly_cloud.const import get_offset_time
+    from custom_components.firefly_cloud.dates import get_offset_time
 
     now_utc = get_offset_time()
 
@@ -344,7 +344,7 @@ async def test_coordinator_shutdown(hass: HomeAssistant, mock_api):
 async def test_coordinator_multiple_event_days(hass: HomeAssistant, mock_api):
     """Test coordinator with events spanning multiple days."""
     # Use offset time to match coordinator behavior
-    from custom_components.firefly_cloud.const import get_offset_time
+    from custom_components.firefly_cloud.dates import get_offset_time
 
     now_utc = get_offset_time()
 
@@ -668,7 +668,7 @@ async def test_coordinator_task_lookahead_zero_days(hass: HomeAssistant, mock_ap
 @pytest.mark.asyncio
 async def test_coordinator_completed_tasks_filtering(hass: HomeAssistant, mock_api):
     """Test coordinator filtering completed tasks."""
-    from custom_components.firefly_cloud.const import get_offset_time
+    from custom_components.firefly_cloud.dates import get_offset_time
 
     now = get_offset_time().replace(tzinfo=None)  # Match test format
 

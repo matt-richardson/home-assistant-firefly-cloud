@@ -31,7 +31,7 @@ def test_overview_result(coordinator):
     connection = MagicMock()
     with (
         patch("custom_components.firefly_cloud.websocket_api.resolve_child", return_value=(coordinator, CHILD)),
-        patch("custom_components.firefly_cloud.websocket_api.get_offset_time") as now,
+        patch("custom_components.firefly_cloud.dates.get_offset_time") as now,
         patch("custom_components.firefly_cloud.websocket_api.build_overview", return_value={"ok": 1}) as build,
     ):
         now.return_value.date.return_value = date(2026, 11, 14)

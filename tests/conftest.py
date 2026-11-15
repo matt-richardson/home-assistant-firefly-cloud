@@ -30,7 +30,7 @@ from custom_components.firefly_cloud.const import (
 
 def firefly_due(days_from_today: int) -> str:
     """Return a due date as Firefly sends it: a local calendar date with no timezone."""
-    from custom_components.firefly_cloud.const import get_offset_time
+    from custom_components.firefly_cloud.dates import get_offset_time
 
     return f"{(get_offset_time().date() + timedelta(days=days_from_today)).isoformat()}T00:00:00"
 
@@ -442,7 +442,7 @@ def mock_api():
     }
 
     # Mock events - use offset time for consistency with coordinator
-    from custom_components.firefly_cloud.const import get_offset_time
+    from custom_components.firefly_cloud.dates import get_offset_time
 
     now = get_offset_time().replace(tzinfo=None)  # Match test expectation format
     api.get_events.return_value = [
