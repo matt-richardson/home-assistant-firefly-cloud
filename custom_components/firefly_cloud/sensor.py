@@ -164,7 +164,7 @@ class FireflySensor(FireflyBaseEntity, SensorEntity):
             "tasks": [
                 {
                     "title": task.title,
-                    "subject": task.subject or UNKNOWN_SUBJECT,
+                    "subject": UNKNOWN_SUBJECT if task.subject is None else task.subject,
                     **_change_attributes(task),
                     "due_date": dates.local_midnight(task.due).isoformat() if task.due else None,
                     "due_date_formatted": (task.due.strftime("%A, %d %B %Y") if task.due else None),
@@ -177,7 +177,7 @@ class FireflySensor(FireflyBaseEntity, SensorEntity):
             "overdue_tasks": [
                 {
                     "title": task.title,
-                    "subject": task.subject or UNKNOWN_SUBJECT,
+                    "subject": UNKNOWN_SUBJECT if task.subject is None else task.subject,
                     **_change_attributes(task),
                     "due_date_formatted": (task.due.strftime("%A, %d %B %Y") if task.due else None),
                     "days_overdue": ((now.date() - task.due).days if task.due else 0),
@@ -192,7 +192,7 @@ class FireflySensor(FireflyBaseEntity, SensorEntity):
             "tasks": [
                 {
                     "title": task.title,
-                    "subject": task.subject or UNKNOWN_SUBJECT,
+                    "subject": UNKNOWN_SUBJECT if task.subject is None else task.subject,
                     **_change_attributes(task),
                     "setter": task.setter,
                     "description": _description(task),
@@ -209,7 +209,7 @@ class FireflySensor(FireflyBaseEntity, SensorEntity):
             "tasks": [
                 {
                     "title": task.title,
-                    "subject": task.subject or UNKNOWN_SUBJECT,
+                    "subject": UNKNOWN_SUBJECT if task.subject is None else task.subject,
                     **_change_attributes(task),
                     "due_date": dates.local_midnight(task.due).isoformat() if task.due else None,
                     "due_date_formatted": (task.due.strftime("%A, %d %B %Y") if task.due else None),

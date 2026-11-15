@@ -1528,3 +1528,17 @@ async def test_sensor_shows_unknown_subject_when_none(mock_coordinator, mock_con
     sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_UPCOMING_TASKS, "test-child-123")
     [task] = sensor.extra_state_attributes["tasks"]
     assert task["subject"] == "Unknown Subject"
+
+
+@pytest.mark.asyncio
+async def test_sensor_keeps_empty_subject(mock_coordinator, mock_config_entry):
+    """A task whose subject is an empty string shows it as-is."""
+    from custom_components.firefly_cloud.dates import get_offset_time
+
+    _set_child(
+        mock_coordinator,
+        tasks=(make_task("1", title="Blank subject", due=get_offset_time().date() + timedelta(days=1), subject=""),),
+    )
+    sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_UPCOMING_TASKS, "test-child-123")
+    [task] = sensor.extra_state_attributes["tasks"]
+    assert task["subject"] == ""
