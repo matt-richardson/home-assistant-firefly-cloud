@@ -1,6 +1,8 @@
 """Test configuration for Firefly Cloud integration."""
 
 import inspect
+import os
+import sys
 import zoneinfo
 from contextlib import ExitStack
 from datetime import datetime, timedelta
@@ -492,3 +494,27 @@ def melbourne():
 def new_york():
     """Run the test with Home Assistant set to America/New_York."""
     yield from _use_time_zone("America/New_York")
+
+
+# Python 3.14 on macOS segfaults while tearing down the interpreter after the full
+# suite has finished (all tests passed, reports written), which pops a
+# "Python quit unexpectedly" dialog and turns the exit code into 139. Skip that
+# teardown there by exiting straight after pytest is done. CI (Linux) is unaffected.
+_SKIP_INTERPRETER_TEARDOWN = sys.platform == "darwin" and sys.version_info >= (3, 14)
+_exit_status = 0
+
+
+def pytest_sessionfinish(session, exitstatus):  # pylint: disable=unused-argument
+    """Remember pytest's exit status for the early exit below."""
+    global _exit_status  # pylint: disable=global-statement
+    _exit_status = int(exitstatus)
+
+
+@pytest.hookimpl(trylast=True)
+def pytest_unconfigure(config):
+    """Exit without interpreter teardown on macOS + Python 3.14 (see above)."""
+    if not _SKIP_INTERPRETER_TEARDOWN or hasattr(config, "workerinput"):
+        return
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(_exit_status)  # pylint: disable=protected-access
