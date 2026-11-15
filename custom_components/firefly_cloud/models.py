@@ -9,12 +9,13 @@ from typing import Any
 
 from homeassistant.util import dt as dt_util
 
+from .const import TASK_STATUS_COMPLETED
 from .dates import parse_due_date
 
 UNKNOWN_SUBJECT = "Unknown Subject"
 
 
-def firefly_task_id(task: dict[str, Any]) -> Any:
+def _firefly_task_id(task: dict[str, Any]) -> Any:
     """Return a task's Firefly id (as used for todo items and dashboard changes)."""
     return task.get("guid", task.get("id", "unknown"))
 
@@ -53,7 +54,7 @@ class Lesson:
 
     start: datetime
     end: datetime
-    subject: str
+    subject: str | None
     location: str | None
     description: str | None
     guild: str | None
@@ -83,12 +84,12 @@ class Task:  # pylint: disable=too-many-instance-attributes
     """A homework task; ``due`` is the date in force and ``firefly_due`` is the school's."""
 
     id: str
-    title: str
-    description: str
+    title: str | None
+    description: str | None
     subject: str | None
     setter: Any
     set_at: datetime | None
-    completion_status: str
+    completion_status: str | None
     firefly_due: date | None
     due: date | None
     change: dict[str, Any] | None = None
@@ -116,7 +117,7 @@ class Task:  # pylint: disable=too-many-instance-attributes
 
         firefly_due = parse_due_date(raw.get("dueDate"))
         return cls(
-            id=str(firefly_task_id(raw)),
+            id=str(_firefly_task_id(raw)),
             title=raw.get("title", "Untitled Task"),
             description=raw.get("description", ""),
             subject=subject,
@@ -130,7 +131,7 @@ class Task:  # pylint: disable=too-many-instance-attributes
     @property
     def is_completed(self) -> bool:
         """Whether Firefly marks the task completed."""
-        return (self.completion_status or "").lower() == "completed"
+        return (self.completion_status or "").lower() == TASK_STATUS_COMPLETED.lower()
 
     @property
     def _active_change(self) -> dict[str, Any]:

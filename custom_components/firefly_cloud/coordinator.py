@@ -37,7 +37,7 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator[FireflyData]):  # pylint: d
         self,
         hass: HomeAssistant,
         api: FireflyAPIClient,
-        task_lookahead_days: int = DEFAULT_TASK_LOOKAHEAD_DAYS,
+        task_lookahead_days: float = DEFAULT_TASK_LOOKAHEAD_DAYS,
         children_guids: Optional[List[str]] = None,
         change_store: Optional[TaskChangeStore] = None,
     ) -> None:
@@ -247,7 +247,7 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator[FireflyData]):  # pylint: d
         for event in events:
             try:
                 lessons.append(Lesson.from_firefly(event))
-            except (ValueError, KeyError) as err:
+            except (ValueError, KeyError, TypeError, AttributeError) as err:
                 _LOGGER.warning("Error processing event data: %s", err)
         return tuple(sorted(lessons, key=lambda lesson: lesson.start))
 

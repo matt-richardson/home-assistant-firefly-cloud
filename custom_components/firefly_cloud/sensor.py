@@ -61,7 +61,7 @@ def _change_attributes(task: Task) -> Dict[str, Any]:
     }
 
 
-def _description(task: Task) -> str:
+def _description(task: Task) -> str | None:
     """Return a task's description, cut to 100 characters."""
     if task.description and len(task.description) > 100:
         return task.description[:100] + "..."
@@ -265,7 +265,7 @@ class FireflySensor(FireflyBaseEntity, SensorEntity):
         # If no current class, return "None" string
         return "None"
 
-    def _format_class_with_time(self, event: Lesson, show_times: bool) -> str:
+    def _format_class_with_time(self, event: Lesson, show_times: bool) -> str | None:
         """Format a class event with optional time prefix."""
         subject = event.subject
         if not show_times:
@@ -296,7 +296,7 @@ class FireflySensor(FireflyBaseEntity, SensorEntity):
         # Not in a class - find the next upcoming class
         return self._find_next_upcoming_class(events, now, show_times)
 
-    def _find_next_class_after_current(self, events: Sequence[Lesson], now: datetime, show_times: bool) -> str:
+    def _find_next_class_after_current(self, events: Sequence[Lesson], now: datetime, show_times: bool) -> str | None:
         """Find the next class when currently in a class."""
         current_date = now.date()
 
@@ -311,7 +311,7 @@ class FireflySensor(FireflyBaseEntity, SensorEntity):
 
         return "None"
 
-    def _find_next_upcoming_class(self, events: Sequence[Lesson], now: datetime, show_times: bool) -> str:
+    def _find_next_upcoming_class(self, events: Sequence[Lesson], now: datetime, show_times: bool) -> str | None:
         """Find the next upcoming class when not currently in a class."""
         upcoming_events = [event for event in events if event.start > now]
 

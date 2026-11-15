@@ -106,7 +106,7 @@ class FireflyCalendar(FireflyBaseEntity, CalendarEntity):  # pylint: disable=abs
         return CalendarEvent(
             start=lesson.start,
             end=lesson.end,
-            summary=lesson.subject,
+            summary=lesson.subject,  # type: ignore[arg-type]  # Firefly may send null
             description=self._build_event_description(lesson),
             location=lesson.location,
         )

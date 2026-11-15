@@ -631,6 +631,22 @@ async def test_coordinator_event_date_parsing_error(hass: HomeAssistant, mock_ap
 
 
 @pytest.mark.asyncio
+async def test_coordinator_skips_malformed_lessons_and_keeps_valid_ones(hass: HomeAssistant, mock_api):
+    """A lesson with non-iterable attendees or a null start is skipped, not fatal."""
+    mock_api.get_events.return_value = [
+        {"start": "2025-01-01T09:00:00Z", "end": "2025-01-01T10:00:00Z", "subject": "Bad attendees", "attendees": 5},
+        {"start": None, "end": "2025-01-01T11:00:00Z", "subject": "Null start"},
+        {"start": "2025-01-01T12:00:00Z", "end": "2025-01-01T13:00:00Z", "subject": "Valid"},
+    ]
+    coordinator = FireflyUpdateCoordinator(hass=hass, api=mock_api, task_lookahead_days=7)
+
+    data = await coordinator._async_update_data()
+
+    child_data = data.child(list(data.children)[0])
+    assert [lesson.subject for lesson in child_data.lessons] == ["Valid"]
+
+
+@pytest.mark.asyncio
 async def test_coordinator_task_lookahead_zero_days(hass: HomeAssistant, mock_api):
     """Test coordinator with zero lookahead days."""
     now = datetime.now()
