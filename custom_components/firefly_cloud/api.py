@@ -38,6 +38,9 @@ from .exceptions import (
 
 _LOGGER = logging.getLogger(__name__)
 
+# Safety limit on task listing pages (100 tasks each by default)
+MAX_TASK_PAGES = 20
+
 
 def _extract_token_xml(raw: str) -> str:
     """Normalise whatever the user pasted into the token XML document.
@@ -526,20 +529,40 @@ class FireflyAPIClient:
         archive_status: str = TASK_ARCHIVE_ALL,
         sorting_criteria: Optional[List[Dict[str, str]]] = None,
     ) -> List[Dict[str, Any]]:
-        """Get tasks/assignments."""
+        """Get tasks/assignments, fetching every page up to Firefly's totalCount.
+
+        Fetching them all matters: a task missing from the listing is treated as
+        submitted, which drops any due date change saved for it.
+        """
         if sorting_criteria is None:
             sorting_criteria = [{"column": "DueDate", "order": "Descending"}]
 
-        payload = self._build_tasks_payload(
-            student_guid=student_guid,
-            page=page,
-            page_size=page_size,
-            completion_status=completion_status,
-            owner_type=owner_type,
-            archive_status=archive_status,
-            sorting_criteria=sorting_criteria,
-        )
+        tasks: List[Dict[str, Any]] = []
+        for page_number in range(page, page + MAX_TASK_PAGES):
+            payload = self._build_tasks_payload(
+                student_guid=student_guid,
+                page=page_number,
+                page_size=page_size,
+                completion_status=completion_status,
+                owner_type=owner_type,
+                archive_status=archive_status,
+                sorting_criteria=sorting_criteria,
+            )
+            data = await self._post_task_listing(payload)
+            items = data.get("items")
+            if items is None:
+                if data.get("totalCount", data.get("total")) == 0:
+                    return tasks
+                # Not "no tasks": treating it as empty would drop every saved due date change
+                raise FireflyConnectionError("Unexpected task listing response from Firefly")
+            tasks.extend(items)
+            total = data.get("totalCount")
+            if not items or not isinstance(total, int) or len(tasks) >= total:
+                break
+        return tasks
 
+    async def _post_task_listing(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Fetch one page of the task listing, with retries."""
         for attempt in range(MAX_RETRIES):
             try:
                 async with async_timeout.timeout(TIMEOUT_SECONDS):
@@ -554,8 +577,8 @@ class FireflyAPIClient:
                             raise FireflyRateLimitError("Rate limit exceeded")
 
                         response.raise_for_status()
-                        data = await response.json()
-                        return data.get("items", [])
+                        data: Dict[str, Any] = await response.json()
+                        return data
 
             except asyncio.TimeoutError as exc:
                 if attempt == MAX_RETRIES - 1:
@@ -571,7 +594,7 @@ class FireflyAPIClient:
                 continue
 
         # Should never reach here due to exception handling above
-        return []
+        raise FireflyConnectionError("Error getting tasks")  # pragma: no cover
 
     async def get_participating_groups(self, user_guid: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get groups/classes the user participates in."""
