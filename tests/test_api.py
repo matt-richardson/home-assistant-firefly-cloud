@@ -1201,3 +1201,104 @@ async def test_verify_credentials_not_valid(api_client, mock_aiohttp_session):
     mock_aiohttp_session._mock_responses["get"] = mock_http_response(json_data={"valid": False}, status=200)
 
     assert await api_client.verify_credentials() is False
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("payload", [{"status": "ok"}, {"total": 3}, {"error": "busy"}])
+async def test_get_tasks_malformed_response_raises(api_client, mock_aiohttp_session, payload):
+    """A reply without items (other than an explicit total of 0) is an error, not "no tasks".
+
+    Treating it as no tasks would drop every saved due date change for the child.
+    """
+    from tests.conftest import mock_http_response
+
+    mock_aiohttp_session._mock_responses["post"] = mock_http_response(json_data=payload, status=200)
+
+    with pytest.raises(FireflyConnectionError):
+        await api_client.get_tasks()
+
+
+def _post_sequence(session, responses):
+    """Make session.post return the given responses in order, recording each request's JSON body."""
+    from unittest.mock import AsyncMock, MagicMock
+
+    requests = []
+
+    def post(*_args, **kwargs):
+        requests.append(kwargs.get("json"))
+        context_manager = AsyncMock()
+        context_manager.__aenter__.return_value = responses[len(requests) - 1]
+        context_manager.__aexit__.return_value = None
+        return context_manager
+
+    session.post = MagicMock(side_effect=post)
+    return requests
+
+
+@pytest.mark.asyncio
+async def test_get_tasks_fetches_every_page(api_client, mock_aiohttp_session):
+    """More tasks than one page holds are all fetched, page by page, up to totalCount."""
+    from tests.conftest import mock_http_response
+
+    requests = _post_sequence(
+        mock_aiohttp_session,
+        [
+            mock_http_response(json_data={"items": [{"id": 1}, {"id": 2}], "totalCount": 5}),
+            mock_http_response(json_data={"items": [{"id": 3}, {"id": 4}], "totalCount": 5}),
+            mock_http_response(json_data={"items": [{"id": 5}], "totalCount": 5}),
+        ],
+    )
+
+    result = await api_client.get_tasks(page_size=2)
+
+    assert [t["id"] for t in result] == [1, 2, 3, 4, 5]
+    assert [r["page"] for r in requests] == [0, 1, 2]
+
+
+@pytest.mark.asyncio
+async def test_get_tasks_stops_on_an_empty_page(api_client, mock_aiohttp_session):
+    """An empty page ends the paging even if totalCount says there are more."""
+    from tests.conftest import mock_http_response
+
+    requests = _post_sequence(
+        mock_aiohttp_session,
+        [
+            mock_http_response(json_data={"items": [{"id": 1}], "totalCount": 9}),
+            mock_http_response(json_data={"items": [], "totalCount": 9, "hasValues": False}),
+        ],
+    )
+
+    assert [t["id"] for t in await api_client.get_tasks(page_size=1)] == [1]
+    assert len(requests) == 2
+
+
+@pytest.mark.asyncio
+async def test_get_tasks_single_page_without_total_count(api_client, mock_aiohttp_session):
+    """Without a totalCount, one page is fetched (as before)."""
+    from tests.conftest import mock_http_response
+
+    requests = _post_sequence(mock_aiohttp_session, [mock_http_response(json_data={"items": [{"id": 1}]})])
+    assert len(await api_client.get_tasks(page_size=1)) == 1
+    assert len(requests) == 1
+
+
+@pytest.mark.asyncio
+async def test_get_tasks_null_items(api_client, mock_aiohttp_session):
+    """items: null means no tasks only when the count is 0; otherwise it's an error."""
+    from tests.conftest import mock_http_response
+
+    _post_sequence(mock_aiohttp_session, [mock_http_response(json_data={"items": None, "totalCount": 0})])
+    assert await api_client.get_tasks() == []
+
+    _post_sequence(mock_aiohttp_session, [mock_http_response(json_data={"items": None, "totalCount": 4})])
+    with pytest.raises(FireflyConnectionError):
+        await api_client.get_tasks()
+
+
+@pytest.mark.asyncio
+async def test_get_tasks_total_count_zero_without_items(api_client, mock_aiohttp_session):
+    """Firefly's own count field (totalCount) of 0 with no items means no tasks."""
+    from tests.conftest import mock_http_response
+
+    _post_sequence(mock_aiohttp_session, [mock_http_response(json_data={"totalCount": 0, "hasValues": False})])
+    assert await api_client.get_tasks() == []
