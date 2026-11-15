@@ -1115,51 +1115,6 @@ async def test_coordinator_process_tasks_missing_setter(hass: HomeAssistant, moc
 
 
 @pytest.mark.asyncio
-async def test_coordinator_get_events_for_day_no_data(hass: HomeAssistant, mock_api):
-    """Test get_events_for_day with no data."""
-    coordinator = FireflyUpdateCoordinator(
-        hass=hass,
-        api=mock_api,
-        task_lookahead_days=7,
-    )
-
-    # Test with no data loaded
-    result = coordinator.get_events_for_day(datetime.now())
-    assert result == []
-
-
-@pytest.mark.asyncio
-async def test_coordinator_get_events_for_day_with_data(hass: HomeAssistant, mock_api):
-    """Test get_events_for_day with actual data."""
-    coordinator = FireflyUpdateCoordinator(
-        hass=hass,
-        api=mock_api,
-        task_lookahead_days=7,
-    )
-
-    now = datetime.now()
-    tomorrow = now + timedelta(days=1)
-
-    # Mock data structure
-    coordinator.data = {
-        "events": {
-            "today": [{"start": now, "subject": "Today's Event"}],
-            "week": [{"start": now, "subject": "Today's Event"}, {"start": tomorrow, "subject": "Tomorrow's Event"}],
-        }
-    }
-
-    # Test getting today's events
-    today_events = coordinator.get_events_for_day(now)
-    assert len(today_events) == 1
-    assert today_events[0]["subject"] == "Today's Event"
-
-    # Test getting tomorrow's events from week data
-    tomorrow_events = coordinator.get_events_for_day(tomorrow)
-    assert len(tomorrow_events) == 1
-    assert tomorrow_events[0]["subject"] == "Tomorrow's Event"
-
-
-@pytest.mark.asyncio
 async def test_coordinator_process_tasks_keyerror_handling(hass: HomeAssistant, mock_api):
     """Test _process_tasks handling KeyError and TypeError."""
     # Mock task that will cause KeyError during processing

@@ -89,10 +89,8 @@ def mock_coordinator():
                             "due_date": now + timedelta(days=2),
                             "set_date": now - timedelta(days=1),
                             "subject": "Mathematics",
-                            "task_type": "homework",
                             "completion_status": "Todo",
                             "setter": "Mr. Smith",
-                            "raw_data": {},
                         }
                     ],
                     "due_today": [],
@@ -104,10 +102,8 @@ def mock_coordinator():
                             "due_date": now + timedelta(days=2),
                             "set_date": now - timedelta(days=1),
                             "subject": "Mathematics",
-                            "task_type": "homework",
                             "completion_status": "Todo",
                             "setter": "Mr. Smith",
-                            "raw_data": {},
                         }
                     ],
                     "overdue": [],
@@ -197,10 +193,8 @@ async def test_tasks_due_today_sensor_with_tasks(mock_coordinator, mock_config_e
             "due_date": now,
             "set_date": now - timedelta(days=7),
             "subject": "English",
-            "task_type": "assignment",
             "completion_status": "Todo",
             "setter": "Ms. Johnson",
-            "raw_data": {},
         }
     ]
 
@@ -235,10 +229,8 @@ async def test_overdue_tasks_sensor_with_tasks(mock_coordinator, mock_config_ent
             "due_date": now - timedelta(days=7),
             "set_date": now - timedelta(days=14),
             "subject": "History",
-            "task_type": "homework",
             "completion_status": "Todo",
             "setter": "Mr. Brown",
-            "raw_data": {},
         },
         {
             "id": "overdue-task-2",
@@ -247,10 +239,8 @@ async def test_overdue_tasks_sensor_with_tasks(mock_coordinator, mock_config_ent
             "due_date": now - timedelta(days=3),
             "set_date": now - timedelta(days=30),
             "subject": "Science",
-            "task_type": "project",
             "completion_status": "Todo",
             "setter": "Dr. Smith",
-            "raw_data": {},
         },
     ]
 
@@ -275,10 +265,8 @@ async def test_overdue_tasks_sensor_attributes(mock_coordinator, mock_config_ent
             "due_date": now - timedelta(days=7),
             "set_date": now - timedelta(days=14),
             "subject": "History",
-            "task_type": "homework",
             "completion_status": "Todo",
             "setter": "Mr. Brown",
-            "raw_data": {},
         }
     ]
 
@@ -438,10 +426,8 @@ async def test_sensor_attributes_tasks_due_today(mock_coordinator, mock_config_e
             "due_date": now,
             "set_date": now - timedelta(days=7),
             "subject": "English",
-            "task_type": "assignment",
             "completion_status": "Todo",
             "setter": "Ms. Johnson",
-            "raw_data": {},
         }
     ]
 
@@ -598,10 +584,8 @@ async def test_sensor_coordinator_data_update(mock_coordinator, mock_config_entr
             "due_date": now + timedelta(days=3),
             "set_date": now - timedelta(days=1),
             "subject": "Physics",
-            "task_type": "homework",
             "completion_status": "Todo",
             "setter": "Dr. Smith",
-            "raw_data": {},
         }
     )
 

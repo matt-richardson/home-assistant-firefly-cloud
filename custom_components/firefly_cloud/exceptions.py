@@ -19,10 +19,6 @@ class FireflyRateLimitError(FireflyException):
     """Rate limit exceeded."""
 
 
-class FireflyConfigurationError(FireflyException):
-    """Invalid configuration provided."""
-
-
 class FireflySchoolNotFoundError(FireflyException):
     """School not found for given code."""
 

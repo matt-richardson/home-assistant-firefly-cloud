@@ -161,28 +161,7 @@ async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     await TaskChangeStore(hass, entry.entry_id).async_remove()
 
 
-async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Reload config entry."""
-    _LOGGER.debug("Reloading Firefly Cloud integration for %s", entry.title)
-    await async_unload_entry(hass, entry)
-    await async_setup_entry(hass, entry)
-
-
 async def async_update_options(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Update options."""
     _LOGGER.debug("Updating options for Firefly Cloud integration %s", entry.title)
     await hass.config_entries.async_reload(entry.entry_id)
-
-
-async def async_migrate_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
-    """Migrate old entry."""
-    _LOGGER.debug("Migrating Firefly Cloud entry from version %s", config_entry.version)
-
-    if config_entry.version == 1:
-        # No migration needed yet, we're at version 1
-        pass
-
-    # Always update version to current
-    hass.config_entries.async_update_entry(config_entry, version=1)
-    _LOGGER.info("Migration of Firefly Cloud entry completed")
-    return True
