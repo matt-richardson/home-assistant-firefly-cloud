@@ -13,6 +13,7 @@ from .const import DOMAIN
 from .coordinator import FireflyUpdateCoordinator
 from .entity import FireflyBaseEntity
 from .entry_config import child_guids
+from .models import Lesson
 
 
 async def async_setup_entry(
@@ -64,32 +65,21 @@ class FireflyCalendar(FireflyBaseEntity, CalendarEntity):  # pylint: disable=abs
     @property
     def event(self) -> Optional[CalendarEvent]:
         """Return the current or next upcoming event."""
-        if not self.coordinator.data:
-            return None
-
-        # Check if child data exists
-        if self._child_guid not in self.coordinator.data.get("children_data", {}):
-            return None
-
-        # Get events for this child
-        child_data = self.coordinator.data["children_data"][self._child_guid]
-        events = child_data.get("events", {}).get("week", [])
-
-        if not events:
+        child = self._child
+        if child is None or not child.lessons:
             return None
 
         now = dates.get_offset_time()
 
         # Find current event
-        for event in events:
-            if event["start"] <= now <= event["end"]:
-                return self._convert_to_calendar_event(event)
+        for lesson in child.lessons:
+            if lesson.start <= now <= lesson.end:
+                return self._convert_to_calendar_event(lesson)
 
-        # Find next upcoming event
-        upcoming_events = [e for e in events if e["start"] > now]
-        if upcoming_events:
-            # Events are already sorted by start time in coordinator
-            return self._convert_to_calendar_event(upcoming_events[0])
+        # Lessons are sorted by start time, so the first later one is next
+        for lesson in child.lessons:
+            if lesson.start > now:
+                return self._convert_to_calendar_event(lesson)
 
         return None
 
@@ -100,51 +90,39 @@ class FireflyCalendar(FireflyBaseEntity, CalendarEntity):  # pylint: disable=abs
         end_date: datetime,
     ) -> List[CalendarEvent]:
         """Return calendar events within a datetime range."""
-        if not self.coordinator.data:
+        child = self._child
+        if child is None:
             return []
 
-        # Check if child data exists
-        if self._child_guid not in self.coordinator.data.get("children_data", {}):
-            return []
+        # Events that overlap the requested range
+        return [
+            self._convert_to_calendar_event(lesson)
+            for lesson in child.lessons
+            if lesson.end >= start_date and lesson.start <= end_date
+        ]
 
-        # Get events for this child
-        child_data = self.coordinator.data["children_data"][self._child_guid]
-        events = child_data.get("events", {}).get("week", [])
-
-        # Filter events within the requested date range
-        calendar_events = []
-        for event in events:
-            event_start = event["start"]
-            event_end = event["end"]
-
-            # Check if event overlaps with requested range
-            if event_end >= start_date and event_start <= end_date:
-                calendar_events.append(self._convert_to_calendar_event(event))
-
-        return calendar_events
-
-    def _convert_to_calendar_event(self, event: dict) -> CalendarEvent:
-        """Convert Firefly event to CalendarEvent."""
+    def _convert_to_calendar_event(self, lesson: Lesson) -> CalendarEvent:
+        """Convert a lesson to a CalendarEvent."""
         return CalendarEvent(
-            start=event["start"],
-            end=event["end"],
-            summary=event["subject"],
-            description=self._build_event_description(event),
-            location=event.get("location"),
+            start=lesson.start,
+            end=lesson.end,
+            summary=lesson.subject,
+            description=self._build_event_description(lesson),
+            location=lesson.location,
         )
 
-    def _build_event_description(self, event: dict) -> Optional[str]:
+    def _build_event_description(self, lesson: Lesson) -> Optional[str]:
         """Build a comprehensive event description."""
         description_parts = []
 
-        if event.get("description"):
-            description_parts.append(event["description"])
+        if lesson.description:
+            description_parts.append(lesson.description)
 
-        if event.get("guild"):
-            description_parts.append(f"Class: {event['guild']}")
+        if lesson.guild:
+            description_parts.append(f"Class: {lesson.guild}")
 
-        if event.get("attendees"):
-            attendees = event["attendees"][:5]  # Limit to first 5
+        if lesson.attendees:
+            attendees = lesson.attendees[:5]  # Limit to first 5
             # Handle both string and dict attendees
             attendee_names = []
             for attendee in attendees:
@@ -156,8 +134,8 @@ class FireflyCalendar(FireflyBaseEntity, CalendarEntity):  # pylint: disable=abs
                     attendee_names.append(str(attendee))
 
             attendees_str = ", ".join(attendee_names)
-            if len(event["attendees"]) > 5:
-                attendees_str += f" and {len(event['attendees']) - 5} more"
+            if len(lesson.attendees) > 5:
+                attendees_str += f" and {len(lesson.attendees) - 5} more"
             description_parts.append(f"Attendees: {attendees_str}")
 
         return "\n".join(description_parts) if description_parts else None

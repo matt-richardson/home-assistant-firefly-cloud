@@ -6,6 +6,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import CONF_SCHOOL_NAME, DOMAIN
 from .coordinator import FireflyUpdateCoordinator
+from .models import ChildData
 
 
 class FireflyBaseEntity(CoordinatorEntity[FireflyUpdateCoordinator]):
@@ -32,6 +33,13 @@ class FireflyBaseEntity(CoordinatorEntity[FireflyUpdateCoordinator]):
             model="Firefly Cloud Integration",
             configuration_url=config_entry.data.get("host"),
         )
+
+    @property
+    def _child(self) -> ChildData | None:
+        """Return this child's data, or None if the coordinator has no data for it."""
+        if self.coordinator.data is None:
+            return None
+        return self.coordinator.data.child(self._child_guid)
 
     @property
     def name(self) -> str:

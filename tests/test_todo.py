@@ -1,17 +1,24 @@
 """Test the Firefly Cloud todo platform."""
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime
 from unittest.mock import Mock
 
 import pytest
+from conftest import make_child, make_data, make_task
 from homeassistant.components.todo import TodoItem, TodoItemStatus
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
 from custom_components.firefly_cloud.const import CONF_SCHOOL_NAME, CONF_USER_GUID, DOMAIN
 from custom_components.firefly_cloud.coordinator import FireflyUpdateCoordinator
-from custom_components.firefly_cloud.dates import local_midnight
 from custom_components.firefly_cloud.todo import FireflyTodoListEntity
+
+TODAY = date(2026, 11, 16)
+
+
+def _data(*tasks, guid="test-child-123"):
+    """Build coordinator data holding one child with these tasks."""
+    return make_data(make_child(guid, tasks=tasks, today=TODAY))
 
 
 @pytest.fixture
@@ -20,28 +27,15 @@ def mock_coordinator():
     coordinator = Mock(spec=FireflyUpdateCoordinator)
     coordinator.last_update_success = True
 
-    # Mock data structure matching the coordinator
-    mock_task = {
-        "id": "task123",
-        "title": "Math Homework",
-        "subject": "Mathematics",
-        "due_date": datetime.now(timezone.utc),
-        "setter": "Mr. Smith",
-        "description": "Complete exercises 1-10",
-    }
-
-    coordinator.data = {
-        "children_data": {
-            "child123": {
-                "name": "Test Child",
-                "tasks": {
-                    "upcoming": [mock_task],
-                    "due_today": [mock_task],
-                    "overdue": [],
-                },
-            }
-        }
-    }
+    mock_task = make_task(
+        "task123",
+        title="Math Homework",
+        subject="Mathematics",
+        due=TODAY,
+        setter="Mr. Smith",
+        description="Complete exercises 1-10",
+    )
+    coordinator.data = make_data(make_child("child123", tasks=[mock_task], today=TODAY, name="Test Child"))
 
     return coordinator
 
@@ -111,7 +105,7 @@ class TestFireflyTodoListEntity:
 
     def test_available_without_child(self, todo_entity, mock_coordinator):
         """Test entity availability without child data."""
-        mock_coordinator.data = {"children_data": {}}
+        mock_coordinator.data = make_data()
         assert todo_entity.available is False
 
     def test_todo_items(self, todo_entity):
@@ -136,19 +130,19 @@ class TestFireflyTodoListEntity:
 
     def test_todo_items_without_child(self, todo_entity, mock_coordinator):
         """Test todo items without child data."""
-        mock_coordinator.data = {"children_data": {}}
+        mock_coordinator.data = make_data()
         assert todo_entity.todo_items is None
 
     def test_create_todo_item_from_task_data(self, todo_entity):
         """Test creating todo item from task data."""
-        task_data = {
-            "id": "test123",
-            "title": "Science Project",
-            "subject": "Science",
-            "due_date": datetime(2023, 12, 25, 9, 0, 0, tzinfo=timezone.utc),
-            "setter": "Ms. Johnson",
-            "description": "Build a volcano model",
-        }
+        task_data = make_task(
+            "test123",
+            title="Science Project",
+            subject="Science",
+            due=date(2023, 12, 25),
+            setter="Ms. Johnson",
+            description="Build a volcano model",
+        )
 
         item = todo_entity._create_todo_item(task_data, TodoItemStatus.NEEDS_ACTION)
 
@@ -159,9 +153,9 @@ class TestFireflyTodoListEntity:
         assert "Build a volcano model" in item.description
         assert len(item.uid) <= 50  # Ensure UID is within limits
 
-    def test_todo_due_is_date(self, todo_entity, melbourne):
-        """The todo due is the local calendar date, with no time."""
-        task_data = {"id": "1", "title": "T", "due_date": local_midnight(date(2026, 11, 20))}
+    def test_todo_due_is_date(self, todo_entity):
+        """The todo due is the calendar date, with no time."""
+        task_data = make_task("1", title="T", due=date(2026, 11, 20))
 
         item = todo_entity._create_todo_item(task_data, TodoItemStatus.NEEDS_ACTION)
 
@@ -170,9 +164,7 @@ class TestFireflyTodoListEntity:
 
     def test_create_todo_item_minimal_data(self, todo_entity):
         """Test creating todo item with minimal data."""
-        task_data = {
-            "title": "Basic Task",
-        }
+        task_data = make_task("", title="Basic Task", setter=None)
 
         item = todo_entity._create_todo_item(task_data, TodoItemStatus.NEEDS_ACTION)
 
@@ -219,13 +211,7 @@ async def test_create_todo_item_with_missing_due_date():
 
     entity = FireflyTodoListEntity(coordinator, config_entry, "test-child-123")
 
-    task_data = {
-        "title": "Task Without Due Date",
-        "description": "No due date",
-        "subject": {"name": "Math"},
-        "completionStatus": "Todo",
-        # Missing dueDate
-    }
+    task_data = make_task("t1", title="Task Without Due Date", description="No due date", due=None)
 
     todo_item = entity._create_todo_item(task_data, TodoItemStatus.NEEDS_ACTION)
 
@@ -243,13 +229,8 @@ async def test_create_todo_item_with_invalid_due_date():
 
     entity = FireflyTodoListEntity(coordinator, config_entry, "test-child-123")
 
-    task_data = {
-        "title": "Task With Bad Date",
-        "description": "Invalid date format",
-        "dueDate": "not-a-valid-date",
-        "subject": {"name": "Science"},
-        "completionStatus": "Todo",
-    }
+    # An unparseable due date reaches the entity as no due date
+    task_data = make_task("t1", title="Task With Bad Date", description="Invalid date format", due=None)
 
     todo_item = entity._create_todo_item(task_data, TodoItemStatus.NEEDS_ACTION)
 
@@ -267,13 +248,13 @@ async def test_create_todo_item_with_missing_subject():
 
     entity = FireflyTodoListEntity(coordinator, config_entry, "test-child-123")
 
-    task_data = {
-        "title": "Task Without Subject",
-        "description": "No subject field",
-        "dueDate": "2023-12-31T23:59:59Z",
-        "completionStatus": "Todo",
-        # Missing subject field
-    }
+    task_data = make_task(
+        "t1",
+        title="Task Without Subject",
+        description="No subject field",
+        subject=None,
+        due=date(2023, 12, 31),
+    )
 
     todo_item = entity._create_todo_item(task_data, TodoItemStatus.NEEDS_ACTION)
 
@@ -287,35 +268,24 @@ async def test_create_todo_item_with_missing_subject():
 async def test_todo_items_with_mixed_completion_status():
     """Test todo_items with mixed completion status."""
     coordinator = Mock(spec=FireflyUpdateCoordinator)
-    coordinator.data = {
-        "children_data": {
-            "test-child-123": {
-                "name": "Test Child",
-                "tasks": {
-                    "upcoming": [
-                        {
-                            "id": "completed123",
-                            "title": "Completed Task",
-                            "description": "This is done",
-                            "dueDate": "2023-12-31T23:59:59Z",
-                            "subject": {"name": "Math"},
-                            "completion_status": "Completed",
-                        },
-                        {
-                            "id": "pending456",
-                            "title": "Pending Task",
-                            "description": "Still to do",
-                            "dueDate": "2023-12-25T12:00:00Z",
-                            "subject": {"name": "English"},
-                            "completion_status": "Todo",
-                        },
-                    ],
-                    "overdue": [],
-                    "due_today": [],
-                },
-            }
-        }
-    }
+    coordinator.data = _data(
+        make_task(
+            "completed123",
+            title="Completed Task",
+            description="This is done",
+            subject="Math",
+            due=TODAY,
+            completion_status="Completed",
+        ),
+        make_task(
+            "pending456",
+            title="Pending Task",
+            description="Still to do",
+            subject="English",
+            due=TODAY,
+            completion_status="Todo",
+        ),
+    )
 
     config_entry = Mock(spec=ConfigEntry)
     config_entry.data = {"school_name": "Test School"}
@@ -342,38 +312,25 @@ async def test_todo_items_deduplication():
     coordinator = Mock(spec=FireflyUpdateCoordinator)
     coordinator.last_update_success = True
 
-    # Create same task appearing in multiple categories
-    duplicate_task = {
-        "id": "duplicate123",
-        "title": "Same Task",
-        "description": "Appears in multiple lists",
-        "due_date": datetime.now(timezone.utc),
-        "setter": "Teacher",
-        "completionStatus": "Todo",
-    }
+    # A task due today is both upcoming and due today
+    duplicate_task = make_task(
+        "duplicate123",
+        title="Same Task",
+        description="Appears in multiple lists",
+        due=TODAY,
+        setter="Teacher",
+    )
 
     # Different task to ensure we're not losing other tasks
-    unique_task = {
-        "id": "unique456",
-        "title": "Different Task",
-        "description": "Only appears once",
-        "due_date": datetime.now(timezone.utc),
-        "setter": "Teacher2",
-        "completionStatus": "Todo",
-    }
+    unique_task = make_task(
+        "unique456",
+        title="Different Task",
+        description="Only appears once",
+        due=date(2026, 11, 18),
+        setter="Teacher2",
+    )
 
-    coordinator.data = {
-        "children_data": {
-            "test-child-123": {
-                "name": "Test Child",
-                "tasks": {
-                    "upcoming": [duplicate_task, unique_task],
-                    "due_today": [duplicate_task],  # Same task appears here
-                    "overdue": [duplicate_task],  # And here too
-                },
-            }
-        }
-    }
+    coordinator.data = _data(duplicate_task, unique_task)
 
     config_entry = Mock(spec=ConfigEntry)
     config_entry.data = {CONF_SCHOOL_NAME: "Test School"}
@@ -399,32 +356,12 @@ async def test_todo_items_with_tasks_missing_ids():
     coordinator.last_update_success = True
 
     # Task without ID should be skipped during deduplication
-    task_without_id = {
-        "title": "No ID Task",
-        "description": "Missing ID field",
-        "completionStatus": "Todo",
-    }
+    task_without_id = make_task("", title="No ID Task", description="Missing ID field", due=TODAY)
 
     # Task with ID should be included
-    task_with_id = {
-        "id": "valid123",
-        "title": "Valid Task",
-        "description": "Has proper ID",
-        "completionStatus": "Todo",
-    }
+    task_with_id = make_task("valid123", title="Valid Task", description="Has proper ID", due=TODAY)
 
-    coordinator.data = {
-        "children_data": {
-            "test-child-123": {
-                "name": "Test Child",
-                "tasks": {
-                    "upcoming": [task_without_id, task_with_id],
-                    "due_today": [],
-                    "overdue": [],
-                },
-            }
-        }
-    }
+    coordinator.data = _data(task_without_id, task_with_id)
 
     config_entry = Mock(spec=ConfigEntry)
     config_entry.data = {CONF_SCHOOL_NAME: "Test School"}

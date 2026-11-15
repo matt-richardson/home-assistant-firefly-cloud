@@ -1,11 +1,11 @@
 """Test the Firefly Cloud calendar platform."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from types import MappingProxyType
 from unittest.mock import MagicMock
 
 import pytest
-from conftest import create_config_entry_with_version_compat
+from conftest import create_config_entry_with_version_compat, make_child, make_data, make_lesson
 from homeassistant.components.calendar import CalendarEvent
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
@@ -20,6 +20,46 @@ from custom_components.firefly_cloud.const import (
     CONF_USER_GUID,
     DOMAIN,
 )
+from custom_components.firefly_cloud.models import Lesson
+
+
+def _lesson(start, end, subject, location, description, guild, attendees):
+    """Build a Lesson with every field set."""
+    return Lesson(
+        start=start,
+        end=end,
+        subject=subject,
+        location=location,
+        description=description,
+        guild=guild,
+        attendees=tuple(attendees),
+    )
+
+
+def _set_lessons(coordinator, *lessons, guid="test-child-123"):
+    """Replace a child's lessons in the coordinator data."""
+    coordinator.data = make_data(
+        make_child(guid, lessons=lessons, today=dt_util.now().date(), name="John Doe"),
+        make_child("test-child-456", today=dt_util.now().date(), name="Jane Doe"),
+    )
+
+
+def _maths(start, end):
+    """Build the first fixture lesson at a different time."""
+    return _lesson(start, end, "Mathematics", "Room 101", "Algebra lesson", "Year 10", ["Mr. Smith"])
+
+
+def _science(now):
+    """Build the second fixture lesson (tomorrow 11:00)."""
+    return _lesson(
+        now.replace(hour=11, minute=0, second=0, microsecond=0) + timedelta(days=1),
+        now.replace(hour=12, minute=0, second=0, microsecond=0) + timedelta(days=1),
+        "Science",
+        "Lab 1",
+        "Chemistry experiment",
+        "Year 10",
+        ["Ms. Johnson"],
+    )
 
 
 @pytest.fixture
@@ -28,61 +68,27 @@ def mock_coordinator():
     coordinator = MagicMock()
     now = dt_util.now()
 
-    # Mock coordinator data
-    coordinator.data = {
-        "user_info": {
-            "username": "john.doe",
-            "fullname": "John Doe",
-            "email": "john.doe@test.com",
-            "role": "student",
-            "guid": "test-user-123",
-        },
-        "children_guids": ["test-child-123", "test-child-456"],
-        "children_data": {
-            "test-child-123": {
-                "name": "John Doe",
-                "events": {
-                    "week": [
-                        {
-                            "start": now.replace(hour=9, minute=0, second=0, microsecond=0),
-                            "end": now.replace(hour=10, minute=0, second=0, microsecond=0),
-                            "subject": "Mathematics",
-                            "location": "Room 101",
-                            "description": "Algebra lesson",
-                            "guild": "Year 10",
-                            "attendees": ["Mr. Smith"],
-                        },
-                        {
-                            "start": now.replace(hour=11, minute=0, second=0, microsecond=0) + timedelta(days=1),
-                            "end": now.replace(hour=12, minute=0, second=0, microsecond=0) + timedelta(days=1),
-                            "subject": "Science",
-                            "location": "Lab 1",
-                            "description": "Chemistry experiment",
-                            "guild": "Year 10",
-                            "attendees": ["Ms. Johnson"],
-                        },
-                    ]
-                },
-                "tasks": {
-                    "all": [],
-                    "due_today": [],
-                    "upcoming": [],
-                    "overdue": [],
-                },
-            },
-            "test-child-456": {
-                "name": "Jane Doe",
-                "events": {"week": []},
-                "tasks": {
-                    "all": [],
-                    "due_today": [],
-                    "upcoming": [],
-                    "overdue": [],
-                },
-            },
-        },
-        "last_updated": now,
-    }
+    _set_lessons(
+        coordinator,
+        _lesson(
+            now.replace(hour=9, minute=0, second=0, microsecond=0),
+            now.replace(hour=10, minute=0, second=0, microsecond=0),
+            "Mathematics",
+            "Room 101",
+            "Algebra lesson",
+            "Year 10",
+            ["Mr. Smith"],
+        ),
+        _lesson(
+            now.replace(hour=11, minute=0, second=0, microsecond=0) + timedelta(days=1),
+            now.replace(hour=12, minute=0, second=0, microsecond=0) + timedelta(days=1),
+            "Science",
+            "Lab 1",
+            "Chemistry experiment",
+            "Year 10",
+            ["Ms. Johnson"],
+        ),
+    )
 
     coordinator.last_update_success = True
     coordinator.last_exception = None
@@ -122,7 +128,7 @@ async def test_calendar_availability(mock_coordinator, mock_config_entry):
 
     # Available when coordinator has successful update and child data exists
     mock_coordinator.last_update_success = True
-    mock_coordinator.data = {"children_data": {"test-child-123": {"some": "data"}}}
+    mock_coordinator.data = make_data(make_child("test-child-123", today=dt_util.now().date()))
     assert calendar.available is True
 
     # Unavailable when coordinator update failed
@@ -142,8 +148,7 @@ async def test_calendar_current_event(mock_coordinator, mock_config_entry):
 
     # Mock current time to be during first event
     now = dt_util.now()
-    mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"][0]["start"] = now - timedelta(minutes=30)
-    mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"][0]["end"] = now + timedelta(minutes=30)
+    _set_lessons(mock_coordinator, _maths(now - timedelta(minutes=30), now + timedelta(minutes=30)), _science(now))
 
     event = calendar.event
     assert event is not None
@@ -159,8 +164,7 @@ async def test_calendar_next_event(mock_coordinator, mock_config_entry):
 
     # Mock both events to be in the future
     now = dt_util.now()
-    mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"][0]["start"] = now + timedelta(hours=1)
-    mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"][0]["end"] = now + timedelta(hours=2)
+    _set_lessons(mock_coordinator, _maths(now + timedelta(hours=1), now + timedelta(hours=2)), _science(now))
 
     event = calendar.event
     assert event is not None
@@ -174,7 +178,7 @@ async def test_calendar_no_events(mock_coordinator, mock_config_entry):
     calendar = FireflyCalendar(mock_coordinator, mock_config_entry, "test-child-123")
 
     # Clear events
-    mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"] = []
+    _set_lessons(mock_coordinator)
 
     event = calendar.event
     assert event is None
@@ -208,8 +212,7 @@ async def test_calendar_get_events_filtered_by_date(hass, mock_coordinator, mock
     end_date = start_date + timedelta(days=1)
 
     # Mock first event to be today, second to be tomorrow
-    mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"][0]["start"] = now.replace(hour=9)
-    mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"][0]["end"] = now.replace(hour=10)
+    _set_lessons(mock_coordinator, _maths(now.replace(hour=9), now.replace(hour=10)), _science(now))
     events = await calendar.async_get_events(hass, start_date, end_date)
 
     # Should only return today's event
@@ -223,7 +226,7 @@ async def test_calendar_convert_event_with_description(mock_coordinator, mock_co
     calendar = FireflyCalendar(mock_coordinator, mock_config_entry, "test-child-123")
 
     # Get first event from coordinator data
-    event_data = mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"][0]
+    event_data = mock_coordinator.data.child("test-child-123").lessons[0]
     calendar_event = calendar._convert_to_calendar_event(event_data)
 
     assert isinstance(calendar_event, CalendarEvent)
@@ -252,15 +255,7 @@ async def test_calendar_name_includes_child_name(mock_config_entry):
     """Test calendar name includes child name when available."""
     coordinator = MagicMock()
     coordinator.last_update_success = True
-    coordinator.data = {
-        "children_data": {
-            "child-123": {
-                "name": "John Doe",
-                "events": {"week": []},
-                "tasks": {"upcoming": [], "due_today": [], "all": [], "overdue": []},
-            }
-        }
-    }
+    coordinator.data = make_data(make_child("child-123", today=dt_util.now().date(), name="John Doe"))
 
     calendar = FireflyCalendar(coordinator, mock_config_entry, "child-123")
 
@@ -273,14 +268,7 @@ async def test_calendar_name_fallback_to_guid(mock_config_entry):
     """Test calendar name falls back to GUID when no name available."""
     coordinator = MagicMock()
     coordinator.last_update_success = True
-    coordinator.data = {
-        "children_data": {
-            "child-123": {
-                "events": {"week": []},
-                "tasks": {"upcoming": [], "due_today": [], "all": [], "overdue": []},
-            }
-        }
-    }
+    coordinator.data = make_data(make_child("child-123", today=dt_util.now().date(), name=None))
 
     calendar = FireflyCalendar(coordinator, mock_config_entry, "child-123")
 
@@ -313,22 +301,12 @@ async def test_calendar_multiple_children_setup(hass: HomeAssistant):
     )
 
     coordinator = MagicMock()
-    coordinator.data = {
-        "user_info": {"username": "parent", "fullname": "Parent User"},
-        "children_guids": ["child-1", "child-2"],
-        "children_data": {
-            "child-1": {
-                "name": "Child One",
-                "events": {"week": []},
-                "tasks": {"upcoming": [], "due_today": [], "all": [], "overdue": []},
-            },
-            "child-2": {
-                "name": "Child Two",
-                "events": {"week": []},
-                "tasks": {"upcoming": [], "due_today": [], "all": [], "overdue": []},
-            },
-        },
-    }
+    today = dt_util.now().date()
+    coordinator.data = make_data(
+        make_child("child-1", today=today, name="Child One"),
+        make_child("child-2", today=today, name="Child Two"),
+        user_info={"username": "parent", "fullname": "Parent User"},
+    )
 
     hass.data[DOMAIN] = {config_entry.entry_id: coordinator}
 
@@ -354,15 +332,15 @@ async def test_calendar_event_build_description_empty_fields(mock_coordinator, m
     calendar = FireflyCalendar(mock_coordinator, mock_config_entry, "test-child-123")
 
     # Event with minimal data
-    event_data = {
-        "start": dt_util.now(),
-        "end": dt_util.now() + timedelta(hours=1),
-        "subject": "Test Subject",
-        "location": "Test Location",
-        "description": None,
-        "guild": None,
-        "attendees": [],
-    }
+    event_data = Lesson(
+        start=dt_util.now(),
+        end=dt_util.now() + timedelta(hours=1),
+        subject="Test Subject",
+        location="Test Location",
+        description=None,
+        guild=None,
+        attendees=(),
+    )
 
     calendar_event = calendar._convert_to_calendar_event(event_data)
 
@@ -378,15 +356,15 @@ async def test_calendar_event_build_description_with_many_attendees(mock_coordin
     calendar = FireflyCalendar(mock_coordinator, mock_config_entry, "test-child-123")
 
     # Event with many attendees
-    event_data = {
-        "start": dt_util.now(),
-        "end": dt_util.now() + timedelta(hours=1),
-        "subject": "Test Subject",
-        "location": "Test Location",
-        "description": "Test description",
-        "guild": "Year 10",
-        "attendees": [f"Teacher {i}" for i in range(10)],  # 10 attendees
-    }
+    event_data = Lesson(
+        start=dt_util.now(),
+        end=dt_util.now() + timedelta(hours=1),
+        subject="Test Subject",
+        location="Test Location",
+        description="Test description",
+        guild="Year 10",
+        attendees=tuple(f"Teacher {i}" for i in range(10)),  # 10 attendees
+    )
 
     calendar_event = calendar._convert_to_calendar_event(event_data)
 
@@ -401,19 +379,19 @@ async def test_calendar_event_build_description_with_dict_attendees(mock_coordin
     calendar = FireflyCalendar(mock_coordinator, mock_config_entry, "test-child-123")
 
     # Event with dictionary attendees (how they come from the real API)
-    event_data = {
-        "start": dt_util.now(),
-        "end": dt_util.now() + timedelta(hours=1),
-        "subject": "Chemistry Lab",
-        "location": "Science Lab 1",
-        "description": "Bring safety goggles",
-        "guild": "Year 11",
-        "attendees": [
+    event_data = Lesson(
+        start=dt_util.now(),
+        end=dt_util.now() + timedelta(hours=1),
+        subject="Chemistry Lab",
+        location="Science Lab 1",
+        description="Bring safety goggles",
+        guild="Year 11",
+        attendees=[
             {"name": "Dr. Smith", "role": "teacher"},
             {"name": "Ms. Johnson", "role": "assistant"},
             {"name": "Mr. Brown"},  # Missing role
         ],
-    }
+    )
 
     calendar_event = calendar._convert_to_calendar_event(event_data)
 
@@ -460,10 +438,7 @@ async def test_calendar_handles_missing_child_data_gracefully(hass, mock_config_
     """Test calendar handles missing child data gracefully."""
     coordinator = MagicMock()
     coordinator.last_update_success = True
-    coordinator.data = {
-        "user_info": {"username": "test", "fullname": "Test User", "guid": "test-123"},
-        "children_data": {},  # Missing the specific child
-    }
+    coordinator.data = make_data(user_info={"username": "test", "fullname": "Test User", "guid": "test-123"})
 
     calendar = FireflyCalendar(coordinator, mock_config_entry, "missing-child-123")
 
@@ -478,52 +453,37 @@ async def test_calendar_handles_missing_child_data_gracefully(hass, mock_config_
 
 
 @pytest.mark.asyncio
-async def test_calendar_convert_event_missing_start_time(hass, mock_config_entry):
-    """Test calendar convert_event with missing start time."""
-
+async def test_calendar_handles_lessons_without_timezone(hass, mock_config_entry):
+    """A lesson Firefly sent with no timezone is made timezone-aware, so the calendar can compare it."""
+    now = dt_util.now()
+    naive_start = (now - timedelta(minutes=30)).replace(tzinfo=None)
+    naive_end = (now + timedelta(minutes=30)).replace(tzinfo=None)
+    lesson = Lesson.from_firefly(
+        {
+            "start": naive_start.isoformat(),
+            "end": naive_end.isoformat(),
+            "subject": "Maths",
+            "location": "M8",
+        }
+    )
     coordinator = MagicMock()
+    coordinator.last_update_success = True
+    coordinator.data = make_data(make_child("test-child-123", lessons=[lesson], today=now.date()))
     calendar = FireflyCalendar(coordinator, mock_config_entry, "test-child-123")
 
-    # Event missing start time
-    incomplete_event = {
-        "end": datetime.now(timezone.utc) + timedelta(hours=1),
-        "subject": "Test Event",
-        "location": "Room 101",
-    }
+    event = calendar.event
+    events = await calendar.async_get_events(hass, now - timedelta(days=1), now + timedelta(days=1))
 
-    with pytest.raises(KeyError):
-        calendar._convert_to_calendar_event(incomplete_event)
-
-
-@pytest.mark.asyncio
-async def test_calendar_convert_event_missing_end_time(hass, mock_config_entry):
-    """Test calendar convert_event with missing end time."""
-
-    coordinator = MagicMock()
-    calendar = FireflyCalendar(coordinator, mock_config_entry, "test-child-123")
-
-    # Event missing end time
-    incomplete_event = {"start": datetime.now(timezone.utc), "subject": "Test Event", "location": "Room 101"}
-
-    with pytest.raises(KeyError):
-        calendar._convert_to_calendar_event(incomplete_event)
+    assert event is not None
+    assert event.summary == "Maths"
+    assert [e.summary for e in events] == ["Maths"]
 
 
 @pytest.mark.asyncio
 async def test_calendar_get_events_no_week_events_data(hass, mock_config_entry):
     """Test calendar get_events when week events data is missing."""
     coordinator = MagicMock()
-    coordinator.data = {
-        "children_data": {
-            "test-child-123": {
-                "name": "Test Child",
-                "events": {
-                    "week": []
-                    # Missing "week" key
-                },
-            }
-        }
-    }
+    coordinator.data = make_data(make_child("test-child-123", today=dt_util.now().date()))
 
     calendar = FireflyCalendar(coordinator, mock_config_entry, "test-child-123")
 
@@ -540,35 +500,32 @@ async def test_calendar_current_event_with_multiple_overlapping(hass, mock_confi
     now = dt_util.now()
 
     coordinator = MagicMock()
-    coordinator.data = {
-        "children_data": {
-            "test-child-123": {
-                "name": "Test Child",
-                "events": {
-                    "week": [
-                        {
-                            "start": now - timedelta(minutes=30),
-                            "end": now + timedelta(minutes=30),
-                            "subject": "Math Class",
-                            "location": "Room 101",
-                            "description": "First class",
-                            "attendees": [],
-                            "guild": None,
-                        },
-                        {
-                            "start": now - timedelta(minutes=15),
-                            "end": now + timedelta(minutes=45),
-                            "subject": "Study Hall",
-                            "location": "Library",
-                            "description": "Second class",
-                            "attendees": [],
-                            "guild": None,
-                        },
-                    ]
-                },
-            }
-        }
-    }
+    coordinator.data = make_data(
+        make_child(
+            "test-child-123",
+            lessons=[
+                _lesson(
+                    now - timedelta(minutes=30),
+                    now + timedelta(minutes=30),
+                    "Math Class",
+                    "Room 101",
+                    "First class",
+                    None,
+                    [],
+                ),
+                _lesson(
+                    now - timedelta(minutes=15),
+                    now + timedelta(minutes=45),
+                    "Study Hall",
+                    "Library",
+                    "Second class",
+                    None,
+                    [],
+                ),
+            ],
+            today=now.date(),
+        )
+    )
     coordinator.last_update_success = True
 
     calendar = FireflyCalendar(coordinator, mock_config_entry, "test-child-123")
@@ -585,7 +542,7 @@ async def test_calendar_build_description_none_values(hass, mock_config_entry):
     coordinator = MagicMock()
     calendar = FireflyCalendar(coordinator, mock_config_entry, "test-child-123")
 
-    event_data = {"description": None, "location": None, "attendees": None, "guild": None}
+    event_data = make_lesson(dt_util.now(), description=None)
 
     description = calendar._build_event_description(event_data)
 
