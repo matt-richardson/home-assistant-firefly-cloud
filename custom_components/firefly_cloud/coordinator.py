@@ -273,7 +273,7 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):  # pylint: disable=too-ma
                     total_tasks += len(tasks_data.get("all", []))
 
         _LOGGER.debug(
-            "Successfully updated Firefly data for %d children: " "%d lessons, %d total tasks",
+            "Successfully updated Firefly data for %d children: %d lessons, %d total tasks",
             len(target_guids),
             total_lessons,
             total_tasks,
