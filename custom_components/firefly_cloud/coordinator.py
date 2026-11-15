@@ -360,7 +360,6 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):  # pylint: disable=too-ma
                         if isinstance(task.get("setter"), dict)
                         else task.get("setter", "Unknown")
                     ),
-                    "raw_data": task,  # Keep raw data for debugging
                     **change_fields(task),
                 }
                 processed_tasks.append(processed_task)
@@ -389,25 +388,6 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):  # pylint: disable=too-ma
             if due_day is not None and due_day < today:
                 overdue_tasks.append(task)
         return self._process_tasks(overdue_tasks)
-
-    def get_events_for_day(self, target_date: datetime) -> List[Dict[str, Any]]:
-        """Get events for a specific day."""
-        if not self.data or "events" not in self.data:
-            return []
-
-        day_start = target_date.replace(hour=0, minute=0, second=0, microsecond=0)
-        day_end = day_start + timedelta(days=1)
-
-        # For today, use the cached today events
-        from .const import get_offset_time
-
-        today = get_offset_time().replace(hour=0, minute=0, second=0, microsecond=0)
-        if day_start == today:
-            return self.data["events"]["today"]
-
-        # For other days in the week, filter from week events
-        week_events = self.data["events"]["week"]
-        return [event for event in week_events if day_start <= event["start"] < day_end]
 
     def _extract_child_name(self, child_guid: str) -> Optional[str]:
         """Extract child name from user info or children info."""

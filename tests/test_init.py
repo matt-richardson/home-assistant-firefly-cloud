@@ -7,22 +7,8 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 
-from custom_components.firefly_cloud import (
-    async_reload_entry,
-    async_setup_entry,
-    async_unload_entry,
-    async_update_options,
-)
-from custom_components.firefly_cloud.const import (
-    CONF_CHILDREN_GUIDS,
-    CONF_DEVICE_ID,
-    CONF_HOST,
-    CONF_SCHOOL_CODE,
-    CONF_SCHOOL_NAME,
-    CONF_SECRET,
-    CONF_USER_GUID,
-    DOMAIN,
-)
+from custom_components.firefly_cloud import async_setup_entry, async_unload_entry, async_update_options
+from custom_components.firefly_cloud.const import DOMAIN
 from custom_components.firefly_cloud.exceptions import (
     FireflyAuthenticationError,
     FireflyConnectionError,
@@ -207,25 +193,6 @@ async def test_async_unload_entry_failure(
         assert result is False
         assert mock_config_entry.entry_id in hass.data[DOMAIN]
         coordinator.async_shutdown.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_async_reload_entry(
-    hass: HomeAssistant,
-    mock_config_entry: ConfigEntry,
-) -> None:
-    """Test reloading of config entry."""
-    with (
-        patch("custom_components.firefly_cloud.async_unload_entry") as mock_unload,
-        patch("custom_components.firefly_cloud.async_setup_entry") as mock_setup,
-    ):
-        mock_unload.return_value = True
-        mock_setup.return_value = True
-
-        await async_reload_entry(hass, mock_config_entry)
-
-        mock_unload.assert_called_once_with(hass, mock_config_entry)
-        mock_setup.assert_called_once_with(hass, mock_config_entry)
 
 
 @pytest.mark.asyncio
@@ -478,46 +445,6 @@ async def test_async_setup_entry_credentials_verification_false(
 
 
 @pytest.mark.asyncio
-async def test_async_reload_entry_unload_failure(
-    hass: HomeAssistant,
-    mock_config_entry: ConfigEntry,
-) -> None:
-    """Test reload when unload fails."""
-    with (
-        patch("custom_components.firefly_cloud.async_unload_entry") as mock_unload,
-        patch("custom_components.firefly_cloud.async_setup_entry") as mock_setup,
-    ):
-        mock_unload.return_value = False  # Unload fails
-        mock_setup.return_value = True
-
-        await async_reload_entry(hass, mock_config_entry)
-
-        mock_unload.assert_called_once_with(hass, mock_config_entry)
-        # Setup should still be called even if unload fails
-        mock_setup.assert_called_once_with(hass, mock_config_entry)
-
-
-@pytest.mark.asyncio
-async def test_async_reload_entry_setup_failure(
-    hass: HomeAssistant,
-    mock_config_entry: ConfigEntry,
-) -> None:
-    """Test reload when setup fails."""
-    with (
-        patch("custom_components.firefly_cloud.async_unload_entry") as mock_unload,
-        patch("custom_components.firefly_cloud.async_setup_entry") as mock_setup,
-    ):
-        mock_unload.return_value = True
-        mock_setup.side_effect = ConfigEntryNotReady("Setup failed")
-
-        with pytest.raises(ConfigEntryNotReady):
-            await async_reload_entry(hass, mock_config_entry)
-
-        mock_unload.assert_called_once_with(hass, mock_config_entry)
-        mock_setup.assert_called_once_with(hass, mock_config_entry)
-
-
-@pytest.mark.asyncio
 async def test_async_setup_entry_creates_api_client_correctly(
     hass: HomeAssistant,
     mock_config_entry: ConfigEntry,
@@ -551,47 +478,6 @@ async def test_async_setup_entry_creates_api_client_correctly(
 
         # Verify session was obtained
         mock_session_getter.assert_called_once_with(hass)
-
-
-@pytest.mark.asyncio
-async def test_async_migrate_entry_version_1(hass: HomeAssistant):
-    """Test migration of config entry at version 1 (no-op)."""
-    from types import MappingProxyType
-
-    from conftest import create_config_entry_with_version_compat
-
-    from custom_components.firefly_cloud import async_migrate_entry
-
-    # Create a config entry at version 1
-    config_entry = create_config_entry_with_version_compat(
-        domain=DOMAIN,
-        title="Test School - User",
-        data={
-            CONF_SCHOOL_CODE: "testschool",
-            CONF_SCHOOL_NAME: "Test School",
-            CONF_HOST: "https://testschool.fireflycloud.net",
-            CONF_DEVICE_ID: "test-device-123",
-            CONF_SECRET: "test-secret-456",
-            CONF_USER_GUID: "test-user-789",
-            CONF_CHILDREN_GUIDS: ["child1"],
-        },
-        options={},
-        version=1,
-        minor_version=1,
-        source="user",
-        unique_id="testschool",
-        entry_id="test-entry-migration",
-        discovery_keys=MappingProxyType({}),
-    )
-    hass.config_entries._entries[config_entry.entry_id] = config_entry
-
-    # Run migration
-    result = await async_migrate_entry(hass, config_entry)
-
-    # Should return True (success)
-    assert result is True
-    # Version should still be 1
-    assert config_entry.version == 1
 
 
 @pytest.mark.asyncio

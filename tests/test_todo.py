@@ -26,7 +26,6 @@ def mock_coordinator():
         "title": "Math Homework",
         "subject": "Mathematics",
         "due_date": datetime.now(timezone.utc),
-        "task_type": "homework",
         "setter": "Mr. Smith",
         "description": "Complete exercises 1-10",
     }
@@ -127,7 +126,6 @@ class TestFireflyTodoListEntity:
         assert item.status == TodoItemStatus.NEEDS_ACTION
         assert item.due is not None
         assert item.description is not None
-        assert "Type: homework" in item.description
         assert "Set by: Mr. Smith" in item.description
         assert "Complete exercises 1-10" in item.description
 
@@ -148,7 +146,6 @@ class TestFireflyTodoListEntity:
             "title": "Science Project",
             "subject": "Science",
             "due_date": datetime(2023, 12, 25, 9, 0, 0, tzinfo=timezone.utc),
-            "task_type": "project",
             "setter": "Ms. Johnson",
             "description": "Build a volcano model",
         }
@@ -158,7 +155,6 @@ class TestFireflyTodoListEntity:
         assert item.summary == "Science Project"
         assert item.status == TodoItemStatus.NEEDS_ACTION
         assert item.due == date(2023, 12, 25)
-        assert "Type: project" in item.description
         assert "Set by: Ms. Johnson" in item.description
         assert "Build a volcano model" in item.description
         assert len(item.uid) <= 50  # Ensure UID is within limits
@@ -184,23 +180,6 @@ class TestFireflyTodoListEntity:
         assert item.status == TodoItemStatus.NEEDS_ACTION
         assert item.due is None
         assert item.description is None
-
-    @pytest.mark.asyncio
-    async def test_read_only_operations(self, todo_entity):
-        """Test that all modification operations raise NotImplementedError."""
-        test_item = TodoItem(uid="test", summary="Test Task", status=TodoItemStatus.NEEDS_ACTION)
-
-        with pytest.raises(NotImplementedError, match="read-only"):
-            await todo_entity.async_create_todo_item(test_item)
-
-        with pytest.raises(NotImplementedError, match="read-only"):
-            await todo_entity.async_delete_todo_items(["test"])
-
-        with pytest.raises(NotImplementedError, match="read-only"):
-            await todo_entity.async_update_todo_item(test_item)
-
-        with pytest.raises(NotImplementedError, match="read-only"):
-            await todo_entity.async_move_todo_item("test", "prev")
 
 
 @pytest.mark.asyncio
@@ -369,7 +348,6 @@ async def test_todo_items_deduplication():
         "title": "Same Task",
         "description": "Appears in multiple lists",
         "due_date": datetime.now(timezone.utc),
-        "task_type": "homework",
         "setter": "Teacher",
         "completionStatus": "Todo",
     }
@@ -380,7 +358,6 @@ async def test_todo_items_deduplication():
         "title": "Different Task",
         "description": "Only appears once",
         "due_date": datetime.now(timezone.utc),
-        "task_type": "project",
         "setter": "Teacher2",
         "completionStatus": "Todo",
     }

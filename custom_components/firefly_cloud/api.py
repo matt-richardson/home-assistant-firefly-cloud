@@ -17,6 +17,7 @@ from .const import (
     FIREFLY_API_VERSION_PATH,
     FIREFLY_APP_GATEWAY,
     FIREFLY_GRAPHQL_PATH,
+    FIREFLY_TASK_LISTING_PATH,
     FIREFLY_VERIFY_TOKEN_PATH,
     MAX_RETRIES,
     RETRY_DELAY_BASE,
@@ -567,7 +568,7 @@ class FireflyAPIClient:
             try:
                 async with async_timeout.timeout(TIMEOUT_SECONDS):
                     async with self._session.post(
-                        f"{self._host}/api/v2/taskListing/view/parent/tasks/all/filterBy",
+                        f"{self._host}{FIREFLY_TASK_LISTING_PATH}",
                         params={"ffauth_device_id": self._device_id, "ffauth_secret": self._secret},
                         json=payload,
                     ) as response:
@@ -595,34 +596,6 @@ class FireflyAPIClient:
 
         # Should never reach here due to exception handling above
         raise FireflyConnectionError("Error getting tasks")  # pragma: no cover
-
-    async def get_participating_groups(self, user_guid: Optional[str] = None) -> List[Dict[str, Any]]:
-        """Get groups/classes the user participates in."""
-        if not user_guid and self._user_info:
-            user_guid = self._user_info["guid"]
-
-        if not user_guid:
-            raise FireflyAuthenticationError("No user GUID available")
-
-        query = f"""
-        query GetGroups {{
-            users(guid: "{user_guid}") {{
-                participating_in {{
-                    guid,
-                    sort_key,
-                    name,
-                    personal_colour
-                }}
-            }}
-        }}
-        """
-
-        data = await self._graphql_query(query)
-        users = data.get("users", [])
-        if not users:
-            return []
-
-        return users[0].get("participating_in", [])
 
     def get_auth_url(self) -> str:
         """Get the authentication URL for browser redirect."""

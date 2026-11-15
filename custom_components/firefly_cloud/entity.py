@@ -30,7 +30,6 @@ class FireflyBaseEntity(CoordinatorEntity[FireflyUpdateCoordinator]):
             name=f"Firefly Cloud - {school_name}",
             manufacturer="Firefly Learning",
             model="Firefly Cloud Integration",
-            sw_version="1.0.0",
             configuration_url=config_entry.data.get("host"),
         )
 

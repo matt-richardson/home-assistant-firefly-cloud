@@ -32,11 +32,10 @@ DEFAULT_APP_ID = "Home Assistant Firefly Cloud Integration"
 
 # API endpoints
 FIREFLY_APP_GATEWAY = "https://appgateway.fireflysolutions.co.uk/appgateway/school/"
-FIREFLY_LOGIN_PATH = "/Login/api"
 FIREFLY_API_VERSION_PATH = "/login/api/version"
 FIREFLY_VERIFY_TOKEN_PATH = "/Login/api/verifytoken"
 FIREFLY_GRAPHQL_PATH = "/_api/1.0/graphql"
-FIREFLY_TASK_API_PATH = "/api/v2/taskListing/view/student/tasks/all/filterBy"
+FIREFLY_TASK_LISTING_PATH = "/api/v2/taskListing/view/parent/tasks/all/filterBy"
 
 # Sensor types
 SENSOR_UPCOMING_TASKS = "upcoming_tasks"
@@ -92,16 +91,12 @@ SENSOR_TYPES: dict[str, SensorConfig] = {
 # Task completion statuses
 TASK_STATUS_TODO = "Todo"
 TASK_STATUS_COMPLETED = "Completed"
-TASK_STATUS_OVERDUE = "Overdue"
 
 # Task owner types
 TASK_OWNER_ONLY_SETTERS = "OnlySetters"
 
 # Task archive statuses
 TASK_ARCHIVE_ALL = "All"
-
-# Task sorting
-TASK_SORT_DUE_DATE_ASC = {"column": "DueDate", "order": "Ascending"}
 
 # Error retry configuration
 MAX_RETRIES = 3
@@ -142,6 +137,3 @@ def get_offset_time() -> "datetime.datetime":
 
 RETRY_DELAY_BASE = 2  # Exponential backoff base in seconds
 TIMEOUT_SECONDS = 30
-
-# Parallel updates
-PARALLEL_UPDATES = 1

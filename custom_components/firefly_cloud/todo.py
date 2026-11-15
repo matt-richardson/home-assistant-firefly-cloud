@@ -42,7 +42,7 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class FireflyTodoListEntity(FireflyBaseEntity, TodoListEntity):
+class FireflyTodoListEntity(FireflyBaseEntity, TodoListEntity):  # pylint: disable=abstract-method  # read-only
     """Firefly todo list entity."""
 
     def __init__(
@@ -64,7 +64,7 @@ class FireflyTodoListEntity(FireflyBaseEntity, TodoListEntity):
         # Set entity properties
         self._attr_icon = "mdi:clipboard-check"
 
-        # Firefly is read-only, so we only support viewing (no creation/editing/deletion)
+        # Firefly is read-only, so no creating, editing or deleting items
         self._attr_supported_features = TodoListEntityFeature(0)
 
     @property
@@ -123,8 +123,6 @@ class FireflyTodoListEntity(FireflyBaseEntity, TodoListEntity):
         description_parts = []
         if task_data.get("setter"):
             description_parts.append(f"Set by: {task_data['setter']}")
-        if task_data.get("task_type"):
-            description_parts.append(f"Type: {task_data['task_type']}")
         if task_data.get("description"):
             description_parts.append(task_data["description"])
 
@@ -137,23 +135,3 @@ class FireflyTodoListEntity(FireflyBaseEntity, TodoListEntity):
             due=due,
             description=description,
         )
-
-    async def async_create_todo_item(self, item: TodoItem) -> None:  # pylint: disable=unused-argument
-        """Create a new todo item."""
-        raise NotImplementedError("Firefly Cloud integration is read-only")
-
-    async def async_delete_todo_items(self, uids: list[str]) -> None:  # pylint: disable=unused-argument
-        """Delete todo items."""
-        raise NotImplementedError("Firefly Cloud integration is read-only")
-
-    async def async_update_todo_item(self, item: TodoItem) -> None:  # pylint: disable=unused-argument
-        """Update a todo item."""
-        raise NotImplementedError("Firefly Cloud integration is read-only")
-
-    async def async_move_todo_item(
-        self,
-        uid: str,  # pylint: disable=unused-argument
-        previous_uid: str | None = None,  # pylint: disable=unused-argument
-    ) -> None:
-        """Move a todo item."""
-        raise NotImplementedError("Firefly Cloud integration is read-only")

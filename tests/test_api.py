@@ -239,27 +239,6 @@ async def test_get_tasks_token_expired(api_client, mock_aiohttp_session):
 
 
 @pytest.mark.asyncio
-async def test_get_participating_groups_success(api_client):
-    """Test successful participating groups retrieval."""
-    api_client._user_info = {"guid": "test-user-123"}
-    mock_groups = [{"guid": "group1", "name": "Test Group"}]
-
-    with patch.object(api_client, "_graphql_query") as mock_query:
-        mock_query.return_value = {"users": [{"participating_in": mock_groups}]}
-
-        result = await api_client.get_participating_groups()
-
-        assert result == mock_groups
-
-
-@pytest.mark.asyncio
-async def test_get_participating_groups_no_user(api_client):
-    """Test participating groups retrieval without user info."""
-    with pytest.raises(FireflyAuthenticationError):
-        await api_client.get_participating_groups()
-
-
-@pytest.mark.asyncio
 async def test_get_auth_url(api_client):
     """Test authentication URL generation."""
     url = api_client.get_auth_url()
@@ -560,18 +539,6 @@ async def test_get_tasks_with_guid_filter(api_client, mock_aiohttp_session):
     result = await api_client.get_tasks(student_guid="child-123")
 
     assert result == mock_tasks
-
-
-@pytest.mark.asyncio
-async def test_get_participating_groups_query_error(api_client):
-    """Test participating groups with query error."""
-    api_client._user_info = {"guid": "test-user-123"}
-
-    with patch.object(api_client, "_graphql_query") as mock_query:
-        mock_query.side_effect = FireflyAPIError("Query failed")
-
-        with pytest.raises(FireflyAPIError):
-            await api_client.get_participating_groups()
 
 
 @pytest.mark.asyncio
@@ -966,19 +933,6 @@ async def test_graphql_query_client_error_retry(api_client, mock_aiohttp_session
 
     with pytest.raises(FireflyConnectionError, match="Error executing query"):
         await api_client._graphql_query("query { test }")
-
-
-@pytest.mark.asyncio
-async def test_get_participating_groups_no_users_data(api_client):
-    """Test get_participating_groups with no users data."""
-    api_client._user_info = {"guid": "test-user-123"}
-
-    with patch.object(api_client, "_graphql_query") as mock_query:
-        mock_query.return_value = {"users": []}
-
-        result = await api_client.get_participating_groups()
-
-        assert result == []
 
 
 @pytest.mark.asyncio

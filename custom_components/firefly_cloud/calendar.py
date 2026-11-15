@@ -41,7 +41,7 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class FireflyCalendar(FireflyBaseEntity, CalendarEntity):
+class FireflyCalendar(FireflyBaseEntity, CalendarEntity):  # pylint: disable=abstract-method  # read-only
     """Firefly Cloud calendar entity."""
 
     def __init__(
@@ -166,26 +166,3 @@ class FireflyCalendar(FireflyBaseEntity, CalendarEntity):
             description_parts.append(f"Attendees: {attendees_str}")
 
         return "\n".join(description_parts) if description_parts else None
-
-    async def async_create_event(self, **kwargs) -> None:  # pylint: disable=unused-argument
-        """Create a new event."""
-        raise NotImplementedError("Firefly Cloud integration is read-only")
-
-    async def async_delete_event(
-        self,
-        uid: str,  # pylint: disable=unused-argument
-        recurrence_id: str | None = None,  # pylint: disable=unused-argument
-        recurrence_range: str | None = None,  # pylint: disable=unused-argument
-    ) -> None:
-        """Delete an event."""
-        raise NotImplementedError("Firefly Cloud integration is read-only")
-
-    async def async_update_event(
-        self,
-        uid: str,  # pylint: disable=unused-argument
-        event: dict,  # pylint: disable=unused-argument
-        recurrence_id: str | None = None,  # pylint: disable=unused-argument
-        recurrence_range: str | None = None,  # pylint: disable=unused-argument
-    ) -> None:
-        """Update an event."""
-        raise NotImplementedError("Firefly Cloud integration is read-only")
