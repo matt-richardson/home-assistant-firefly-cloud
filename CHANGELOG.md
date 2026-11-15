@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.8.0](https://github.com/matt-richardson/home-assistant-firefly-cloud/compare/v0.7.0...v0.8.0) (2026-11-15)
+
+
+### Features
+
+* add tasks and upcoming classes dashboard cards ([#46](https://github.com/matt-richardson/home-assistant-firefly-cloud/issues/46)) ([7395dee](https://github.com/matt-richardson/home-assistant-firefly-cloud/commit/7395deefc121554b8c0d018ed117cc22c1b50561))
+
+
+### Bug Fixes
+
+* fetch every page of tasks and reject malformed task listings ([#47](https://github.com/matt-richardson/home-assistant-firefly-cloud/issues/47)) ([78f843b](https://github.com/matt-richardson/home-assistant-firefly-cloud/commit/78f843b3a5d650d07588d9ef2971a907f0b7b002))
+* find task subjects from the timetable ([#48](https://github.com/matt-richardson/home-assistant-firefly-cloud/issues/48)) ([5be6de8](https://github.com/matt-richardson/home-assistant-firefly-cloud/commit/5be6de840f93aff4c2b21b7aab6615edcf1dd561))
+* treat task due dates as local calendar dates ([#44](https://github.com/matt-richardson/home-assistant-firefly-cloud/issues/44)) ([548c8f4](https://github.com/matt-richardson/home-assistant-firefly-cloud/commit/548c8f4462c12eb2f9545c84b35c941a55c58ed7))
+
 ## [0.7.0](https://github.com/matt-richardson/home-assistant-firefly-cloud/compare/v0.6.3...v0.7.0) (2026-10-22)
 
 
