@@ -48,7 +48,7 @@ async def _coordinator_with(hass, mock_api, change_store, tasks):
 
 
 def _today():
-    from custom_components.firefly_cloud.const import get_offset_time
+    from custom_components.firefly_cloud.dates import get_offset_time
 
     return get_offset_time().date()
 

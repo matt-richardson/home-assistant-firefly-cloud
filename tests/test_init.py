@@ -1,6 +1,6 @@
 """Test the Firefly Cloud init module."""
 
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from homeassistant.config_entries import ConfigEntry
@@ -398,9 +398,7 @@ async def test_async_setup_entry_default_task_lookahead(
         "secret": "test-secret-456",
         "user_guid": "test-user-789",
     }
-    # Mock options properly
-    config_entry.options = MagicMock()
-    config_entry.options.get = Mock(return_value=None)
+    config_entry.options = {}
 
     with (
         patch("custom_components.firefly_cloud.FireflyAPIClient") as mock_api_class,

@@ -24,6 +24,7 @@ from .const import (
     DEFAULT_TASK_LOOKAHEAD_DAYS,
     DOMAIN,
 )
+from .entry_config import entry_option
 from .exceptions import (
     FireflyAuthenticationError,
     FireflyConnectionError,
@@ -331,10 +332,7 @@ class FireflyCloudOptionsFlowHandler(config_entries.OptionsFlow):
             {
                 vol.Optional(
                     CONF_TASK_LOOKAHEAD_DAYS,
-                    default=self.config_entry.options.get(
-                        CONF_TASK_LOOKAHEAD_DAYS,
-                        self.config_entry.data.get(CONF_TASK_LOOKAHEAD_DAYS, DEFAULT_TASK_LOOKAHEAD_DAYS),
-                    ),
+                    default=entry_option(self.config_entry, CONF_TASK_LOOKAHEAD_DAYS, DEFAULT_TASK_LOOKAHEAD_DAYS),
                 ): selector.NumberSelector(
                     selector.NumberSelectorConfig(
                         min=1,
@@ -344,10 +342,7 @@ class FireflyCloudOptionsFlowHandler(config_entries.OptionsFlow):
                 ),
                 vol.Optional(
                     CONF_SHOW_CLASS_TIMES,
-                    default=self.config_entry.options.get(
-                        CONF_SHOW_CLASS_TIMES,
-                        self.config_entry.data.get(CONF_SHOW_CLASS_TIMES, DEFAULT_SHOW_CLASS_TIMES),
-                    ),
+                    default=entry_option(self.config_entry, CONF_SHOW_CLASS_TIMES, DEFAULT_SHOW_CLASS_TIMES),
                 ): bool,
             }
         )

@@ -9,10 +9,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
 
+from . import dates
 from .const import (
-    CONF_CHILDREN_GUIDS,
     CONF_SHOW_CLASS_TIMES,
-    CONF_USER_GUID,
     DEFAULT_SHOW_CLASS_TIMES,
     DOMAIN,
     SENSOR_CURRENT_CLASS,
@@ -24,6 +23,7 @@ from .const import (
 )
 from .coordinator import FireflyUpdateCoordinator
 from .entity import FireflyBaseEntity
+from .entry_config import child_guids, entry_option
 
 
 async def async_setup_entry(
@@ -34,15 +34,10 @@ async def async_setup_entry(
     """Set up Firefly Cloud sensor platform."""
     coordinator: FireflyUpdateCoordinator = hass.data[DOMAIN][config_entry.entry_id]
 
-    # Get children GUIDs from config or use user GUID if no children
-    children_guids = config_entry.data.get(CONF_CHILDREN_GUIDS, [])
-    if not children_guids:
-        children_guids = [config_entry.data[CONF_USER_GUID]]
-
     # Create sensors for each child and each sensor type
     entities: List[SensorEntity] = []
 
-    for child_guid in children_guids:
+    for child_guid in child_guids(config_entry):
         for sensor_type in SENSOR_TYPES:
             entities.append(
                 FireflySensor(
@@ -167,11 +162,9 @@ class FireflySensor(FireflyBaseEntity, SensorEntity):
 
     def _get_upcoming_tasks_attributes(self, child_data: Dict[str, Any]) -> Dict[str, Any]:
         """Get attributes for upcoming tasks sensor."""
-        from .const import get_offset_time
-
         tasks = child_data.get("tasks", {}).get("upcoming", [])
         overdue_tasks = child_data.get("tasks", {}).get("overdue", [])
-        now = get_offset_time()
+        now = dates.get_offset_time()
 
         return {
             "tasks": [
@@ -222,10 +215,8 @@ class FireflySensor(FireflyBaseEntity, SensorEntity):
 
     def _get_overdue_tasks_attributes(self, child_data: Dict[str, Any]) -> Dict[str, Any]:
         """Get attributes for overdue tasks sensor."""
-        from .const import get_offset_time
-
         tasks = child_data.get("tasks", {}).get("overdue", [])
-        now = get_offset_time()
+        now = dates.get_offset_time()
 
         return {
             "tasks": [
@@ -253,9 +244,7 @@ class FireflySensor(FireflyBaseEntity, SensorEntity):
         if not events:
             return "None"
 
-        from .const import get_offset_time
-
-        now = get_offset_time()
+        now = dates.get_offset_time()
 
         # Find current event (class currently happening)
         for event in events:
@@ -280,15 +269,10 @@ class FireflySensor(FireflyBaseEntity, SensorEntity):
         if not events:
             return "None"
 
-        from .const import get_offset_time
-
-        now = get_offset_time()
+        now = dates.get_offset_time()
 
         # Get show_class_times option
-        show_times = self._config_entry.options.get(
-            CONF_SHOW_CLASS_TIMES,
-            self._config_entry.data.get(CONF_SHOW_CLASS_TIMES, DEFAULT_SHOW_CLASS_TIMES),
-        )
+        show_times = entry_option(self._config_entry, CONF_SHOW_CLASS_TIMES, DEFAULT_SHOW_CLASS_TIMES)
 
         # Find current event (class currently happening)
         for event in events:
@@ -336,13 +320,8 @@ class FireflySensor(FireflyBaseEntity, SensorEntity):
         if not events:
             return "None"
 
-        from .const import get_offset_time
-
-        now = get_offset_time()
-        show_times = self._config_entry.options.get(
-            CONF_SHOW_CLASS_TIMES,
-            self._config_entry.data.get(CONF_SHOW_CLASS_TIMES, DEFAULT_SHOW_CLASS_TIMES),
-        )
+        now = dates.get_offset_time()
+        show_times = entry_option(self._config_entry, CONF_SHOW_CLASS_TIMES, DEFAULT_SHOW_CLASS_TIMES)
 
         # Check if we're currently in a class
         current_class_raw = self._get_current_class_subject(child_data)
@@ -386,9 +365,7 @@ class FireflySensor(FireflyBaseEntity, SensorEntity):
     def _get_current_class_attributes(self, child_data: Dict[str, Any]) -> Dict[str, Any]:
         """Get attributes for current class sensor."""
         events = child_data.get("events", {}).get("week", [])
-        from .const import get_offset_time
-
-        now = get_offset_time()
+        now = dates.get_offset_time()
 
         if not events:
             return {
@@ -438,9 +415,7 @@ class FireflySensor(FireflyBaseEntity, SensorEntity):
     def _get_next_class_attributes(self, child_data: Dict[str, Any]) -> Dict[str, Any]:
         """Get attributes for next class sensor."""
         events = child_data.get("events", {}).get("week", [])
-        from .const import get_offset_time
-
-        now = get_offset_time()
+        now = dates.get_offset_time()
 
         if not events:
             return {"status": "no_upcoming_class", "current_time": now.isoformat()}

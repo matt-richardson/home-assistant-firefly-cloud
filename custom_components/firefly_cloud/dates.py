@@ -1,10 +1,29 @@
-"""Due date helpers: Firefly due dates are calendar dates local to Home Assistant."""
+"""Date and time helpers.
+
+Firefly due dates are calendar dates local to Home Assistant. Code that needs the
+current time calls ``dates.get_offset_time()`` through the module (not a
+``from`` import), so tests can patch it in one place.
+"""
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from homeassistant.util import dt as dt_util
+
+# Shift "now" for testing against historical data; both 0 in normal operation.
+# Negative values go back in time, e.g. TIME_OFFSET_DAYS = -6 is six days ago, and
+# TIME_OFFSET_DAYS = -1, TIME_OFFSET_HOURS = -2 is yesterday, two hours earlier.
+TIME_OFFSET_DAYS = 0
+TIME_OFFSET_HOURS = 0  # can be fractional
+
+
+def get_offset_time() -> datetime:
+    """Return Home Assistant's current local time, shifted by the offsets above."""
+    now = dt_util.now()
+    if TIME_OFFSET_DAYS == 0 and TIME_OFFSET_HOURS == 0:
+        return now
+    return now + timedelta(days=TIME_OFFSET_DAYS, hours=TIME_OFFSET_HOURS)
 
 
 def parse_due_date(value: str | None) -> date | None:

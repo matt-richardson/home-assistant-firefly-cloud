@@ -20,6 +20,7 @@ from .const import (
     DOMAIN,
 )
 from .coordinator import FireflyUpdateCoordinator
+from .entry_config import entry_option
 from .exceptions import FireflyAuthenticationError, FireflyConnectionError, FireflyTokenExpiredError
 from .frontend import async_register_frontend
 from .services import async_setup_services, async_unload_services
@@ -42,12 +43,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:  #
     user_guid = entry.data[CONF_USER_GUID]
     children_guids = entry.data.get(CONF_CHILDREN_GUIDS, [])
 
-    # Get task lookahead days from options or data
-    task_lookahead_days = (
-        entry.options.get(CONF_TASK_LOOKAHEAD_DAYS)
-        or entry.data.get(CONF_TASK_LOOKAHEAD_DAYS)
-        or DEFAULT_TASK_LOOKAHEAD_DAYS
-    )
+    task_lookahead_days = entry_option(entry, CONF_TASK_LOOKAHEAD_DAYS, DEFAULT_TASK_LOOKAHEAD_DAYS)
 
     # Create HTTP session
     session = aiohttp_client.async_get_clientsession(hass)
