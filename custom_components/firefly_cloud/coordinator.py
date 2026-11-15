@@ -203,8 +203,6 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):  # pylint: disable=too-ma
         today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
         return {
             "today_start": today_start,
-            "today_end": today_start + timedelta(days=1),
-            "week_start": today_start,
             "calendar_end": today_start + timedelta(days=30),
         }
 
@@ -224,16 +222,13 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):  # pylint: disable=too-ma
     async def _fetch_child_raw(self, child_guid: str, date_ranges: Dict[str, datetime]) -> Dict[str, Any]:
         """Fetch a single child's raw Firefly data."""
         return {
-            "events_today": await self.api.get_events(date_ranges["today_start"], date_ranges["today_end"], child_guid),
-            "events_week": await self.api.get_events(
-                date_ranges["week_start"], date_ranges["calendar_end"], child_guid
-            ),
+            "events": await self.api.get_events(date_ranges["today_start"], date_ranges["calendar_end"], child_guid),
             "tasks": await self.api.get_tasks(student_guid=child_guid),
         }
 
     def _build_child_data(self, child_guid: str, raw: Dict[str, Any], now: datetime) -> Dict[str, Any]:
         """Build a child's data from raw Firefly data, applying dashboard due date changes."""
-        by_class = class_subjects(raw["events_week"])
+        by_class = class_subjects(raw["events"])
         if self.change_store is not None:
             # Remembered, so tasks keep their subjects through holidays when the timetable is empty
             by_class = self.change_store.remember_class_subjects(child_guid, by_class)
@@ -241,10 +236,7 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):  # pylint: disable=too-ma
         today = now.date()
 
         return {
-            "events": {
-                "today": self._process_events(raw["events_today"]),
-                "week": self._process_events(raw["events_week"]),
-            },
+            "events": {"week": self._process_events(raw["events"])},
             "tasks": {
                 "all": self._process_tasks(tasks),
                 "due_today": self._filter_tasks_by_date(tasks, today, today + timedelta(days=1)),
@@ -268,8 +260,7 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):  # pylint: disable=too-ma
 
     def _log_update_statistics(self, target_guids: List[str], children_data: Dict[str, Dict[str, Any]]) -> None:
         """Log statistics about the update."""
-        total_events_today = 0
-        total_events_week = 0
+        total_lessons = 0
         total_tasks = 0
 
         for child_data in children_data.values():
@@ -277,17 +268,14 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):  # pylint: disable=too-ma
                 events_data = child_data.get("events")
                 tasks_data = child_data.get("tasks")
                 if isinstance(events_data, dict):
-                    total_events_today += len(events_data.get("today", []))
-                    total_events_week += len(events_data.get("week", []))
+                    total_lessons += len(events_data.get("week", []))
                 if isinstance(tasks_data, dict):
                     total_tasks += len(tasks_data.get("all", []))
 
         _LOGGER.debug(
-            "Successfully updated Firefly data for %d children: "
-            "%d events today, %d events this week, %d total tasks",
+            "Successfully updated Firefly data for %d children: " "%d lessons, %d total tasks",
             len(target_guids),
-            total_events_today,
-            total_events_week,
+            total_lessons,
             total_tasks,
         )
 

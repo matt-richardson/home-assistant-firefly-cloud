@@ -75,6 +75,23 @@ async def test_coordinator_update_data_success(hass: HomeAssistant, mock_api):
 
 
 @pytest.mark.asyncio
+async def test_refresh_fetches_lessons_once_per_child(hass: HomeAssistant, mock_api):
+    """Each refresh asks Firefly for a child's lessons once, covering the next 30 days."""
+    mock_api.get_children_info.return_value = [
+        {"guid": "c1", "username": "c1", "name": "Child One"},
+        {"guid": "c2", "username": "c2", "name": "Child Two"},
+    ]
+    coordinator = FireflyUpdateCoordinator(hass=hass, api=mock_api, task_lookahead_days=7, children_guids=["c1", "c2"])
+
+    await coordinator._async_update_data()
+
+    assert mock_api.get_events.call_count == 2
+    for call in mock_api.get_events.call_args_list:
+        start, end, _guid = call.args
+        assert end - start == timedelta(days=30)
+
+
+@pytest.mark.asyncio
 async def test_coordinator_process_events(hass: HomeAssistant, mock_api):
     """Test event processing."""
     coordinator = FireflyUpdateCoordinator(
@@ -90,15 +107,11 @@ async def test_coordinator_process_events(hass: HomeAssistant, mock_api):
     child_data = data["children_data"][child_guid]
 
     assert "events" in child_data
-    assert "today" in child_data["events"]
     assert "week" in child_data["events"]
 
-    # Should have today's events
-    assert len(child_data["events"]["today"]) == 1
-    assert child_data["events"]["today"][0]["subject"] == "Mathematics"
-
-    # Week events should include today's events
-    assert len(child_data["events"]["week"]) >= 1
+    # The single fetch covers today and the rest of the month
+    assert len(child_data["events"]["week"]) == 1
+    assert child_data["events"]["week"][0]["subject"] == "Mathematics"
 
 
 @pytest.mark.asyncio
@@ -388,10 +401,9 @@ async def test_coordinator_multiple_event_days(hass: HomeAssistant, mock_api):
     child_data = data["children_data"][child_guid]
 
     # Both events are returned (UTC timezone handling)
-    assert len(child_data["events"]["today"]) == 2
     assert len(child_data["events"]["week"]) == 2
     # Verify both events are processed correctly
-    subjects = [event["subject"] for event in child_data["events"]["today"]]
+    subjects = [event["subject"] for event in child_data["events"]["week"]]
     assert "Today's Class" in subjects
     assert "Tomorrow's Class" in subjects
 
@@ -552,7 +564,6 @@ async def test_coordinator_empty_api_responses(hass: HomeAssistant, mock_api):
     child_guid = list(data["children_data"].keys())[0]
     child_data = data["children_data"][child_guid]
 
-    assert len(child_data["events"]["today"]) == 0
     assert len(child_data["events"]["week"]) == 0
     assert len(child_data["tasks"]["all"]) == 0
     assert len(child_data["tasks"]["upcoming"]) == 0
@@ -818,7 +829,6 @@ async def test_coordinator_data_structure(hass: HomeAssistant, mock_api):
     # Verify children_data structure for each child
     for child_data in data["children_data"].values():
         assert "events" in child_data
-        assert "today" in child_data["events"]
         assert "week" in child_data["events"]
         assert "tasks" in child_data
         assert "all" in child_data["tasks"]
@@ -936,7 +946,7 @@ async def test_coordinator_process_events_invalid_date_format(hass: HomeAssistan
     child_data = data["children_data"][child_guid]
 
     # Event should be filtered out due to invalid date
-    assert len(child_data["events"]["today"]) == 0
+    assert len(child_data["events"]["week"]) == 0
 
 
 @pytest.mark.asyncio
