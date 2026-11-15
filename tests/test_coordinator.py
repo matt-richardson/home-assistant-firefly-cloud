@@ -1,10 +1,11 @@
 """Test the Firefly Cloud coordinator."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List
 from unittest.mock import AsyncMock
 
 import pytest
+from freezegun import freeze_time
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import UpdateFailed
@@ -15,6 +16,7 @@ from custom_components.firefly_cloud.exceptions import (
     FireflyConnectionError,
     FireflyTokenExpiredError,
 )
+from tests.conftest import firefly_due
 
 
 @pytest.fixture
@@ -53,7 +55,7 @@ def mock_api():
             "guid": "task-1",
             "title": "Math Homework",
             "description": "Complete exercises 1-10",
-            "dueDate": (now + timedelta(days=2)).isoformat() + "Z",
+            "dueDate": firefly_due(2),
             "setDate": (now - timedelta(days=1)).isoformat() + "Z",
             "subject": {"name": "Mathematics"},
             "completionStatus": "Todo",
@@ -180,12 +182,11 @@ async def test_coordinator_filter_tasks_due_today(hass: HomeAssistant, mock_api)
     from custom_components.firefly_cloud.const import get_offset_time
 
     now_utc = get_offset_time()
-    today_end_utc = now_utc.replace(hour=23, minute=59, second=59, microsecond=0)
     task_due_today = {
         "guid": "urgent-task",
         "title": "Submit Report",
         "description": "Final report submission",
-        "dueDate": today_end_utc.isoformat().replace("+00:00", "Z"),
+        "dueDate": firefly_due(0),
         "setDate": (now_utc - timedelta(days=7)).isoformat().replace("+00:00", "Z"),
         "subject": {"name": "English"},
         "completionStatus": "Todo",
@@ -220,7 +221,7 @@ async def test_coordinator_filter_overdue_tasks(hass: HomeAssistant, mock_api):
         "guid": "overdue-task",
         "title": "Late Assignment",
         "description": "Should have been submitted yesterday",
-        "dueDate": (now_utc - timedelta(days=1)).isoformat().replace("+00:00", "Z"),
+        "dueDate": firefly_due(-1),
         "setDate": (now_utc - timedelta(days=7)).isoformat().replace("+00:00", "Z"),
         "subject": {"name": "History"},
         "completionStatus": "Todo",
@@ -335,7 +336,7 @@ async def test_coordinator_task_lookahead_filtering(hass: HomeAssistant, mock_ap
             "guid": "task-near",
             "title": "Near Task",
             "description": "Due soon",
-            "dueDate": (now_utc + timedelta(days=3)).isoformat().replace("+00:00", "Z"),  # Within 7
+            "dueDate": firefly_due(3),  # Within 7
             "setDate": (now_utc - timedelta(days=1)).isoformat().replace("+00:00", "Z"),
             "subject": {"name": "Math"},
             "completionStatus": "Todo",
@@ -345,7 +346,7 @@ async def test_coordinator_task_lookahead_filtering(hass: HomeAssistant, mock_ap
             "guid": "task-far",
             "title": "Far Task",
             "description": "Due later",
-            "dueDate": (now_utc + timedelta(days=10)).isoformat().replace("+00:00", "Z"),  # Beyond 7 days
+            "dueDate": firefly_due(10),  # Beyond 7 days
             "setDate": (now_utc - timedelta(days=1)).isoformat().replace("+00:00", "Z"),
             "subject": {"name": "Science"},
             "completionStatus": "Todo",
@@ -686,7 +687,7 @@ async def test_coordinator_task_lookahead_zero_days(hass: HomeAssistant, mock_ap
         "guid": "future-task",
         "title": "Future Task",
         "description": "Due tomorrow",
-        "dueDate": (now + timedelta(days=1)).isoformat() + "Z",
+        "dueDate": firefly_due(1),
         "setDate": now.isoformat() + "Z",
         "subject": {"name": "Math"},
         "completionStatus": "Todo",
@@ -725,7 +726,7 @@ async def test_coordinator_completed_tasks_filtering(hass: HomeAssistant, mock_a
             "guid": "completed-task",
             "title": "Completed Task",
             "description": "Already done",
-            "dueDate": (now + timedelta(days=1)).isoformat() + "Z",
+            "dueDate": firefly_due(1),
             "setDate": now.isoformat() + "Z",
             "subject": {"name": "Math"},
             "completionStatus": "Done",  # Completed
@@ -735,7 +736,7 @@ async def test_coordinator_completed_tasks_filtering(hass: HomeAssistant, mock_a
             "guid": "todo-task",
             "title": "Todo Task",
             "description": "Still to do",
-            "dueDate": (now + timedelta(days=2)).isoformat() + "Z",
+            "dueDate": firefly_due(2),
             "setDate": now.isoformat() + "Z",
             "subject": {"name": "Science"},
             "completionStatus": "Todo",  # Not completed
@@ -802,7 +803,7 @@ async def test_coordinator_refresh_with_existing_data(hass: HomeAssistant, mock_
             "guid": "new-task",
             "title": "New Task",
             "description": "Added after first refresh",
-            "dueDate": (datetime.now() + timedelta(days=1)).isoformat() + "Z",
+            "dueDate": firefly_due(1),
             "setDate": datetime.now().isoformat() + "Z",
             "subject": {"name": "Physics"},
             "completionStatus": "Todo",
@@ -1101,7 +1102,7 @@ async def test_coordinator_process_tasks_missing_subject(hass: HomeAssistant, mo
             "guid": "no-subject-task",
             "title": "Task Without Subject",
             "description": "No subject field",
-            "dueDate": (now + timedelta(days=1)).isoformat().replace("+00:00", "Z"),
+            "dueDate": firefly_due(1),
             "setDate": now.isoformat().replace("+00:00", "Z"),
             # Missing subject field
             "completionStatus": "Todo",
@@ -1136,7 +1137,7 @@ async def test_coordinator_process_tasks_missing_setter(hass: HomeAssistant, moc
             "guid": "no-setter-task",
             "title": "Task Without Setter",
             "description": "No setter field",
-            "dueDate": (now + timedelta(days=1)).isoformat().replace("+00:00", "Z"),
+            "dueDate": firefly_due(1),
             "setDate": now.isoformat().replace("+00:00", "Z"),
             "subject": {"name": "Math"},
             "completionStatus": "Todo",
@@ -1230,136 +1231,6 @@ async def test_coordinator_process_tasks_keyerror_handling(hass: HomeAssistant, 
 
     # Task should be filtered out due to processing error (gracefully handled)
     assert len(child_data["tasks"]["all"]) >= 0
-
-
-@pytest.mark.asyncio
-async def test_coordinator_filter_tasks_naive_datetime_handling(hass: HomeAssistant, mock_api):
-    """Test _filter_tasks_by_date with naive datetime inputs."""
-    now_utc = datetime.now(timezone.utc)
-
-    # Mock task with proper date
-    mock_api.get_tasks.return_value = [
-        {
-            "guid": "test-task",
-            "title": "Test Task",
-            "description": "Test",
-            "dueDate": (now_utc + timedelta(hours=1)).isoformat().replace("+00:00", "Z"),
-            "setDate": now_utc.isoformat().replace("+00:00", "Z"),
-            "subject": {"name": "Math"},
-            "completionStatus": "Todo",
-            "setter": {"name": "Teacher"},
-        }
-    ]
-
-    coordinator = FireflyUpdateCoordinator(
-        hass=hass,
-        api=mock_api,
-        task_lookahead_days=7,
-    )
-
-    # Test with naive datetime (coordinator should handle timezone conversion)
-    naive_start = datetime.now().replace(tzinfo=None)
-    naive_end = naive_start + timedelta(days=1)
-
-    filtered_tasks = coordinator._filter_tasks_by_date(mock_api.get_tasks.return_value, naive_start, naive_end)
-
-    assert len(filtered_tasks) >= 0  # Should not crash
-
-
-@pytest.mark.asyncio
-async def test_coordinator_filter_tasks_no_timezone_due_date(hass: HomeAssistant, mock_api):
-    """Test _filter_tasks_by_date with due date without timezone info."""
-    now = datetime.now()
-
-    # Mock task with naive due date (no timezone)
-    mock_api.get_tasks.return_value = [
-        {
-            "guid": "naive-task",
-            "title": "Naive Date Task",
-            "description": "Task with naive due date",
-            "dueDate": (now + timedelta(hours=1)).isoformat(),  # No 'Z' suffix
-            "setDate": now.isoformat() + "Z",
-            "subject": {"name": "Math"},
-            "completionStatus": "Todo",
-            "setter": {"name": "Teacher"},
-        }
-    ]
-
-    coordinator = FireflyUpdateCoordinator(
-        hass=hass,
-        api=mock_api,
-        task_lookahead_days=7,
-    )
-
-    start = datetime.now(timezone.utc)
-    end = start + timedelta(days=1)
-
-    filtered_tasks = coordinator._filter_tasks_by_date(mock_api.get_tasks.return_value, start, end)
-
-    assert len(filtered_tasks) >= 0  # Should handle naive datetime gracefully
-
-
-@pytest.mark.asyncio
-async def test_coordinator_filter_overdue_tasks_naive_now(hass: HomeAssistant, mock_api):
-    """Test _filter_overdue_tasks with naive now datetime."""
-    past_time = datetime.now(timezone.utc) - timedelta(days=1)
-
-    mock_api.get_tasks.return_value = [
-        {
-            "guid": "overdue-task",
-            "title": "Overdue Task",
-            "description": "Past due",
-            "dueDate": past_time.isoformat().replace("+00:00", "Z"),
-            "setDate": (past_time - timedelta(days=1)).isoformat().replace("+00:00", "Z"),
-            "subject": {"name": "Math"},
-            "completionStatus": "Todo",
-            "setter": {"name": "Teacher"},
-        }
-    ]
-
-    coordinator = FireflyUpdateCoordinator(
-        hass=hass,
-        api=mock_api,
-        task_lookahead_days=7,
-    )
-
-    # Test with naive now datetime
-    naive_now = datetime.now().replace(tzinfo=None)
-
-    overdue_tasks = coordinator._filter_overdue_tasks(mock_api.get_tasks.return_value, naive_now)
-
-    assert len(overdue_tasks) >= 0  # Should handle timezone conversion
-
-
-@pytest.mark.asyncio
-async def test_coordinator_filter_overdue_tasks_naive_due_date(hass: HomeAssistant, mock_api):
-    """Test _filter_overdue_tasks with naive due date."""
-    past_time = datetime.now() - timedelta(days=1)
-
-    mock_api.get_tasks.return_value = [
-        {
-            "guid": "naive-overdue-task",
-            "title": "Naive Overdue Task",
-            "description": "Past due with naive date",
-            "dueDate": past_time.isoformat(),  # No timezone info
-            "setDate": (past_time - timedelta(days=1)).isoformat() + "Z",
-            "subject": {"name": "Math"},
-            "completionStatus": "Todo",
-            "setter": {"name": "Teacher"},
-        }
-    ]
-
-    coordinator = FireflyUpdateCoordinator(
-        hass=hass,
-        api=mock_api,
-        task_lookahead_days=7,
-    )
-
-    now = datetime.now(timezone.utc)
-
-    overdue_tasks = coordinator._filter_overdue_tasks(mock_api.get_tasks.return_value, now)
-
-    assert len(overdue_tasks) >= 0  # Should handle naive due date conversion
 
 
 @pytest.mark.asyncio
@@ -1899,3 +1770,83 @@ async def test_coordinator_statistics_error_type_tracking(hass: HomeAssistant, m
 
     assert coordinator.statistics["error_counts"]["FireflyConnectionError"] == 2
     assert coordinator.statistics["error_counts"]["FireflyAuthenticationError"] == 1
+
+
+# --- Local calendar due dates -------------------------------------------------
+
+
+def _task(due):
+    """Build a raw Firefly task with the given dueDate."""
+    return {"id": f"id-{due}", "title": f"due {due}", "dueDate": due, "completionStatus": "Todo"}
+
+
+@pytest.fixture
+def date_coordinator(hass: HomeAssistant, mock_api, melbourne):
+    """Coordinator with HA set to Australia/Melbourne."""
+    return FireflyUpdateCoordinator(hass=hass, api=mock_api, task_lookahead_days=7)
+
+
+@freeze_time("2026-11-20 10:00:00")  # UTC: 9pm 20 Nov in Melbourne
+def test_due_today_all_day_local(date_coordinator):
+    """A task due today is due all day, and not overdue in the evening."""
+    tasks = [_task("2026-11-20T00:00:00")]
+    today = date(2026, 11, 20)
+    assert len(date_coordinator._filter_tasks_by_date(tasks, today, today + timedelta(days=1))) == 1
+    assert date_coordinator._filter_overdue_tasks(tasks, today) == []
+
+
+def test_overdue_from_next_day(date_coordinator):
+    """A task becomes overdue the day after its due date."""
+    tasks = [_task("2026-11-20T00:00:00")]
+    assert len(date_coordinator._filter_overdue_tasks(tasks, date(2026, 11, 21))) == 1
+
+
+def test_upcoming_window_is_today_plus_lookahead_exclusive(date_coordinator):
+    """The lookahead window includes today + 6 days and excludes today + 7."""
+    tasks = [_task("2026-11-20T00:00:00"), _task("2026-11-21T00:00:00")]
+    today = date(2026, 11, 14)
+    titles = [t["title"] for t in date_coordinator._filter_tasks_by_date(tasks, today, today + timedelta(days=7))]
+    assert titles == ["due 2026-11-20T00:00:00"]
+
+
+def test_filters_skip_bad_due_dates(date_coordinator):
+    """Missing or junk due dates are left out of every filter."""
+    tasks = [_task(None), _task(""), _task("not-a-date")]
+    today = date(2026, 11, 14)
+    assert date_coordinator._filter_tasks_by_date(tasks, today, today + timedelta(days=7)) == []
+    assert date_coordinator._filter_overdue_tasks(tasks, today) == []
+
+
+def test_overdue_skips_completed(date_coordinator):
+    """Completed tasks are never overdue."""
+    task = _task("2026-11-01T00:00:00") | {"completionStatus": "Completed"}
+    assert date_coordinator._filter_overdue_tasks([task], date(2026, 11, 14)) == []
+
+
+def test_processed_due_date_is_local_midnight(date_coordinator):
+    """Processed tasks carry the due date as local midnight."""
+    [processed] = date_coordinator._process_tasks([_task("2026-11-20T00:00:00")])
+    assert processed["due_date"].isoformat() == "2026-11-20T00:00:00+11:00"
+
+
+@pytest.mark.asyncio
+@freeze_time("2026-11-19 14:00:00")  # UTC: 1am on 20 Nov in Melbourne, still 19 Nov in UTC
+async def test_update_uses_local_today(hass: HomeAssistant, mock_api, melbourne):
+    """The full update works out "today" in HA's timezone, not UTC."""
+    mock_api.get_tasks.return_value = [
+        _task("2026-11-20T00:00:00") | {"title": "Due 20th"},
+        _task("2026-11-19T00:00:00") | {"title": "Due 19th"},
+    ]
+    coordinator = FireflyUpdateCoordinator(hass=hass, api=mock_api, task_lookahead_days=7)
+
+    data = await coordinator._async_update_data()
+
+    tasks = next(iter(data["children_data"].values()))["tasks"]
+    assert [t["title"] for t in tasks["due_today"]] == ["Due 20th"]
+    assert [t["title"] for t in tasks["overdue"]] == ["Due 19th"]
+
+
+def test_overdue_handles_null_completion_status(date_coordinator):
+    """A task with a null completionStatus is treated as not completed, without raising."""
+    task = _task("2026-11-01T00:00:00") | {"completionStatus": None}
+    assert len(date_coordinator._filter_overdue_tasks([task], date(2026, 11, 14))) == 1
