@@ -19,6 +19,7 @@ from .exceptions import (
     FireflyRateLimitError,
     FireflyTokenExpiredError,
 )
+from .subjects import class_subjects, with_subjects
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -216,7 +217,8 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):  # pylint: disable=too-ma
         """Fetch data for a single child."""
         events_today = await self.api.get_events(date_ranges["today_start"], date_ranges["today_end"], child_guid)
         events_calendar = await self.api.get_events(date_ranges["week_start"], date_ranges["calendar_end"], child_guid)
-        tasks = await self.api.get_tasks(student_guid=child_guid)
+        # Firefly tasks carry no subject; find it from the class they were set for
+        tasks = with_subjects(await self.api.get_tasks(student_guid=child_guid), class_subjects(events_calendar))
         today = now.date()
 
         return {
