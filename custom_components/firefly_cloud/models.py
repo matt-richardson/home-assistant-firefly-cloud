@@ -99,7 +99,7 @@ class Task:  # pylint: disable=too-many-instance-attributes
         subject_data = raw.get("subject")
         subject: str | None = None
         if isinstance(subject_data, dict):
-            subject = subject_data.get("name", UNKNOWN_SUBJECT)
+            subject = subject_data.get("name")
         elif isinstance(subject_data, str):
             subject = subject_data
 

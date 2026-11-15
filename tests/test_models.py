@@ -1,5 +1,6 @@
 """Tests for the typed Firefly models."""
 
+from dataclasses import replace
 from datetime import date, datetime, timezone
 
 import pytest
@@ -42,7 +43,7 @@ def test_task_from_firefly_matches_processed_rules():
     assert Task.from_firefly({"setter": {}}).setter == "Unknown"
     assert Task.from_firefly({"setter": "Mr Lee"}).setter == "Mr Lee"
     assert Task.from_firefly({"subject": {"name": "Art"}}).subject == "Art"
-    assert Task.from_firefly({"subject": {}}).subject == UNKNOWN_SUBJECT
+    assert Task.from_firefly({"subject": {}}).subject is None
     assert Task.from_firefly({"subject": "Music"}).subject == "Music"
     assert Task.from_firefly({"subject": None}).subject is None
     assert Task.from_firefly({"subject": 5}).subject is None
@@ -73,8 +74,6 @@ def test_task_change_properties():
     assert not plain.due_date_changed
     assert plain.change_reason is None
     assert Task.from_firefly({"completionStatus": None}).is_completed is False
-
-    from dataclasses import replace
 
     moved = replace(plain, change={"active": {"new_due_date": "2026-11-22", "reason": "Away"}})
     assert moved.due_date_changed
