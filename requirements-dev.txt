@@ -39,3 +39,6 @@ responses  # For HTTP mocking
 # Missing Home Assistant dependencies
 numpy  # Required by stream component
 scipy  # Often required alongside numpy
+
+# Node for the dashboard cards' JavaScript tests (./dev.sh node-setup)
+nodeenv>=1.9.1

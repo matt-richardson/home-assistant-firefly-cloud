@@ -21,6 +21,10 @@ from .const import (
 )
 from .coordinator import FireflyUpdateCoordinator
 from .exceptions import FireflyAuthenticationError, FireflyConnectionError, FireflyTokenExpiredError
+from .frontend import async_register_frontend
+from .services import async_setup_services, async_unload_services
+from .task_changes import TaskChangeStore
+from .websocket_api import async_register_websocket_api
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -84,12 +88,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         _LOGGER.exception("Unexpected error setting up Firefly Cloud")
         raise ConfigEntryNotReady(f"Unexpected error: {err}") from err
 
+    # Due date changes made on the dashboard (kept in Home Assistant, not Firefly)
+    change_store = TaskChangeStore(hass, entry.entry_id)
+    await change_store.async_load()
+
     # Create update coordinator
     coordinator = FireflyUpdateCoordinator(
         hass=hass,
         api=api,
         task_lookahead_days=task_lookahead_days,
         children_guids=children_guids,
+        change_store=change_store,
     )
 
     # Fetch initial data
@@ -101,6 +110,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Store coordinator in hass.data
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
+
+    async_setup_services(hass)
+    async_register_websocket_api(hass)
+    await async_register_frontend(hass)
 
     # Set up platforms
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -130,12 +143,22 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             except Exception as err:  # pylint: disable=broad-except
                 _LOGGER.warning("Error shutting down coordinator: %s", err)
 
+        # Then write any pending task change save (and stop saving) before a reload or removal
+        if coordinator and getattr(coordinator, "change_store", None) is not None:
+            await coordinator.change_store.async_flush()
+
         # Clean up hass.data if this was the last entry
         if not hass.data[DOMAIN]:
             hass.data.pop(DOMAIN)
+            async_unload_services(hass)
 
     _LOGGER.info("Firefly Cloud integration unloaded for %s", entry.title)
     return unload_ok
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Delete the entry's saved task changes when it's removed."""
+    await TaskChangeStore(hass, entry.entry_id).async_remove()
 
 
 async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:

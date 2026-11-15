@@ -73,5 +73,49 @@
       "title": "Unexpected Error",
       "description": "An unexpected error occurred while updating Firefly data: {error_message}. Please check the logs for more details."
     }
+  },
+  "services": {
+    "set_task_due_date": {
+      "name": "Set task due date",
+      "description": "Change a task's due date on the dashboard, or add a note, with an optional reason. Firefly itself is not changed.",
+      "fields": {
+        "task_id": {
+          "name": "Task ID",
+          "description": "The Firefly task ID."
+        },
+        "due_date": {
+          "name": "New due date",
+          "description": "Leave empty to add a note without changing the date."
+        },
+        "reason": {
+          "name": "Reason",
+          "description": "Why the date changed, e.g. \"Doing it in class today\"."
+        }
+      }
+    },
+    "clear_task_due_date": {
+      "name": "Undo task due date change",
+      "description": "Undo a dashboard due date change or note. The change stays in the task's history.",
+      "fields": {
+        "task_id": {
+          "name": "Task ID",
+          "description": "The Firefly task ID."
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "entity_not_found": {
+      "message": "{entity_id} is not a Firefly Cloud tasks list."
+    },
+    "task_not_found": {
+      "message": "Task {task_id} is not one of this child's open tasks."
+    },
+    "nothing_to_change": {
+      "message": "Give a new due date or a reason."
+    },
+    "no_change": {
+      "message": "This task has no due date change to undo."
+    }
   }
 }
