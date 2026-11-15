@@ -16,6 +16,7 @@ from homeassistant.util import dt as dt_util
 
 from .child_lookup import resolve_child
 from .const import DOMAIN
+from .models import Task
 from .task_changes import clear_change, set_change
 
 SERVICE_SET_TASK_DUE_DATE = "set_task_due_date"
@@ -53,7 +54,7 @@ def _error(key: str, **placeholders: str) -> ServiceValidationError:
     return ServiceValidationError(translation_domain=DOMAIN, translation_key=key, translation_placeholders=placeholders)
 
 
-def _resolve_task(hass: HomeAssistant, call: ServiceCall) -> tuple[Any, str, dict[str, Any]]:
+def _resolve_task(hass: HomeAssistant, call: ServiceCall) -> tuple[Any, str, Task]:
     """Find the coordinator, child and open task a service call targets."""
     entity_id = call.data["entity_id"]
     resolved = resolve_child(hass, entity_id)
@@ -61,8 +62,8 @@ def _resolve_task(hass: HomeAssistant, call: ServiceCall) -> tuple[Any, str, dic
         raise _error("entity_not_found", entity_id=entity_id)
     coordinator, child_guid = resolved
     task_id = call.data[ATTR_TASK_ID]
-    tasks = (coordinator.data or {}).get("children_data", {}).get(child_guid, {}).get("tasks", {}).get("all", [])
-    task = next((t for t in tasks if str(t.get("id")) == task_id), None)
+    child = coordinator.data.child(child_guid) if coordinator.data else None
+    task = next((t for t in child.tasks if t.id == task_id), None) if child else None
     if task is None:
         raise _error("task_not_found", task_id=task_id)
     return coordinator, child_guid, task
@@ -74,8 +75,8 @@ async def _async_set_task_due_date(hass: HomeAssistant, call: ServiceCall) -> No
         set_change(
             coordinator.change_store.state,
             child_guid,
-            task["id"],
-            firefly_due=task.get("firefly_due_date"),
+            task.id,
+            firefly_due=task.firefly_due,
             new_due=call.data.get(ATTR_DUE_DATE),
             reason=call.data.get(ATTR_REASON),
             now=dt_util.now(),
@@ -89,7 +90,7 @@ async def _async_set_task_due_date(hass: HomeAssistant, call: ServiceCall) -> No
 async def _async_clear_task_due_date(hass: HomeAssistant, call: ServiceCall) -> None:
     coordinator, child_guid, task = _resolve_task(hass, call)
     try:
-        clear_change(coordinator.change_store.state, child_guid, task["id"], dt_util.now())
+        clear_change(coordinator.change_store.state, child_guid, task.id, dt_util.now())
     except ValueError as err:
         raise _error(str(err)) from err
     coordinator.change_store.async_save_delayed()
