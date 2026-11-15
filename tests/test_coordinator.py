@@ -1151,20 +1151,12 @@ async def test_coordinator_process_tasks_keyerror_handling(hass: HomeAssistant, 
 
 
 @pytest.mark.asyncio
-async def test_coordinator_process_tasks_subject_dict(hass):
+async def test_coordinator_process_tasks_subject_dict(hass, mock_api):
     """Test coordinator handles task with subject as dict."""
-    from unittest.mock import AsyncMock
-
-    from custom_components.firefly_cloud.api import FireflyAPIClient
-    from custom_components.firefly_cloud.coordinator import FireflyUpdateCoordinator
-
-    # Create mock API client
-    mock_api = AsyncMock(spec=FireflyAPIClient)
-
     coordinator = FireflyUpdateCoordinator(hass, mock_api, task_lookahead_days=7, children_guids=["child1"])
 
     # Create task with subject as dict
-    tasks = [
+    mock_api.get_tasks.return_value = [
         {
             "guid": "task1",
             "title": "Math Homework",
@@ -1176,27 +1168,20 @@ async def test_coordinator_process_tasks_subject_dict(hass):
         }
     ]
 
-    processed = coordinator._process_tasks(tasks)
+    data = await coordinator._async_update_data()
+    processed = data["children_data"]["child1"]["tasks"]["all"]
 
     assert len(processed) == 1
     assert processed[0]["subject"] == "Mathematics"
 
 
 @pytest.mark.asyncio
-async def test_coordinator_process_tasks_subject_string(hass):
+async def test_coordinator_process_tasks_subject_string(hass, mock_api):
     """Test coordinator handles task with subject as string."""
-    from unittest.mock import AsyncMock
-
-    from custom_components.firefly_cloud.api import FireflyAPIClient
-    from custom_components.firefly_cloud.coordinator import FireflyUpdateCoordinator
-
-    # Create mock API client
-    mock_api = AsyncMock(spec=FireflyAPIClient)
-
     coordinator = FireflyUpdateCoordinator(hass, mock_api, task_lookahead_days=7, children_guids=["child1"])
 
     # Create task with subject as string
-    tasks = [
+    mock_api.get_tasks.return_value = [
         {
             "guid": "task1",
             "title": "Math Homework",
@@ -1208,7 +1193,8 @@ async def test_coordinator_process_tasks_subject_string(hass):
         }
     ]
 
-    processed = coordinator._process_tasks(tasks)
+    data = await coordinator._async_update_data()
+    processed = data["children_data"]["child1"]["tasks"]["all"]
 
     assert len(processed) == 1
     assert processed[0]["subject"] == "Mathematics"
@@ -1703,46 +1689,67 @@ def date_coordinator(hass: HomeAssistant, mock_api, melbourne):
     return FireflyUpdateCoordinator(hass=hass, api=mock_api, task_lookahead_days=7)
 
 
+async def _refreshed_child(coordinator, tasks):
+    """Refresh the coordinator with the given raw tasks and return the (only) child's data."""
+    coordinator.api.get_tasks.return_value = tasks
+    data = await coordinator._async_update_data()
+    return next(iter(data.children.values()))
+
+
+@pytest.mark.asyncio
 @freeze_time("2026-11-20 10:00:00")  # UTC: 9pm 20 Nov in Melbourne
-def test_due_today_all_day_local(date_coordinator):
+async def test_due_today_all_day_local(date_coordinator):
     """A task due today is due all day, and not overdue in the evening."""
-    tasks = [_task("2026-11-20T00:00:00")]
-    today = date(2026, 11, 20)
-    assert len(date_coordinator._filter_tasks_by_date(tasks, today, today + timedelta(days=1))) == 1
-    assert date_coordinator._filter_overdue_tasks(tasks, today) == []
+    child = await _refreshed_child(date_coordinator, [_task("2026-11-20T00:00:00")])
+    assert child.today == date(2026, 11, 20)
+    assert len(child.due_today) == 1
+    assert child.overdue == []
 
 
-def test_overdue_from_next_day(date_coordinator):
+@pytest.mark.asyncio
+@freeze_time("2026-11-21 01:00:00")  # UTC: noon 21 Nov in Melbourne
+async def test_overdue_from_next_day(date_coordinator):
     """A task becomes overdue the day after its due date."""
-    tasks = [_task("2026-11-20T00:00:00")]
-    assert len(date_coordinator._filter_overdue_tasks(tasks, date(2026, 11, 21))) == 1
+    child = await _refreshed_child(date_coordinator, [_task("2026-11-20T00:00:00")])
+    assert child.today == date(2026, 11, 21)
+    assert len(child.overdue) == 1
 
 
-def test_upcoming_window_is_today_plus_lookahead_exclusive(date_coordinator):
+@pytest.mark.asyncio
+@freeze_time("2026-11-14 01:00:00")  # UTC: noon 14 Nov in Melbourne
+async def test_upcoming_window_is_today_plus_lookahead_exclusive(date_coordinator):
     """The lookahead window includes today + 6 days and excludes today + 7."""
-    tasks = [_task("2026-11-20T00:00:00"), _task("2026-11-21T00:00:00")]
-    today = date(2026, 11, 14)
-    titles = [t["title"] for t in date_coordinator._filter_tasks_by_date(tasks, today, today + timedelta(days=7))]
-    assert titles == ["due 2026-11-20T00:00:00"]
+    child = await _refreshed_child(date_coordinator, [_task("2026-11-20T00:00:00"), _task("2026-11-21T00:00:00")])
+    assert child.today == date(2026, 11, 14)
+    assert [t.title for t in child.upcoming] == ["due 2026-11-20T00:00:00"]
 
 
-def test_filters_skip_bad_due_dates(date_coordinator):
+@pytest.mark.asyncio
+@freeze_time("2026-11-14 01:00:00")  # UTC: noon 14 Nov in Melbourne
+async def test_filters_skip_bad_due_dates(date_coordinator):
     """Missing or junk due dates are left out of every filter."""
-    tasks = [_task(None), _task(""), _task("not-a-date")]
-    today = date(2026, 11, 14)
-    assert date_coordinator._filter_tasks_by_date(tasks, today, today + timedelta(days=7)) == []
-    assert date_coordinator._filter_overdue_tasks(tasks, today) == []
+    child = await _refreshed_child(date_coordinator, [_task(None), _task(""), _task("not-a-date")])
+    assert child.today == date(2026, 11, 14)
+    assert len(child.tasks) == 3
+    assert child.upcoming == []
+    assert child.overdue == []
 
 
-def test_overdue_skips_completed(date_coordinator):
+@pytest.mark.asyncio
+@freeze_time("2026-11-14 01:00:00")  # UTC: noon 14 Nov in Melbourne
+async def test_overdue_skips_completed(date_coordinator):
     """Completed tasks are never overdue."""
-    task = _task("2026-11-01T00:00:00") | {"completionStatus": "Completed"}
-    assert date_coordinator._filter_overdue_tasks([task], date(2026, 11, 14)) == []
+    child = await _refreshed_child(date_coordinator, [_task("2026-11-01T00:00:00") | {"completionStatus": "Completed"}])
+    assert child.today == date(2026, 11, 14)
+    assert child.overdue == []
 
 
-def test_processed_due_date_is_local_midnight(date_coordinator):
+@pytest.mark.asyncio
+async def test_processed_due_date_is_local_midnight(date_coordinator):
     """Processed tasks carry the due date as local midnight."""
-    [processed] = date_coordinator._process_tasks([_task("2026-11-20T00:00:00")])
+    date_coordinator.api.get_tasks.return_value = [_task("2026-11-20T00:00:00")]
+    data = await date_coordinator._async_update_data()
+    [processed] = next(iter(data["children_data"].values()))["tasks"]["all"]
     assert processed["due_date"].isoformat() == "2026-11-20T00:00:00+11:00"
 
 
@@ -1763,10 +1770,13 @@ async def test_update_uses_local_today(hass: HomeAssistant, mock_api, melbourne)
     assert [t["title"] for t in tasks["overdue"]] == ["Due 19th"]
 
 
-def test_overdue_handles_null_completion_status(date_coordinator):
+@pytest.mark.asyncio
+@freeze_time("2026-11-14 01:00:00")  # UTC: noon 14 Nov in Melbourne
+async def test_overdue_handles_null_completion_status(date_coordinator):
     """A task with a null completionStatus is treated as not completed, without raising."""
-    task = _task("2026-11-01T00:00:00") | {"completionStatus": None}
-    assert len(date_coordinator._filter_overdue_tasks([task], date(2026, 11, 14))) == 1
+    child = await _refreshed_child(date_coordinator, [_task("2026-11-01T00:00:00") | {"completionStatus": None}])
+    assert child.today == date(2026, 11, 14)
+    assert len(child.overdue) == 1
 
 
 def _week_event(code, subject):

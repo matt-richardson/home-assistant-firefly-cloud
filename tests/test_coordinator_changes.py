@@ -312,3 +312,46 @@ async def test_subjects_survive_holidays(hass: HomeAssistant, mock_api, change_s
     [processed] = _child(await coordinator._async_update_data())["tasks"]["all"]
 
     assert processed["subject"] == "Year 8 Performing Arts"
+
+
+@pytest.mark.asyncio
+async def test_coordinator_data_is_firefly_data(hass: HomeAssistant, mock_api, change_store):
+    """After a refresh the coordinator holds typed data."""
+    from custom_components.firefly_cloud.models import FireflyData, Task
+
+    coordinator = await _coordinator_with(hass, mock_api, change_store, [_dated_task(1, 2)])
+
+    assert isinstance(coordinator.data, FireflyData)
+    [guid] = coordinator.data.children
+    assert isinstance(coordinator.data.child(guid).tasks[0], Task)
+
+
+@pytest.mark.asyncio
+async def test_rebuild_twice_is_stable(hass: HomeAssistant, mock_api, change_store):
+    """Rebuilding re-applies changes to the cached raw data without altering it."""
+    from unittest.mock import MagicMock
+
+    from custom_components.firefly_cloud.task_changes import set_change
+
+    coordinator = await _coordinator_with(hass, mock_api, change_store, [_dated_task(1, -1, "Late")])
+    coordinator.async_update_listeners = MagicMock()
+    [guid] = coordinator.data.children
+    set_change(
+        change_store.state,
+        guid,
+        1,
+        firefly_due=_today() - timedelta(days=1),
+        new_due=_today() + timedelta(days=2),
+        reason="x",
+        now=datetime.now(),
+    )
+
+    await coordinator.async_rebuild_from_last_fetch()
+    first = coordinator.data.children
+    await coordinator.async_rebuild_from_last_fetch()
+
+    assert coordinator.data.children == first
+    assert first[guid].tasks[0].due == _today() + timedelta(days=2)
+    for raw_task in coordinator._last_raw[guid]["tasks"]:
+        assert "fireflyDueDate" not in raw_task
+        assert "_change" not in raw_task

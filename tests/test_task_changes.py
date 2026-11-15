@@ -5,9 +5,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from zoneinfo import ZoneInfo
 
 import pytest
+from conftest import make_task
 
 from custom_components.firefly_cloud.task_changes import (
     TaskChangeStore,
+    apply_changes,
     clear_change,
     effective_due,
     observe_firefly_dates,
@@ -307,3 +309,42 @@ async def test_saves_after_flush_are_ignored():
     changes.remember_class_subjects(CHILD, {"pabc1 b": "Year 8 Performing Arts"})
 
     store.async_delay_save.assert_not_called()
+
+
+def test_apply_changes_returns_tasks_with_effective_due():
+    """Applying changes gives new tasks carrying the date in force and the change record."""
+    with patch("custom_components.firefly_cloud.task_changes.Store"):
+        store = TaskChangeStore(MagicMock(), "entry-1")
+    observe_firefly_dates(store.state, CHILD, {"t1": NOV[20]}, NOW)
+    set_change(store.state, CHILD, "t1", firefly_due=NOV[20], new_due=NOV[25], reason="ill", now=NOW)
+    task = make_task("t1", due=NOV[20])
+
+    [applied] = apply_changes(store, CHILD, [task], NOW)
+
+    assert applied.due == date(2026, 11, 25)
+    assert applied.firefly_due == date(2026, 11, 20)
+    assert applied.due_date_changed is True
+    assert applied.change == task_record(store.state, CHILD, "t1")
+    assert task.due == NOV[20] and task.change is None
+
+
+def test_apply_changes_without_store_returns_tasks_unchanged():
+    """With no store there is nothing to apply."""
+    tasks = [make_task("t1", due=NOV[20])]
+    assert apply_changes(None, CHILD, tasks, NOW) is tasks
+
+
+def test_apply_changes_saves_only_when_firefly_dates_change():
+    """The store is saved when Firefly's dates are first seen or change, not otherwise."""
+    with patch("custom_components.firefly_cloud.task_changes.Store"):
+        store = TaskChangeStore(MagicMock(), "entry-1")
+    store.async_save_delayed = MagicMock()
+    tasks = [make_task("t1", due=NOV[20])]
+
+    apply_changes(store, CHILD, tasks, NOW)
+    apply_changes(store, CHILD, tasks, NOW)
+
+    assert store.async_save_delayed.call_count == 1
+    [applied] = apply_changes(store, CHILD, tasks, NOW)
+    assert applied.due == NOV[20] and applied.due_date_changed is False
+    assert applied.change == task_record(store.state, CHILD, "t1")

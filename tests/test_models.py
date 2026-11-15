@@ -4,7 +4,7 @@ from dataclasses import replace
 from datetime import date, datetime, timezone
 
 import pytest
-from conftest import make_child, make_data
+from conftest import make_child, make_data, make_task
 
 from custom_components.firefly_cloud.models import UNKNOWN_SUBJECT, Bucket, Lesson, Task, bucket
 
@@ -142,3 +142,32 @@ def test_firefly_data_child():
     data = make_data(child)
     assert data.child("child-1") is child
     assert data.child("nope") is None
+
+
+# TEMPORARY: removed with the compatibility layer once every consumer reads FireflyData
+def test_legacy_top_level_dict():
+    """FireflyData still serves the old top-level dict keys."""
+    child = make_child("c1", tasks=[make_task("t1", due=date(2026, 11, 20), subject=None)], today=date(2026, 11, 14))
+    data = make_data(child, user_info={"guid": "u"})
+
+    assert data["children_guids"] == ["c1"]
+    assert data.get("user_info") == {"guid": "u"}
+    assert data.get("missing", "fallback") == "fallback"
+    assert "last_updated" in data and "missing" not in data
+    [task] = data["children_data"]["c1"]["tasks"]["upcoming"]
+    assert task["subject"] == UNKNOWN_SUBJECT
+    assert "change" not in task
+
+
+def test_legacy_task_dict_has_change_fields_only_with_a_change_record():
+    """Tasks that went through a change store carry the change fields, as before."""
+    record = {"active": {"new_due_date": "2026-11-25", "reason": "ill"}}
+    task = make_task("t1", due=date(2026, 11, 25), firefly_due=date(2026, 11, 20), change=record)
+    child = make_child("c1", tasks=[task], today=date(2026, 11, 14), lookahead_days=30)
+
+    [legacy] = make_data(child)["children_data"]["c1"]["tasks"]["all"]
+
+    assert legacy["firefly_due_date"] == date(2026, 11, 20)
+    assert legacy["due_date_changed"] is True
+    assert legacy["due_date_change_reason"] == "ill"
+    assert legacy["change"] is record
