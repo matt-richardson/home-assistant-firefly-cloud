@@ -5,12 +5,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from enum import StrEnum
-from functools import cached_property
 from typing import Any
 
 from homeassistant.util import dt as dt_util
 
-from .dates import local_midnight, parse_due_date
+from .dates import parse_due_date
 
 UNKNOWN_SUBJECT = "Unknown Subject"
 
@@ -190,79 +189,3 @@ class FireflyData:
     def child(self, guid: str) -> ChildData | None:
         """Return a child's data, or None if unknown."""
         return self.children.get(guid)
-
-    # TEMPORARY: removed when every consumer reads FireflyData
-    @cached_property
-    def _legacy(self) -> dict[str, Any]:
-        return {
-            "user_info": self.user_info,
-            "children_guids": list(self.children),
-            "children_data": {guid: _legacy_child_dict(child) for guid, child in self.children.items()},
-            "last_updated": self.last_updated,
-        }
-
-    def __getitem__(self, key: str) -> Any:
-        """Serve the old top-level dict (TEMPORARY)."""
-        return self._legacy[key]
-
-    def get(self, key: str, default: Any = None) -> Any:
-        """Serve the old top-level dict (TEMPORARY)."""
-        return self._legacy.get(key, default)
-
-    def __contains__(self, key: object) -> bool:
-        """Serve the old top-level dict (TEMPORARY)."""
-        return key in self._legacy
-
-
-# TEMPORARY: removed when every consumer reads FireflyData
-def _legacy_task_dict(task: Task) -> dict[str, Any]:
-    """Return a task as the coordinator's old processed dict."""
-    result: dict[str, Any] = {
-        "id": task.id,
-        "title": task.title,
-        "description": task.description,
-        "due_date": local_midnight(task.due) if task.due else None,
-        "set_date": task.set_at,
-        "subject": UNKNOWN_SUBJECT if task.subject is None else task.subject,
-        "completion_status": task.completion_status,
-        "setter": task.setter,
-    }
-    if task.change is not None:
-        # Only tasks that went through a change store had these fields
-        result.update(
-            {
-                "firefly_due_date": task.firefly_due,
-                "due_date_changed": task.due_date_changed,
-                "due_date_change_reason": task.change_reason,
-                "change": task.change,
-            }
-        )
-    return result
-
-
-# TEMPORARY: removed when every consumer reads FireflyData
-def _legacy_child_dict(child: ChildData) -> dict[str, Any]:
-    """Return a child as the coordinator's old processed dict."""
-    return {
-        "events": {
-            "week": [
-                {
-                    "start": lesson.start,
-                    "end": lesson.end,
-                    "subject": lesson.subject,
-                    "location": lesson.location,
-                    "description": lesson.description,
-                    "guild": lesson.guild,
-                    "attendees": list(lesson.attendees),
-                }
-                for lesson in child.lessons
-            ]
-        },
-        "tasks": {
-            "all": [_legacy_task_dict(task) for task in child.tasks],
-            "due_today": [_legacy_task_dict(task) for task in child.due_today],
-            "upcoming": [_legacy_task_dict(task) for task in child.upcoming],
-            "overdue": [_legacy_task_dict(task) for task in child.overdue],
-        },
-        "name": child.name,
-    }

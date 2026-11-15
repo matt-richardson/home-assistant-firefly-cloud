@@ -35,12 +35,7 @@ async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: ConfigE
         CONF_CHILDREN_GUIDS: entry.data.get(CONF_CHILDREN_GUIDS, []),
     }
 
-    # Extract last_updated with proper None handling
-    last_updated = None
-    if coordinator.data and "last_updated" in coordinator.data:
-        last_updated_value = coordinator.data.get("last_updated")
-        if last_updated_value is not None:
-            last_updated = last_updated_value.isoformat()
+    data = coordinator.data
 
     diagnostics_data = {
         "entry": {
@@ -53,9 +48,9 @@ async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: ConfigE
             "statistics": coordinator.statistics,
         },
         "data_summary": {
-            "children_count": len(coordinator.data.get("children_guids", [])) if coordinator.data else 0,
-            "has_user_info": "user_info" in (coordinator.data or {}),
-            "last_updated": last_updated,
+            "children_count": len(data.children) if data is not None else 0,
+            "has_user_info": data is not None,
+            "last_updated": data.last_updated.isoformat() if data is not None else None,
         },
     }
 

@@ -1,6 +1,6 @@
 """Test the Firefly Cloud diagnostics."""
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from unittest.mock import AsyncMock
 
 import pytest
@@ -19,7 +19,7 @@ from custom_components.firefly_cloud.const import (
 )
 from custom_components.firefly_cloud.coordinator import FireflyUpdateCoordinator
 from custom_components.firefly_cloud.diagnostics import async_get_config_entry_diagnostics
-from tests.conftest import create_config_entry_with_version_compat
+from tests.conftest import create_config_entry_with_version_compat, make_child, make_data
 
 
 @pytest.fixture
@@ -33,12 +33,13 @@ def mock_coordinator(hass):
     )
 
     # Set up test data
-    coordinator.data = {
-        "user_info": {"guid": "test-user-123", "username": "test_user"},
-        "children_guids": ["child-1", "child-2"],
-        "children_data": {},
-        "last_updated": datetime.now(timezone.utc),
-    }
+    today = date(2026, 11, 16)
+    coordinator.data = make_data(
+        make_child("child-1", today=today),
+        make_child("child-2", today=today),
+        user_info={"guid": "test-user-123", "username": "test_user"},
+        last_updated=datetime.now(timezone.utc),
+    )
 
     # Set up statistics
     coordinator.statistics = {
