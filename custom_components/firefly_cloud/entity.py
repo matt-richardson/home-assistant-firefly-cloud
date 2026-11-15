@@ -1,7 +1,5 @@
 """Base entity class for Firefly Cloud integration."""
 
-from collections.abc import Callable
-
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -25,7 +23,6 @@ class FireflyBaseEntity(CoordinatorEntity[FireflyUpdateCoordinator]):
         self._child_guid = child_guid
         self._base_name = base_name
         self._attr_name = None
-        self._unsub_coordinator: Callable[[], None] | None = None
 
         school_name = config_entry.data.get(CONF_SCHOOL_NAME, "Firefly Cloud")
         self._attr_device_info = DeviceInfo(
@@ -35,25 +32,6 @@ class FireflyBaseEntity(CoordinatorEntity[FireflyUpdateCoordinator]):
             model="Firefly Cloud Integration",
             configuration_url=config_entry.data.get("host"),
         )
-
-    async def async_added_to_hass(self) -> None:
-        """When entity is added to hass."""
-        await super().async_added_to_hass()
-        # Subscribe to coordinator updates if not already done by CoordinatorEntity
-        if not self._unsub_coordinator:
-            self._unsub_coordinator = self.coordinator.async_add_listener(
-                self._handle_coordinator_update  # type: ignore[arg-type]
-            )
-
-    async def async_will_remove_from_hass(self) -> None:
-        """When entity will be removed from hass."""
-        if self._unsub_coordinator:
-            self._unsub_coordinator()
-        await super().async_will_remove_from_hass()
-
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator."""
-        self.async_write_ha_state()
 
     @property
     def name(self) -> str:

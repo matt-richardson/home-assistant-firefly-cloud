@@ -31,7 +31,7 @@ _LOGGER = logging.getLogger(__name__)
 PLATFORMS: list[Platform] = [Platform.CALENDAR, Platform.SENSOR, Platform.TODO]
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:  # pylint: disable=too-many-statements
     """Set up Firefly Cloud from a config entry."""
     _LOGGER.debug("Setting up Firefly Cloud integration for %s", entry.title)
 
@@ -104,6 +104,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Fetch initial data
     try:
         await coordinator.async_config_entry_first_refresh()
+    except (ConfigEntryAuthFailed, ConfigEntryNotReady):
+        # Let Home Assistant start reauthentication or retry setup as these ask
+        raise
     except Exception as err:
         _LOGGER.error("Failed to fetch initial data from Firefly: %s", err)
         raise ConfigEntryNotReady(f"Failed to fetch initial data: {err}") from err

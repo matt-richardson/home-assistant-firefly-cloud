@@ -9,7 +9,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import CONF_CHILDREN_GUIDS, CONF_USER_GUID, DOMAIN
+from .const import CONF_CHILDREN_GUIDS, CONF_USER_GUID, DOMAIN, TASK_STATUS_COMPLETED
 from .coordinator import FireflyUpdateCoordinator
 from .entity import FireflyBaseEntity
 
@@ -89,14 +89,14 @@ class FireflyTodoListEntity(FireflyBaseEntity, TodoListEntity):  # pylint: disab
             for task in task_list:
                 task_id = task.get("id")
                 if task_id and task_id not in unique_tasks:
-                    status = self._map_completion_status(task.get("completionStatus", "Todo"))
+                    status = self._map_completion_status(task.get("completion_status"))
                     unique_tasks[task_id] = self._create_todo_item(task, status)
 
         return list(unique_tasks.values())
 
-    def _map_completion_status(self, completion_status: str) -> TodoItemStatus:
-        """Map Firefly completion status to TodoItemStatus."""
-        if completion_status == "Done":
+    def _map_completion_status(self, completion_status: str | None) -> TodoItemStatus:
+        """Map a processed task's Firefly completion status to TodoItemStatus."""
+        if (completion_status or "").lower() == TASK_STATUS_COMPLETED.lower():
             return TodoItemStatus.COMPLETED
         return TodoItemStatus.NEEDS_ACTION
 

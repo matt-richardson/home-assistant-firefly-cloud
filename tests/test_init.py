@@ -132,6 +132,27 @@ async def test_async_setup_entry_coordinator_fetch_failure(
 
 
 @pytest.mark.asyncio
+async def test_async_setup_entry_first_refresh_auth_failure_starts_reauth(
+    hass: HomeAssistant,
+    mock_config_entry: ConfigEntry,
+    mock_firefly_api: AsyncMock,
+) -> None:
+    """An auth failure on the first fetch stays an auth failure, so Home Assistant asks to log in again."""
+    with (
+        patch("custom_components.firefly_cloud.FireflyAPIClient") as mock_api_class,
+        patch("custom_components.firefly_cloud.FireflyUpdateCoordinator") as mock_coordinator_class,
+        patch("homeassistant.helpers.aiohttp_client.async_get_clientsession"),
+    ):
+        mock_api_class.return_value = mock_firefly_api
+        mock_coordinator = AsyncMock()
+        mock_coordinator.async_config_entry_first_refresh.side_effect = ConfigEntryAuthFailed("Token expired")
+        mock_coordinator_class.return_value = mock_coordinator
+
+        with pytest.raises(ConfigEntryAuthFailed, match="Token expired"):
+            await async_setup_entry(hass, mock_config_entry)
+
+
+@pytest.mark.asyncio
 async def test_async_unload_entry_success(
     hass: HomeAssistant,
     mock_config_entry: ConfigEntry,
