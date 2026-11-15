@@ -1850,3 +1850,28 @@ def test_overdue_handles_null_completion_status(date_coordinator):
     """A task with a null completionStatus is treated as not completed, without raising."""
     task = _task("2026-11-01T00:00:00") | {"completionStatus": None}
     assert len(date_coordinator._filter_overdue_tasks([task], date(2026, 11, 14))) == 1
+
+
+# --- Subjects from the timetable ----------------------------------------------
+
+
+def _week_event(code, subject):
+    return {
+        "start": "2026-11-16T21:55:00Z",
+        "end": "2026-11-16T22:55:00Z",
+        "subject": subject,
+        "description": f"{code}\nAttendees: Unknown, Unknown",
+    }
+
+
+@pytest.mark.asyncio
+async def test_update_fills_in_subjects(hass: HomeAssistant, mock_api):
+    """A full update gives tasks the subject of their class from the timetable."""
+    mock_api.get_tasks.return_value = [
+        {"id": 1, "title": "A", "dueDate": firefly_due(2), "addressees": [{"name": "Class PABC1 B"}]}
+    ]
+    mock_api.get_events.return_value = [_week_event("PABC1 B", "Year 8 Performing Arts")]
+    coordinator = FireflyUpdateCoordinator(hass=hass, api=mock_api)
+    data = await coordinator._async_update_data()
+    [task] = next(iter(data["children_data"].values()))["tasks"]["all"]
+    assert task["subject"] == "Year 8 Performing Arts"
