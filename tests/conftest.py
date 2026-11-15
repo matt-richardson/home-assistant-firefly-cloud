@@ -5,8 +5,9 @@ import os
 import sys
 import zoneinfo
 from contextlib import ExitStack
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from types import MappingProxyType
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -26,6 +27,7 @@ from custom_components.firefly_cloud.const import (
     DEFAULT_TASK_LOOKAHEAD_DAYS,
     DOMAIN,
 )
+from custom_components.firefly_cloud.models import ChildData, FireflyData, Lesson, Task
 
 
 def firefly_due(days_from_today: int) -> str:
@@ -518,3 +520,68 @@ def pytest_unconfigure(config):
     sys.stdout.flush()
     sys.stderr.flush()
     os._exit(_exit_status)  # pylint: disable=protected-access
+
+
+_UNSET: Any = object()
+
+
+def make_task(
+    task_id="t1",
+    *,
+    due=None,
+    firefly_due=_UNSET,
+    title="Task",
+    subject="Maths",
+    setter="Ms Rivera",
+    description="",
+    set_at=None,
+    completion_status="Todo",
+    change=None,
+) -> Task:
+    """Build a Task; Firefly's due date defaults to ``due``."""
+    return Task(
+        id=task_id,
+        title=title,
+        description=description,
+        subject=subject,
+        setter=setter,
+        set_at=set_at,
+        completion_status=completion_status,
+        firefly_due=due if firefly_due is _UNSET else firefly_due,
+        due=due,
+        change=change,
+    )
+
+
+def make_lesson(start: datetime, minutes=60, subject="Maths", location="M8", description=None) -> Lesson:
+    """Build a Lesson starting at ``start`` and lasting ``minutes``."""
+    return Lesson(
+        start=start,
+        end=start + timedelta(minutes=minutes),
+        subject=subject,
+        location=location,
+        description=description,
+        guild=None,
+        attendees=(),
+    )
+
+
+def make_child(guid="child-1", *, tasks=(), lessons=(), today: date, lookahead_days=7, name="Test Child") -> ChildData:
+    """Build a ChildData; lessons are sorted by start like the coordinator does."""
+    return ChildData(
+        guid=guid,
+        name=name,
+        tasks=tuple(tasks),
+        lessons=tuple(sorted(lessons, key=lambda lesson: lesson.start)),
+        today=today,
+        lookahead_days=lookahead_days,
+    )
+
+
+def make_data(*children: ChildData, last_updated=None, user_info=None) -> FireflyData:
+    """Build a FireflyData from children."""
+    return FireflyData(
+        children={child.guid: child for child in children},
+        user_info=user_info or {},
+        last_updated=last_updated or datetime(2026, 11, 14, 8, 0, tzinfo=zoneinfo.ZoneInfo("Australia/Melbourne")),
+    )

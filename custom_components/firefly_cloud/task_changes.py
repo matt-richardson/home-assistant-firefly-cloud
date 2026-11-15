@@ -27,6 +27,7 @@ from homeassistant.helpers.storage import Store
 
 from .const import DOMAIN
 from .dates import parse_due_date
+from .models import firefly_task_id
 
 STORAGE_VERSION = 1
 STORAGE_KEY = f"{DOMAIN}.task_changes.{{entry_id}}"
@@ -151,11 +152,6 @@ def effective_due(state: dict[str, Any], child_guid: str, task_id: Any, firefly_
     if record and record["active"] and record["active"]["new_due_date"]:
         return date.fromisoformat(record["active"]["new_due_date"])
     return firefly_due
-
-
-def firefly_task_id(task: dict[str, Any]) -> Any:
-    """Return a task's Firefly id (as used for todo items and dashboard changes)."""
-    return task.get("guid", task.get("id", "unknown"))
 
 
 def apply_changes(
