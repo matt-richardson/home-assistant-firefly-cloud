@@ -12,28 +12,13 @@ from typing import Any
 
 from homeassistant.util import dt as dt_util
 
-LESSON_DAYS = 14
-# The coordinator's placeholder when a task's subject can't be found; the card shows no subject instead
-UNKNOWN_SUBJECT = "Unknown Subject"
+from .models import ChildData, Lesson, Task, bucket
 
-BUCKET_OVERDUE = "overdue"
-BUCKET_THIS_WEEK = "this_week"
-BUCKET_LATER = "later"
-BUCKET_NO_DATE = "no_date"
+LESSON_DAYS = 14
 
 
 def _iso(day: date | None) -> str | None:
     return day.isoformat() if day else None
-
-
-def _bucket(due: date | None, today: date, lookahead_days: int) -> str:
-    if due is None:
-        return BUCKET_NO_DATE
-    if due < today:
-        return BUCKET_OVERDUE
-    if due < today + timedelta(days=lookahead_days):
-        return BUCKET_THIS_WEEK
-    return BUCKET_LATER
 
 
 def _change_summary(active: dict[str, Any] | None) -> dict[str, Any] | None:
@@ -66,10 +51,11 @@ def _change_entry(change: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _history(task: dict[str, Any], record: dict[str, Any] | None, firefly_due: date | None) -> list[dict[str, Any]]:
+def _history(task: Task) -> list[dict[str, Any]]:
     """Newest first: dashboard changes and notes, undos, school changes; then when it was set."""
     entries: list[dict[str, Any]] = []
-    first_due = _iso(firefly_due)
+    record = task.change
+    first_due = _iso(task.firefly_due)
     if record:
         for change in record["ended"]:
             entries.append(_change_entry(change))
@@ -91,33 +77,30 @@ def _history(task: dict[str, Any], record: dict[str, Any] | None, firefly_due: d
             first_due = record["school_changes"][0]["from"]
     entries.sort(key=lambda entry: datetime.fromisoformat(entry["at"]), reverse=True)
 
-    set_date = task.get("set_date")
     entries.append(
         {
-            "at": dt_util.as_local(set_date).isoformat() if set_date else None,
+            "at": dt_util.as_local(task.set_at).isoformat() if task.set_at else None,
             "kind": "set",
-            "text_fields": {"setter": task.get("setter"), "due": first_due},
+            "text_fields": {"setter": task.setter, "due": first_due},
         }
     )
     return entries
 
 
-def _task_overview(task: dict[str, Any], today: date, lookahead_days: int) -> dict[str, Any]:
-    due = task["due_date"].date() if task.get("due_date") else None
-    firefly_due = task.get("firefly_due_date", due)
-    record = task.get("change")
+def _task_overview(task: Task, today: date, lookahead_days: float) -> dict[str, Any]:
+    record = task.change
     school_changes = (record or {}).get("school_changes") or []
     return {
-        "id": str(task["id"]),
-        "title": task.get("title"),
-        "subject": None if task.get("subject") in (None, UNKNOWN_SUBJECT) else task["subject"],
-        "setter": task.get("setter"),
-        "due": _iso(due),
-        "firefly_due": _iso(firefly_due),
-        "bucket": _bucket(due, today, lookahead_days),
+        "id": task.id,
+        "title": task.title,
+        "subject": task.subject,
+        "setter": task.setter,
+        "due": _iso(task.due),
+        "firefly_due": _iso(task.firefly_due),
+        "bucket": str(bucket(task.due, today, lookahead_days)),
         "change": _change_summary((record or {}).get("active")),
         "school_change": school_changes[-1] if school_changes else None,
-        "history": _history(task, record, firefly_due),
+        "history": _history(task),
     }
 
 
@@ -126,31 +109,31 @@ def _end_time(start: datetime, end: datetime) -> str:
     return "24:00" if end.date() > start.date() else end.strftime("%H:%M")
 
 
-def _lesson_days(events: list[dict[str, Any]], today: date) -> list[dict[str, Any]]:
+def _lesson_days(lessons: tuple[Lesson, ...], today: date) -> list[dict[str, Any]]:
     end = today + timedelta(days=LESSON_DAYS)
     days: dict[str, list[dict[str, Any]]] = {}
-    for event in sorted(events, key=lambda e: e["start"]):
-        start = dt_util.as_local(event["start"])
+    for lesson in sorted(lessons, key=lambda item: item.start):
+        start = dt_util.as_local(lesson.start)
         if not today <= start.date() < end:
             continue
         days.setdefault(start.date().isoformat(), []).append(
             {
                 "start": start.strftime("%H:%M"),
-                "end": _end_time(start, dt_util.as_local(event["end"])),
-                "subject": event.get("subject"),
-                "location": event.get("location"),
+                "end": _end_time(start, dt_util.as_local(lesson.end)),
+                "subject": lesson.subject,
+                "location": lesson.location,
             }
         )
-    return [{"date": day, "lessons": lessons} for day, lessons in sorted(days.items())]
+    return [{"date": day, "lessons": items} for day, items in sorted(days.items())]
 
 
-def build_overview(child_data: dict[str, Any], today: date, lookahead_days: int) -> dict[str, Any]:
+def build_overview(child: ChildData, today: date, lookahead_days: float) -> dict[str, Any]:
     """Build the tasks and lessons overview for one child, for the dashboard cards."""
-    tasks = [_task_overview(task, today, lookahead_days) for task in child_data.get("tasks", {}).get("all", [])]
+    tasks = [_task_overview(task, today, lookahead_days) for task in child.tasks]
     tasks.sort(key=lambda t: (t["due"] is None, t["due"] or "", t["title"] or ""))
     return {
         "today": today.isoformat(),
         "lookahead_days": lookahead_days,
         "tasks": tasks,
-        "lesson_days": _lesson_days(child_data.get("events", {}).get("week", []), today),
+        "lesson_days": _lesson_days(child.lessons, today),
     }
