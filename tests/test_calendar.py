@@ -594,54 +594,13 @@ async def test_calendar_build_description_none_values(hass, mock_config_entry):
 
 
 @pytest.mark.asyncio
-async def test_calendar_async_added_to_hass(hass, mock_coordinator, mock_config_entry):
-    """Test calendar entity lifecycle when added to hass."""
-    from unittest.mock import MagicMock
-
+async def test_calendar_listens_to_coordinator_once(hass, mock_coordinator, mock_config_entry):
+    """CoordinatorEntity's own subscription is the only one, so each update writes state once."""
     calendar = FireflyCalendar(
         coordinator=mock_coordinator, config_entry=mock_config_entry, child_guid="test-child-123"
     )
-
-    # Mock the coordinator's async_add_listener
     mock_coordinator.async_add_listener = MagicMock(return_value=MagicMock())
 
-    # Add entity to hass
     await calendar.async_added_to_hass()
 
-    # Verify listener was added
-    assert mock_coordinator.async_add_listener.called
-    assert calendar._unsub_coordinator is not None
-
-
-@pytest.mark.asyncio
-async def test_calendar_async_will_remove_from_hass(hass, mock_coordinator, mock_config_entry):
-    """Test calendar entity lifecycle when removed from hass."""
-    from unittest.mock import MagicMock
-
-    calendar = FireflyCalendar(
-        coordinator=mock_coordinator, config_entry=mock_config_entry, child_guid="test-child-123"
-    )
-
-    # Mock the unsub function
-    mock_unsub = MagicMock()
-    calendar._unsub_coordinator = mock_unsub
-
-    # Remove entity from hass
-    await calendar.async_will_remove_from_hass()
-
-    # Verify unsub was called
-    assert mock_unsub.called
-
-
-@pytest.mark.asyncio
-async def test_calendar_async_will_remove_from_hass_no_unsub(hass, mock_coordinator, mock_config_entry):
-    """Test calendar entity removal when no unsub function exists."""
-    calendar = FireflyCalendar(
-        coordinator=mock_coordinator, config_entry=mock_config_entry, child_guid="test-child-123"
-    )
-
-    # No unsub function set
-    calendar._unsub_coordinator = None
-
-    # Should not raise an error
-    await calendar.async_will_remove_from_hass()
+    mock_coordinator.async_add_listener.assert_called_once()
