@@ -221,205 +221,92 @@ class FireflySensor(FireflyBaseEntity, SensorEntity):
             ],
         }
 
-    def _get_current_class_subject(self, child: ChildData) -> Optional[str]:
-        """Get the current class subject without time prefix."""
-        events = child.lessons
-        if not events:
-            return "None"
-
-        now = dates.get_offset_time()
-
-        # Find current event (class currently happening)
-        for event in events:
-            if event.start <= now <= event.end:
-                return event.subject
-
-        # If no current class, return "None" string
-        return "None"
+    def _show_class_times(self) -> bool:
+        return bool(entry_option(self._config_entry, CONF_SHOW_CLASS_TIMES, DEFAULT_SHOW_CLASS_TIMES))
 
     def _get_current_class(self, child: ChildData) -> Optional[str]:
-        """Get the current class if one is active, otherwise return None."""
-        events = child.lessons
-        if not events:
+        """Get the current class if one is active, otherwise the string "None"."""
+        lesson = _current_lesson(child.lessons, dates.get_offset_time())
+        if lesson is None:
             return "None"
-
-        now = dates.get_offset_time()
-
-        # Get show_class_times option
-        show_times = entry_option(self._config_entry, CONF_SHOW_CLASS_TIMES, DEFAULT_SHOW_CLASS_TIMES)
-
-        # Find current event (class currently happening)
-        for event in events:
-            if event.start <= now <= event.end:
-                subject = event.subject
-                if show_times:
-                    # Convert to local timezone before formatting
-                    start_local = dt_util.as_local(event.start)
-                    end_local = dt_util.as_local(event.end)
-                    # Format times as H.MM (no leading zeros on hours)
-                    start_time = f"{start_local.hour}.{start_local.minute:02d}"
-                    end_time = f"{end_local.hour}.{end_local.minute:02d}"
-                    return f"{start_time}-{end_time}: {subject}"
-                return subject
-
-        # If no current class, return "None" string
-        return "None"
-
-    def _format_class_with_time(self, event: Lesson, show_times: bool) -> str | None:
-        """Format a class event with optional time prefix."""
-        subject = event.subject
-        if not show_times:
-            return subject
-
-        # Convert to local timezone before formatting
-        start_local = dt_util.as_local(event.start)
-        end_local = dt_util.as_local(event.end)
-        # Format times as H.MM (no leading zeros on hours)
-        start_time = f"{start_local.hour}.{start_local.minute:02d}"
-        end_time = f"{end_local.hour}.{end_local.minute:02d}"
-        return f"{start_time}-{end_time}: {subject}"
+        return _format_class(lesson, self._show_class_times())
 
     def _get_next_class(self, child: ChildData) -> Optional[str]:
-        """Get the next upcoming class."""
-        events = child.lessons
-        if not events:
+        """Get the next class; while in class, only a later class on the same day counts."""
+        now = dates.get_offset_time()
+        lesson = _next_lesson(child.lessons, now)
+        if lesson is None:
             return "None"
+        if _current_lesson(child.lessons, now) is not None and not _is_same_day(lesson, now):
+            return "None"
+        return _format_class(lesson, self._show_class_times())
 
-        now = dates.get_offset_time()
-        show_times = entry_option(self._config_entry, CONF_SHOW_CLASS_TIMES, DEFAULT_SHOW_CLASS_TIMES)
-
-        # Check if we're currently in a class
-        current_class_raw = self._get_current_class_subject(child)
-        if current_class_raw and current_class_raw != "None":
-            return self._find_next_class_after_current(events, now, show_times)
-
-        # Not in a class - find the next upcoming class
-        return self._find_next_upcoming_class(events, now, show_times)
-
-    def _find_next_class_after_current(self, events: Sequence[Lesson], now: datetime, show_times: bool) -> str | None:
-        """Find the next class when currently in a class."""
-        current_date = now.date()
-
-        for event in events:
-            event_start = event.start
-            if event_start > now:
-                event_local = event_start.astimezone(now.tzinfo) if now.tzinfo else event_start.replace(tzinfo=None)
-                if event_local.date() == current_date:
-                    return self._format_class_with_time(event, show_times)
-                # Next class is tomorrow
-                return "None"
-
-        return "None"
-
-    def _find_next_upcoming_class(self, events: Sequence[Lesson], now: datetime, show_times: bool) -> str | None:
-        """Find the next upcoming class when not currently in a class."""
-        upcoming_events = [event for event in events if event.start > now]
-
-        if upcoming_events:
-            return self._format_class_with_time(upcoming_events[0], show_times)
-
-        return "None"
-
-    def _get_current_class_attributes(self, child: ChildData) -> Dict[str, Any]:
+    @staticmethod
+    def _get_current_class_attributes(child: ChildData) -> Dict[str, Any]:
         """Get attributes for current class sensor."""
-        events = child.lessons
         now = dates.get_offset_time()
-
-        if not events:
-            return {
-                "status": "no_current_class",
-                "current_time": now.isoformat(),
-            }
-
-        # Find current event
-        current_event = None
-        for event in events:
-            if event.start <= now <= event.end:
-                current_event = event
-                break
-
-        if not current_event:
-            return {
-                "status": "no_current_class",
-                "current_time": now.isoformat(),
-            }
-
-        # Calculate time remaining in current class
-        time_remaining = (current_event.end - now).total_seconds() / 60  # minutes
+        lesson = _current_lesson(child.lessons, now)
+        if lesson is None:
+            return {"status": "no_current_class", "current_time": now.isoformat()}
 
         return {
             "status": "in_class",
-            "class_name": current_event.subject,
-            "location": current_event.location,
-            "start_time": current_event.start.isoformat(),
-            "end_time": current_event.end.isoformat(),
-            "minutes_remaining": round(time_remaining),
-            "description": current_event.description,
+            "class_name": lesson.subject,
+            "location": lesson.location,
+            "start_time": lesson.start.isoformat(),
+            "end_time": lesson.end.isoformat(),
+            "minutes_remaining": round((lesson.end - now).total_seconds() / 60),
+            "description": lesson.description,
             "current_time": now.isoformat(),
         }
 
-    def _get_next_class_attributes(self, child: ChildData) -> Dict[str, Any]:
+    @staticmethod
+    def _get_next_class_attributes(child: ChildData) -> Dict[str, Any]:
         """Get attributes for next class sensor."""
-        events = child.lessons
         now = dates.get_offset_time()
-
-        if not events:
+        lesson = _next_lesson(child.lessons, now)
+        if lesson is None:
             return {"status": "no_upcoming_class", "current_time": now.isoformat()}
 
-        upcoming_events = self._get_upcoming_events(events, now)
-        if not upcoming_events:
-            return {"status": "no_upcoming_class", "current_time": now.isoformat()}
-
-        next_event = upcoming_events[0]
-        return self._build_next_class_attributes(next_event, now, child)
-
-    def _get_upcoming_events(self, events: Sequence[Lesson], now: datetime) -> List[Lesson]:
-        """Get list of upcoming events after the current time."""
-        upcoming_events = []
-        for event in events:
-            if event.start > now:
-                upcoming_events.append(event)
-        return upcoming_events
-
-    def _build_next_class_attributes(self, next_event: Lesson, now: datetime, child: ChildData) -> Dict[str, Any]:
-        """Build attributes dict for next class sensor."""
-        current_class = self._get_current_class(child)
-        event_start = next_event.start
-        event_local = event_start.astimezone(now.tzinfo) if now.tzinfo else event_start.replace(tzinfo=None)
-        is_today = now.date() == event_local.date()
-
-        context = self._determine_next_class_context(current_class, is_today)
-
-        if context == "last_class_of_day":
+        is_today = _is_same_day(lesson, now)
+        if _current_lesson(child.lessons, now) is not None and not is_today:
             return {
                 "status": "last_class_of_day",
                 "current_time": now.isoformat(),
                 "context": "no_more_classes_today",
             }
 
-        time_until = (event_start - now).total_seconds() / 60
-
         return {
             "status": "class_scheduled",
-            "class_name": next_event.subject,
-            "location": next_event.location,
-            "start_time": next_event.start.isoformat(),
-            "end_time": next_event.end.isoformat(),
-            "minutes_until": round(time_until),
-            "description": next_event.description,
+            "class_name": lesson.subject,
+            "location": lesson.location,
+            "start_time": lesson.start.isoformat(),
+            "end_time": lesson.end.isoformat(),
+            "minutes_until": round((lesson.start - now).total_seconds() / 60),
+            "description": lesson.description,
             "current_time": now.isoformat(),
-            "context": context,
+            "context": "next_class_today" if is_today else "next_class_future_day",
         }
 
-    @staticmethod
-    def _determine_next_class_context(current_class: Optional[str], is_today: bool) -> str:
-        """Determine the context for the next class."""
-        in_class = current_class and current_class != "None"
 
-        if in_class and is_today:
-            return "next_class_today"
-        if in_class and not is_today:
-            return "last_class_of_day"
-        if not in_class and is_today:
-            return "next_class_today"
-        return "next_class_future_day"
+def _current_lesson(lessons: Sequence[Lesson], now: datetime) -> Lesson | None:
+    """Return the lesson happening now (lessons are sorted by start)."""
+    return next((lesson for lesson in lessons if lesson.start <= now <= lesson.end), None)
+
+
+def _next_lesson(lessons: Sequence[Lesson], now: datetime) -> Lesson | None:
+    """Return the first lesson starting after now (lessons are sorted by start)."""
+    return next((lesson for lesson in lessons if lesson.start > now), None)
+
+
+def _is_same_day(lesson: Lesson, now: datetime) -> bool:
+    return lesson.start.astimezone(now.tzinfo).date() == now.date()
+
+
+def _format_class(lesson: Lesson, show_times: bool) -> str | None:
+    """Return the subject, prefixed with local times as "H.MM-H.MM: " if show_times."""
+    if not show_times:
+        return lesson.subject
+    start = dt_util.as_local(lesson.start)
+    end = dt_util.as_local(lesson.end)
+    return f"{start.hour}.{start.minute:02d}-{end.hour}.{end.minute:02d}: {lesson.subject}"
