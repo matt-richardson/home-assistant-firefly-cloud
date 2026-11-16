@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.8.1](https://github.com/matt-richardson/home-assistant-firefly-cloud/compare/v0.8.0...v0.8.1) (2026-11-16)
+
+
+### Bug Fixes
+
+* ask to log in again when authentication fails on first load ([#52](https://github.com/matt-richardson/home-assistant-firefly-cloud/issues/52)) ([122962f](https://github.com/matt-richardson/home-assistant-firefly-cloud/commit/122962fe815cb8b53071c540e2a2ce20ef93e861))
+* show completed tasks as completed in the todo list ([#53](https://github.com/matt-richardson/home-assistant-firefly-cloud/issues/53)) ([2abceac](https://github.com/matt-richardson/home-assistant-firefly-cloud/commit/2abceac747a8546450fa88644b0a668ea5b5375e))
+* update entities once per refresh ([#54](https://github.com/matt-richardson/home-assistant-firefly-cloud/issues/54)) ([202d13b](https://github.com/matt-richardson/home-assistant-firefly-cloud/commit/202d13b4abfd390cace6d4e369e78b0b8bfb1c76))
+
+
+### Performance Improvements
+
+* fetch each child's lessons once per refresh ([#57](https://github.com/matt-richardson/home-assistant-firefly-cloud/issues/57)) ([34752b1](https://github.com/matt-richardson/home-assistant-firefly-cloud/commit/34752b1e559fa49d62093e56f2e19ba8469ba975))
+
 ## [0.8.0](https://github.com/matt-richardson/home-assistant-firefly-cloud/compare/v0.7.0...v0.8.0) (2026-11-15)
 
 
