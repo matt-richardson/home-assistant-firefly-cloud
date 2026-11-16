@@ -1542,3 +1542,21 @@ async def test_sensor_keeps_empty_subject(mock_coordinator, mock_config_entry):
     sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_UPCOMING_TASKS, "test-child-123")
     [task] = sensor.extra_state_attributes["tasks"]
     assert task["subject"] == ""
+
+
+@pytest.mark.asyncio
+async def test_sensor_truncates_long_descriptions(mock_coordinator, mock_config_entry):
+    """Descriptions over 100 characters are cut to 100 and end with "..."; 100 or fewer are kept."""
+    from custom_components.firefly_cloud.dates import get_offset_time
+
+    due = get_offset_time().date()
+    _set_child(
+        mock_coordinator,
+        tasks=(
+            make_task("1", title="Long", due=due, description="x" * 101),
+            make_task("2", title="Exact", due=due, description="y" * 100),
+        ),
+    )
+    sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_TASKS_DUE_TODAY, "test-child-123")
+    descriptions = {task["title"]: task["description"] for task in sensor.extra_state_attributes["tasks"]}
+    assert descriptions == {"Long": "x" * 100 + "...", "Exact": "y" * 100}
