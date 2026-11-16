@@ -1,7 +1,8 @@
 """Data update coordinator for Firefly Cloud integration."""
 
+import dataclasses
 import logging
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from homeassistant.core import HomeAssistant
@@ -12,7 +13,6 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from . import dates
 from .api import FireflyAPIClient
 from .const import DEFAULT_SCAN_INTERVAL, DEFAULT_TASK_LOOKAHEAD_DAYS, DOMAIN
-from .dates import local_midnight, parse_due_date
 from .exceptions import (
     FireflyAuthenticationError,
     FireflyConnectionError,
@@ -20,23 +20,24 @@ from .exceptions import (
     FireflyRateLimitError,
     FireflyTokenExpiredError,
 )
+from .models import ChildData, FireflyData, Lesson, Task
 from .subjects import class_subjects, with_subjects
-from .task_changes import TaskChangeStore, apply_changes, change_fields, firefly_task_id
+from .task_changes import TaskChangeStore, apply_changes
 
 _LOGGER = logging.getLogger(__name__)
 
 
-class FireflyUpdateCoordinator(DataUpdateCoordinator):  # pylint: disable=too-many-instance-attributes
+class FireflyUpdateCoordinator(DataUpdateCoordinator[FireflyData]):  # pylint: disable=too-many-instance-attributes
     """Class to manage fetching Firefly data."""
 
     # Declared so type checkers without Home Assistant's types know it (the rebuild assigns it directly)
-    data: Dict[str, Any]
+    data: FireflyData
 
     def __init__(
         self,
         hass: HomeAssistant,
         api: FireflyAPIClient,
-        task_lookahead_days: int = DEFAULT_TASK_LOOKAHEAD_DAYS,
+        task_lookahead_days: float = DEFAULT_TASK_LOOKAHEAD_DAYS,
         children_guids: Optional[List[str]] = None,
         change_store: Optional[TaskChangeStore] = None,
     ) -> None:
@@ -72,7 +73,7 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):  # pylint: disable=too-ma
             "error_counts": {},  # Track errors by type
         }
 
-    async def _async_update_data(self) -> Dict[str, Any]:  # pylint: disable=too-many-statements
+    async def _async_update_data(self) -> FireflyData:  # pylint: disable=too-many-statements
         """Fetch data from Firefly API."""
         update_time = datetime.now(timezone.utc).isoformat()
         self.statistics["total_updates"] += 1
@@ -91,15 +92,9 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):  # pylint: disable=too-ma
             # Fetch data for all children
             children_data = await self._fetch_all_children_data(target_guids, date_ranges, now)
 
-            # Build response data
-            data = {
-                "user_info": self._user_info,
-                "children_guids": target_guids,
-                "children_data": children_data,
-                "last_updated": now,
-            }
+            data = FireflyData(children=children_data, user_info=self._user_info, last_updated=now)
 
-            self._log_update_statistics(target_guids, children_data)
+            self._log_update_statistics(children_data)
 
             # Update succeeded - reset counters and dismiss issues
             self._handle_update_success(update_time)
@@ -208,7 +203,7 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):  # pylint: disable=too-ma
 
     async def _fetch_all_children_data(
         self, target_guids: List[str], date_ranges: Dict[str, datetime], now: datetime
-    ) -> Dict[str, Dict[str, Any]]:
+    ) -> Dict[str, ChildData]:
         """Fetch data for all children, then build it.
 
         Every child is fetched before any is built, so a failure part way through
@@ -226,153 +221,56 @@ class FireflyUpdateCoordinator(DataUpdateCoordinator):  # pylint: disable=too-ma
             "tasks": await self.api.get_tasks(student_guid=child_guid),
         }
 
-    def _build_child_data(self, child_guid: str, raw: Dict[str, Any], now: datetime) -> Dict[str, Any]:
-        """Build a child's data from raw Firefly data, applying dashboard due date changes."""
+    def _build_child_data(self, child_guid: str, raw: Dict[str, Any], now: datetime) -> ChildData:
+        """Build a child's data from raw Firefly data, applying dashboard due date changes.
+
+        The raw data is left unchanged, so it can be rebuilt from again.
+        """
         by_class = class_subjects(raw["events"])
         if self.change_store is not None:
             # Remembered, so tasks keep their subjects through holidays when the timetable is empty
             by_class = self.change_store.remember_class_subjects(child_guid, by_class)
-        tasks = apply_changes(self.change_store, child_guid, with_subjects(raw["tasks"], by_class), now)
-        today = now.date()
+        tasks = [Task.from_firefly(task) for task in with_subjects(raw["tasks"], by_class)]
+        return ChildData(
+            guid=child_guid,
+            name=self._extract_child_name(child_guid),
+            tasks=tuple(apply_changes(self.change_store, child_guid, tasks, now)),
+            lessons=self._build_lessons(raw["events"]),
+            today=now.date(),
+            lookahead_days=self.task_lookahead_days,
+        )
 
-        return {
-            "events": {"week": self._process_events(raw["events"])},
-            "tasks": {
-                "all": self._process_tasks(tasks),
-                "due_today": self._filter_tasks_by_date(tasks, today, today + timedelta(days=1)),
-                "upcoming": self._filter_tasks_by_date(tasks, today, today + timedelta(days=self.task_lookahead_days)),
-                "overdue": self._filter_overdue_tasks(tasks, today),
-            },
-            "name": self._extract_child_name(child_guid),
-        }
+    @staticmethod
+    def _build_lessons(events: List[Dict[str, Any]]) -> tuple[Lesson, ...]:
+        """Build lessons from Firefly events, skipping any without valid times, sorted by start."""
+        lessons = []
+        for event in events:
+            try:
+                lessons.append(Lesson.from_firefly(event))
+            except (ValueError, KeyError, TypeError, AttributeError) as err:
+                _LOGGER.warning("Error processing event data: %s", err)
+        return tuple(sorted(lessons, key=lambda lesson: lesson.start))
 
     async def async_rebuild_from_last_fetch(self) -> None:
         """Re-apply dashboard changes to the last fetched data and push it out, without calling Firefly."""
         if not self.data or not self._last_raw:
             return
         now = dates.get_offset_time()
-        children_data = {guid: self._build_child_data(guid, raw, now) for guid, raw in self._last_raw.items()}
+        children = {guid: self._build_child_data(guid, raw, now) for guid, raw in self._last_raw.items()}
         # Update the entities without async_set_updated_data, which would reschedule the next
         # Firefly poll (so every save would push it back) and, during an outage, mark the
         # stale data as a successful update
-        self.data = {**self.data, "children_data": children_data}
+        self.data = dataclasses.replace(self.data, children=children)
         self.async_update_listeners()
 
-    def _log_update_statistics(self, target_guids: List[str], children_data: Dict[str, Dict[str, Any]]) -> None:
+    def _log_update_statistics(self, children: Dict[str, ChildData]) -> None:
         """Log statistics about the update."""
-        total_lessons = 0
-        total_tasks = 0
-
-        for child_data in children_data.values():
-            if isinstance(child_data, dict):
-                events_data = child_data.get("events")
-                tasks_data = child_data.get("tasks")
-                if isinstance(events_data, dict):
-                    total_lessons += len(events_data.get("week", []))
-                if isinstance(tasks_data, dict):
-                    total_tasks += len(tasks_data.get("all", []))
-
         _LOGGER.debug(
             "Successfully updated Firefly data for %d children: %d lessons, %d total tasks",
-            len(target_guids),
-            total_lessons,
-            total_tasks,
+            len(children),
+            sum(len(child.lessons) for child in children.values()),
+            sum(len(child.tasks) for child in children.values()),
         )
-
-    def _process_events(self, events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Process and clean event data."""
-        processed_events = []
-
-        for event in events:
-            try:
-                processed_event = {
-                    "start": datetime.fromisoformat(event["start"].replace("Z", "+00:00")),
-                    "end": datetime.fromisoformat(event["end"].replace("Z", "+00:00")),
-                    "subject": event.get("subject", "Unknown Subject"),
-                    "location": event.get("location"),
-                    "description": event.get("description"),
-                    "guild": event.get("guild"),
-                    "attendees": event.get("attendees", []),
-                }
-                processed_events.append(processed_event)
-            except (ValueError, KeyError) as err:
-                _LOGGER.warning("Error processing event data: %s", err)
-                continue
-
-        # Sort by start time
-        processed_events.sort(key=lambda x: x["start"])
-        return processed_events
-
-    def _process_tasks(self, tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Process and clean task data."""
-        processed_tasks = []
-
-        for task in tasks:
-            try:
-                set_date_str = task.get("setDate")
-
-                due_day = parse_due_date(task.get("dueDate"))
-                due_date = local_midnight(due_day) if due_day else None
-
-                # Handle set date parsing with fallback
-                set_date = None
-                if set_date_str:
-                    try:
-                        set_date = datetime.fromisoformat(set_date_str.replace("Z", "+00:00"))
-                    except (ValueError, TypeError):
-                        _LOGGER.debug("Invalid set date format: %s", set_date_str)
-                        set_date = None
-
-                # Extract subject information
-                subject = "Unknown Subject"
-                if "subject" in task:
-                    subject_data = task["subject"]
-                    if isinstance(subject_data, dict):
-                        subject = subject_data.get("name", "Unknown Subject")
-                    elif isinstance(subject_data, str):
-                        subject = subject_data
-
-                processed_task = {
-                    "id": firefly_task_id(task),
-                    "title": task.get("title", "Untitled Task"),
-                    "description": task.get("description", ""),
-                    "due_date": due_date,
-                    "set_date": set_date,
-                    "subject": subject,
-                    "completion_status": task.get("completionStatus", "Unknown"),
-                    "setter": (
-                        task.get("setter", {}).get("name", "Unknown")
-                        if isinstance(task.get("setter"), dict)
-                        else task.get("setter", "Unknown")
-                    ),
-                    **change_fields(task),
-                }
-                processed_tasks.append(processed_task)
-            except (KeyError, TypeError) as err:
-                _LOGGER.warning("Error processing task data: %s", err)
-                continue
-
-        return processed_tasks
-
-    def _filter_tasks_by_date(self, tasks: List[Dict[str, Any]], start: date, end: date) -> List[Dict[str, Any]]:
-        """Return processed tasks whose local due date is in [start, end)."""
-        filtered_tasks = []
-        for task in tasks:
-            due_day = parse_due_date(task.get("dueDate"))
-            if due_day is not None and start <= due_day < end:
-                filtered_tasks.append(task)
-        return self._process_tasks(filtered_tasks)
-
-    def _filter_overdue_tasks(self, tasks: List[Dict[str, Any]], today: date) -> List[Dict[str, Any]]:
-        """Return processed, uncompleted tasks whose local due date is before today."""
-        overdue_tasks = []
-        for task in tasks:
-            if (task.get("completionStatus") or "").lower() == "completed":
-                continue
-            due_day = parse_due_date(task.get("dueDate"))
-            if due_day is not None and due_day < today:
-                overdue_tasks.append(task)
-        return self._process_tasks(overdue_tasks)
 
     def _extract_child_name(self, child_guid: str) -> Optional[str]:
         """Extract child name from user info or children info."""

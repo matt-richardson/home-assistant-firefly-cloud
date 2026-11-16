@@ -4,6 +4,7 @@ from datetime import date
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from conftest import make_child, make_data
 
 from custom_components.firefly_cloud.const import WS_TYPE_CHILD_OVERVIEW
 from custom_components.firefly_cloud.websocket_api import async_register_websocket_api, ws_child_overview
@@ -18,7 +19,7 @@ def coordinator():
     coord = MagicMock()
     coord.api = AsyncMock()
     coord.task_lookahead_days = 7
-    coord.data = {"children_data": {CHILD: {"tasks": {"all": []}, "events": {"week": []}}}}
+    coord.data = make_data(make_child(CHILD, today=date(2026, 11, 14)))
     return coord
 
 
@@ -37,7 +38,7 @@ def test_overview_result(coordinator):
         now.return_value.date.return_value = date(2026, 11, 14)
         ws_child_overview(MagicMock(), connection, _msg())
 
-    build.assert_called_once_with(coordinator.data["children_data"][CHILD], date(2026, 11, 14), 7)
+    build.assert_called_once_with(coordinator.data.child(CHILD), date(2026, 11, 14))
     connection.send_result.assert_called_once_with(5, {"ok": 1})
 
 
@@ -53,7 +54,7 @@ def test_overview_unknown_entity():
     connection.send_result.assert_not_called()
 
 
-@pytest.mark.parametrize("data", [None, {"children_data": {}}])
+@pytest.mark.parametrize("data", [None, make_data()])
 def test_overview_no_data_for_child(coordinator, data):
     """Before the first update, or for a child not yet returned, the reply is not_ready."""
     coordinator.data = data

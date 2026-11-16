@@ -1,11 +1,12 @@
 """Test the Firefly Cloud sensor platform."""
 
-from datetime import timedelta
+from dataclasses import replace
+from datetime import date, timedelta
 from types import MappingProxyType
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from conftest import create_config_entry_with_version_compat
+from conftest import create_config_entry_with_version_compat, make_child, make_data, make_lesson, make_task
 from homeassistant.core import HomeAssistant
 
 from custom_components.firefly_cloud.const import (
@@ -25,6 +26,32 @@ from custom_components.firefly_cloud.const import (
 )
 from custom_components.firefly_cloud.sensor import FireflySensor, async_setup_entry
 
+CHILD = "test-child-123"
+
+
+def _set_child(coordinator, guid=CHILD, **changes):
+    """Replace fields of one child's data (the data is immutable)."""
+    data = coordinator.data
+    child = replace(data.child(guid), **changes)
+    coordinator.data = replace(data, children={**data.children, guid: child})
+
+
+def _add_tasks(coordinator, *tasks, guid=CHILD):
+    """Add tasks to a child's data."""
+    _set_child(coordinator, guid, tasks=coordinator.data.child(guid).tasks + tasks)
+
+
+def _set_lessons(coordinator, *lessons, guid=CHILD):
+    """Replace a child's lessons, sorted by start like the coordinator does."""
+    _set_child(coordinator, guid, lessons=tuple(sorted(lessons, key=lambda lesson: lesson.start)))
+
+
+def _move_lesson(coordinator, index, start, end, guid=CHILD):
+    """Change the times of one of a child's lessons."""
+    lessons = list(coordinator.data.child(guid).lessons)
+    lessons[index] = replace(lessons[index], start=start, end=end)
+    _set_lessons(coordinator, *lessons, guid=guid)
+
 
 @pytest.fixture
 def mock_coordinator():
@@ -32,99 +59,50 @@ def mock_coordinator():
     coordinator = MagicMock()
     from custom_components.firefly_cloud.dates import get_offset_time
 
-    now = get_offset_time().replace(tzinfo=None)  # Remove timezone for test format
+    now = get_offset_time()
+    today = now.date()
 
-    # Mock coordinator data
-    coordinator.data = {
-        "user_info": {
+    coordinator.data = make_data(
+        make_child(
+            CHILD,
+            name="John Doe",
+            today=today,
+            lessons=[
+                make_lesson(
+                    now.replace(hour=9, minute=0, second=0, microsecond=0),
+                    subject="Mathematics",
+                    location="Room 101",
+                    description="Algebra lesson",
+                ),
+                make_lesson(
+                    now.replace(hour=11, minute=0, second=0, microsecond=0) + timedelta(days=1),
+                    subject="Science",
+                    location="Lab 1",
+                    description="Chemistry experiment",
+                ),
+            ],
+            tasks=[
+                make_task(
+                    "task-1",
+                    title="Math Homework",
+                    description="Complete exercises 1-10",
+                    due=today + timedelta(days=2),
+                    set_at=now - timedelta(days=1),
+                    subject="Mathematics",
+                    setter="Mr. Smith",
+                )
+            ],
+        ),
+        make_child("test-child-456", name="Jane Doe", today=today),
+        user_info={
             "username": "john.doe",
             "fullname": "John Doe",
             "email": "john.doe@test.com",
             "role": "student",
             "guid": "test-user-123",
         },
-        "children_guids": ["test-child-123", "test-child-456"],
-        "children_data": {
-            "test-child-123": {
-                "name": "John Doe",
-                "events": {
-                    "today": [
-                        {
-                            "start": now.replace(hour=9, minute=0, second=0, microsecond=0),
-                            "end": now.replace(hour=10, minute=0, second=0, microsecond=0),
-                            "subject": "Mathematics",
-                            "location": "Room 101",
-                            "description": "Algebra lesson",
-                            "guild": None,
-                            "attendees": [],
-                        }
-                    ],
-                    "week": [
-                        {
-                            "start": now.replace(hour=9, minute=0, second=0, microsecond=0),
-                            "end": now.replace(hour=10, minute=0, second=0, microsecond=0),
-                            "subject": "Mathematics",
-                            "location": "Room 101",
-                            "description": "Algebra lesson",
-                            "guild": None,
-                            "attendees": [],
-                        },
-                        {
-                            "start": now.replace(hour=11, minute=0, second=0, microsecond=0) + timedelta(days=1),
-                            "end": now.replace(hour=12, minute=0, second=0, microsecond=0) + timedelta(days=1),
-                            "subject": "Science",
-                            "location": "Lab 1",
-                            "description": "Chemistry experiment",
-                            "guild": None,
-                            "attendees": [],
-                        },
-                    ],
-                },
-                "tasks": {
-                    "all": [
-                        {
-                            "id": "task-1",
-                            "title": "Math Homework",
-                            "description": "Complete exercises 1-10",
-                            "due_date": now + timedelta(days=2),
-                            "set_date": now - timedelta(days=1),
-                            "subject": "Mathematics",
-                            "completion_status": "Todo",
-                            "setter": "Mr. Smith",
-                        }
-                    ],
-                    "due_today": [],
-                    "upcoming": [
-                        {
-                            "id": "task-1",
-                            "title": "Math Homework",
-                            "description": "Complete exercises 1-10",
-                            "due_date": now + timedelta(days=2),
-                            "set_date": now - timedelta(days=1),
-                            "subject": "Mathematics",
-                            "completion_status": "Todo",
-                            "setter": "Mr. Smith",
-                        }
-                    ],
-                    "overdue": [],
-                },
-            },
-            "test-child-456": {
-                "name": "Jane Doe",
-                "events": {
-                    "today": [],
-                    "week": [],
-                },
-                "tasks": {
-                    "all": [],
-                    "due_today": [],
-                    "upcoming": [],
-                    "overdue": [],
-                },
-            },
-        },
-        "last_updated": get_offset_time(),
-    }
+        last_updated=now,
+    )
 
     coordinator.last_update_success = True
     coordinator.last_exception = None
@@ -184,19 +162,20 @@ async def test_tasks_due_today_sensor_with_tasks(mock_coordinator, mock_config_e
     """Test tasks due today sensor with tasks."""
     from custom_components.firefly_cloud.dates import get_offset_time
 
-    now = get_offset_time().replace(tzinfo=None)
-    mock_coordinator.data["children_data"]["test-child-123"]["tasks"]["due_today"] = [
-        {
-            "id": "urgent-task",
-            "title": "Submit Report",
-            "description": "Final report submission",
-            "due_date": now,
-            "set_date": now - timedelta(days=7),
-            "subject": "English",
-            "completion_status": "Todo",
-            "setter": "Ms. Johnson",
-        }
-    ]
+    now = get_offset_time()
+    today = now.date()
+    _add_tasks(
+        mock_coordinator,
+        make_task(
+            "urgent-task",
+            title="Submit Report",
+            description="Final report submission",
+            due=today,
+            set_at=now - timedelta(days=7),
+            subject="English",
+            setter="Ms. Johnson",
+        ),
+    )
 
     sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_TASKS_DUE_TODAY, "test-child-123")
 
@@ -220,29 +199,29 @@ async def test_overdue_tasks_sensor_with_tasks(mock_coordinator, mock_config_ent
     """Test overdue tasks sensor with tasks."""
     from custom_components.firefly_cloud.dates import get_offset_time
 
-    now = get_offset_time().replace(tzinfo=None)
-    mock_coordinator.data["children_data"]["test-child-123"]["tasks"]["overdue"] = [
-        {
-            "id": "overdue-task-1",
-            "title": "Late Assignment",
-            "description": "This was due last week",
-            "due_date": now - timedelta(days=7),
-            "set_date": now - timedelta(days=14),
-            "subject": "History",
-            "completion_status": "Todo",
-            "setter": "Mr. Brown",
-        },
-        {
-            "id": "overdue-task-2",
-            "title": "Overdue Project",
-            "description": "Final project submission",
-            "due_date": now - timedelta(days=3),
-            "set_date": now - timedelta(days=30),
-            "subject": "Science",
-            "completion_status": "Todo",
-            "setter": "Dr. Smith",
-        },
-    ]
+    now = get_offset_time()
+    today = now.date()
+    _add_tasks(
+        mock_coordinator,
+        make_task(
+            "overdue-task-1",
+            title="Late Assignment",
+            description="This was due last week",
+            due=today - timedelta(days=7),
+            set_at=now - timedelta(days=14),
+            subject="History",
+            setter="Mr. Brown",
+        ),
+        make_task(
+            "overdue-task-2",
+            title="Overdue Project",
+            description="Final project submission",
+            due=today - timedelta(days=3),
+            set_at=now - timedelta(days=30),
+            subject="Science",
+            setter="Dr. Smith",
+        ),
+    )
 
     sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_OVERDUE_TASKS, "test-child-123")
 
@@ -254,21 +233,22 @@ async def test_overdue_tasks_sensor_attributes(mock_coordinator, mock_config_ent
     """Test overdue tasks sensor attributes."""
     from custom_components.firefly_cloud.dates import get_offset_time
 
-    now = get_offset_time().replace(tzinfo=None)
+    now = get_offset_time()
+    today = now.date()
 
     # Add overdue tasks to coordinator data
-    mock_coordinator.data["children_data"]["test-child-123"]["tasks"]["overdue"] = [
-        {
-            "id": "overdue-task",
-            "title": "Late Assignment",
-            "description": "This was due last week",
-            "due_date": now - timedelta(days=7),
-            "set_date": now - timedelta(days=14),
-            "subject": "History",
-            "completion_status": "Todo",
-            "setter": "Mr. Brown",
-        }
-    ]
+    _add_tasks(
+        mock_coordinator,
+        make_task(
+            "overdue-task",
+            title="Late Assignment",
+            description="This was due last week",
+            due=today - timedelta(days=7),
+            set_at=now - timedelta(days=14),
+            subject="History",
+            setter="Mr. Brown",
+        ),
+    )
 
     sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_OVERDUE_TASKS, "test-child-123")
 
@@ -291,7 +271,7 @@ async def test_sensor_availability(mock_coordinator, mock_config_entry):
 
     # Available when coordinator has successful update and child data exists
     mock_coordinator.last_update_success = True
-    mock_coordinator.data = {"children_data": {"test-child-123": {"some": "data"}}}
+    mock_coordinator.data = make_data(make_child(CHILD, today=date.today()))
     assert sensor.available is True
 
     # Unavailable when coordinator update failed
@@ -347,17 +327,12 @@ async def test_sensor_handles_missing_data_gracefully(mock_coordinator, mock_con
     """Test sensor handles missing data gracefully."""
     from custom_components.firefly_cloud.dates import get_offset_time
 
-    # Remove specific data that sensor needs
-    mock_coordinator.data = {
-        "user_info": {"username": "test", "fullname": "Test User", "guid": "test-123"},
-        "children_data": {
-            "test-child-123": {
-                "events": {},  # Missing today/week keys
-                "tasks": {},  # Missing task type keys
-            }
-        },
-        "last_updated": get_offset_time(),
-    }
+    # A child with no lessons or tasks
+    mock_coordinator.data = make_data(
+        make_child(CHILD, today=get_offset_time().date()),
+        user_info={"username": "test", "fullname": "Test User", "guid": "test-123"},
+        last_updated=get_offset_time(),
+    )
 
     sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_UPCOMING_TASKS, "test-child-123")
 
@@ -415,21 +390,22 @@ async def test_sensor_attributes_tasks_due_today(mock_coordinator, mock_config_e
     """Test tasks due today sensor attributes."""
     from custom_components.firefly_cloud.dates import get_offset_time
 
-    now = get_offset_time().replace(tzinfo=None)
+    now = get_offset_time()
+    today = now.date()
 
     # Add task due today to coordinator data
-    mock_coordinator.data["children_data"]["test-child-123"]["tasks"]["due_today"] = [
-        {
-            "id": "urgent-task",
-            "title": "Submit Report",
-            "description": "Final report submission",
-            "due_date": now,
-            "set_date": now - timedelta(days=7),
-            "subject": "English",
-            "completion_status": "Todo",
-            "setter": "Ms. Johnson",
-        }
-    ]
+    _add_tasks(
+        mock_coordinator,
+        make_task(
+            "urgent-task",
+            title="Submit Report",
+            description="Final report submission",
+            due=today,
+            set_at=now - timedelta(days=7),
+            subject="English",
+            setter="Ms. Johnson",
+        ),
+    )
 
     sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_TASKS_DUE_TODAY, "test-child-123")
 
@@ -473,9 +449,7 @@ async def test_sensor_entity_category(mock_coordinator, mock_config_entry):
 async def test_sensor_handles_empty_tasks(mock_coordinator, mock_config_entry):
     """Test sensor handling empty tasks gracefully."""
     # Clear tasks data
-    mock_coordinator.data["children_data"]["test-child-123"]["tasks"]["upcoming"] = []
-    mock_coordinator.data["children_data"]["test-child-123"]["tasks"]["due_today"] = []
-    mock_coordinator.data["children_data"]["test-child-123"]["tasks"]["overdue"] = []
+    _set_child(mock_coordinator, tasks=())
 
     upcoming_sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_UPCOMING_TASKS, "test-child-123")
     due_today_sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_TASKS_DUE_TODAY, "test-child-123")
@@ -487,28 +461,6 @@ async def test_sensor_handles_empty_tasks(mock_coordinator, mock_config_entry):
     assert upcoming_sensor.available is True
     assert due_today_sensor.available is True
     assert overdue_sensor.available is True
-
-
-@pytest.mark.asyncio
-async def test_sensor_error_handling_malformed_data(mock_coordinator, mock_config_entry):
-    """Test sensor error handling when data access fails."""
-    # Mock coordinator with malformed data structure that will cause TypeError on len()
-    mock_coordinator.data = {
-        "children_data": {
-            "test-child-123": {
-                "tasks": {
-                    "upcoming": "not-a-list",  # Should be a list - len() will raise TypeError
-                }
-                # Missing other required keys
-            }
-        }
-    }
-
-    sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_UPCOMING_TASKS, "test-child-123")
-
-    # len("not-a-list") returns 10, so sensor returns 10
-    assert sensor.native_value == 10
-    assert sensor.available is True
 
 
 @pytest.mark.asyncio
@@ -528,15 +480,7 @@ async def test_sensor_name_includes_child_name(mock_config_entry):
     """Test sensor name includes child name when available."""
     coordinator = MagicMock()
     coordinator.last_update_success = True
-    coordinator.data = {
-        "children_data": {
-            "child-123": {
-                "name": "John Doe",
-                "events": {"today": [], "week": []},
-                "tasks": {"upcoming": [], "due_today": [], "all": [], "overdue": []},
-            }
-        }
-    }
+    coordinator.data = make_data(make_child("child-123", name="John Doe", today=date.today()))
 
     sensor = FireflySensor(coordinator, mock_config_entry, SENSOR_UPCOMING_TASKS, "child-123")
 
@@ -549,14 +493,7 @@ async def test_sensor_name_fallback_to_guid(mock_config_entry):
     """Test sensor name falls back to GUID when no name available."""
     coordinator = MagicMock()
     coordinator.last_update_success = True
-    coordinator.data = {
-        "children_data": {
-            "child-123": {
-                "events": {"today": [], "week": []},
-                "tasks": {"upcoming": [], "due_today": [], "all": [], "overdue": []},
-            }
-        }
-    }
+    coordinator.data = make_data(make_child("child-123", name=None, today=date.today()))
 
     sensor = FireflySensor(coordinator, mock_config_entry, SENSOR_UPCOMING_TASKS, "child-123")
 
@@ -575,18 +512,19 @@ async def test_sensor_coordinator_data_update(mock_coordinator, mock_config_entr
     # Update coordinator data - add a new task for UPCOMING_TASKS sensor
     from custom_components.firefly_cloud.dates import get_offset_time
 
-    now = get_offset_time().replace(tzinfo=None)
-    mock_coordinator.data["children_data"]["test-child-123"]["tasks"]["upcoming"].append(
-        {
-            "id": "task-2",
-            "title": "Physics Homework",
-            "description": "Complete lab report",
-            "due_date": now + timedelta(days=3),
-            "set_date": now - timedelta(days=1),
-            "subject": "Physics",
-            "completion_status": "Todo",
-            "setter": "Dr. Smith",
-        }
+    now = get_offset_time()
+    today = now.date()
+    _add_tasks(
+        mock_coordinator,
+        make_task(
+            "task-2",
+            title="Physics Homework",
+            description="Complete lab report",
+            due=today + timedelta(days=3),
+            set_at=now - timedelta(days=1),
+            subject="Physics",
+            setter="Dr. Smith",
+        ),
     )
 
     # Sensor should reflect updated data
@@ -626,11 +564,7 @@ async def test_async_setup_entry_no_children(hass: HomeAssistant):
     )
 
     coordinator = MagicMock()
-    coordinator.data = {
-        "user_info": {"username": "test", "fullname": "Test User"},
-        "children_data": {},  # No children
-        "children_guids": [],
-    }
+    coordinator.data = make_data(user_info={"username": "test", "fullname": "Test User"})  # No children
 
     hass.data[DOMAIN] = {config_entry.entry_id: coordinator}
 
@@ -670,24 +604,10 @@ async def test_async_setup_entry_multiple_children(hass: HomeAssistant):
     )
 
     coordinator = MagicMock()
-    coordinator.data = {
-        "user_info": {"username": "parent", "fullname": "Parent User"},
-        "children_guids": ["child-1", "child-2", "child-3"],
-        "children_data": {
-            "child-1": {
-                "events": {"today": [], "week": []},
-                "tasks": {"upcoming": [], "due_today": [], "all": [], "overdue": []},
-            },
-            "child-2": {
-                "events": {"today": [], "week": []},
-                "tasks": {"upcoming": [], "due_today": [], "all": [], "overdue": []},
-            },
-            "child-3": {
-                "events": {"today": [], "week": []},
-                "tasks": {"upcoming": [], "due_today": [], "all": [], "overdue": []},
-            },
-        },
-    }
+    coordinator.data = make_data(
+        *(make_child(guid, today=date.today()) for guid in ["child-1", "child-2", "child-3"]),
+        user_info={"username": "parent", "fullname": "Parent User"},
+    )
 
     hass.data[DOMAIN] = {config_entry.entry_id: coordinator}
 
@@ -752,13 +672,7 @@ async def test_sensor_unique_ids_are_unique(mock_coordinator, mock_config_entry)
     ]
 
     # Mock coordinator data for multiple children
-    mock_coordinator.data["children_guids"] = children
-    mock_coordinator.data["children_data"] = {}
-    for child in children:
-        mock_coordinator.data["children_data"][child] = {
-            "events": {"today": [], "week": []},
-            "tasks": {"upcoming": [], "due_today": [], "all": [], "overdue": []},
-        }
+    mock_coordinator.data = make_data(*(make_child(child, today=date.today()) for child in children))
 
     unique_ids = set()
 
@@ -819,9 +733,7 @@ async def test_current_class_sensor_with_class(mock_coordinator, mock_config_ent
     now = get_offset_time().replace(hour=9, minute=30, second=0, microsecond=0)
 
     # Update event times to match current time
-    math_event = mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"][0]
-    math_event["start"] = now.replace(minute=0)
-    math_event["end"] = now.replace(hour=10, minute=0)
+    _move_lesson(mock_coordinator, 0, now.replace(minute=0), now.replace(hour=10, minute=0))
 
     with patch("custom_components.firefly_cloud.dates.get_offset_time", return_value=now):
         sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_CURRENT_CLASS, "test-child-123")
@@ -851,7 +763,7 @@ async def test_next_class_sensor(mock_coordinator, mock_config_entry):
 async def test_next_class_sensor_no_upcoming(mock_coordinator, mock_config_entry):
     """Test next class sensor when no upcoming classes."""
     # Clear all future events
-    mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"] = []
+    _set_lessons(mock_coordinator)
 
     sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_NEXT_CLASS, "test-child-123")
     assert sensor.native_value == "None"
@@ -866,9 +778,7 @@ async def test_current_class_attributes(mock_coordinator, mock_config_entry):
     now = get_offset_time().replace(hour=9, minute=30, second=0, microsecond=0)
 
     # Update event times
-    math_event = mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"][0]
-    math_event["start"] = now.replace(minute=0)
-    math_event["end"] = now.replace(hour=10, minute=0)
+    _move_lesson(mock_coordinator, 0, now.replace(minute=0), now.replace(hour=10, minute=0))
 
     with patch("custom_components.firefly_cloud.dates.get_offset_time", return_value=now):
         sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_CURRENT_CLASS, "test-child-123")
@@ -922,7 +832,7 @@ async def test_next_class_attributes(mock_coordinator, mock_config_entry):
 async def test_next_class_attributes_no_upcoming(mock_coordinator, mock_config_entry):
     """Test next class sensor attributes when no upcoming classes."""
     # Clear all future events
-    mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"] = []
+    _set_lessons(mock_coordinator)
 
     sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_NEXT_CLASS, "test-child-123")
 
@@ -936,7 +846,7 @@ async def test_next_class_attributes_no_upcoming(mock_coordinator, mock_config_e
 async def test_class_sensors_with_no_events(mock_coordinator, mock_config_entry):
     """Test class sensors when no events data is available."""
     # Remove events data
-    mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"] = []
+    _set_lessons(mock_coordinator)
 
     current_sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_CURRENT_CLASS, "test-child-123")
     next_sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_NEXT_CLASS, "test-child-123")
@@ -959,30 +869,27 @@ async def test_next_class_during_last_class_of_day(mock_coordinator, mock_config
 
     # Set up events: Math 9-10am (past), Science 11am-12pm (current), English tomorrow 9am
     events = [
-        {
-            "start": now.replace(hour=9, minute=0),
-            "end": now.replace(hour=10, minute=0),
-            "subject": "Mathematics",
-            "location": "Room 101",
-            "description": "Algebra lesson",
-        },
-        {
-            "start": now.replace(hour=11, minute=0),
-            "end": now.replace(hour=12, minute=0),
-            "subject": "Science",
-            "location": "Lab 1",
-            "description": "Last class of day",
-        },
-        {
-            "start": now.replace(hour=9, minute=0) + timedelta(days=1),  # Tomorrow 9am
-            "end": now.replace(hour=10, minute=0) + timedelta(days=1),
-            "subject": "English",
-            "location": "Room 102",
-            "description": "Tomorrow's first class",
-        },
+        make_lesson(
+            now.replace(hour=9, minute=0),
+            subject="Mathematics",
+            location="Room 101",
+            description="Algebra lesson",
+        ),
+        make_lesson(
+            now.replace(hour=11, minute=0),
+            subject="Science",
+            location="Lab 1",
+            description="Last class of day",
+        ),
+        make_lesson(
+            now.replace(hour=9, minute=0) + timedelta(days=1),  # Tomorrow 9am
+            subject="English",
+            location="Room 102",
+            description="Tomorrow's first class",
+        ),
     ]
 
-    mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"] = events
+    _set_lessons(mock_coordinator, *events)
 
     with patch("custom_components.firefly_cloud.dates.get_offset_time", return_value=now):
         current_sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_CURRENT_CLASS, "test-child-123")
@@ -1011,23 +918,21 @@ async def test_next_class_after_school_hours_shows_tomorrow(mock_coordinator, mo
 
     # Set up events: Science today (past), Math tomorrow (future)
     events = [
-        {
-            "start": now.replace(hour=11, minute=0),  # Today 11am (past)
-            "end": now.replace(hour=12, minute=0),
-            "subject": "Science",
-            "location": "Lab 1",
-            "description": "Today's last class",
-        },
-        {
-            "start": now.replace(hour=9, minute=0) + timedelta(days=1),  # Tomorrow 9am
-            "end": now.replace(hour=10, minute=0) + timedelta(days=1),
-            "subject": "Mathematics",
-            "location": "Room 101",
-            "description": "Tomorrow's first class",
-        },
+        make_lesson(
+            now.replace(hour=11, minute=0),  # Today 11am (past)
+            subject="Science",
+            location="Lab 1",
+            description="Today's last class",
+        ),
+        make_lesson(
+            now.replace(hour=9, minute=0) + timedelta(days=1),  # Tomorrow 9am
+            subject="Mathematics",
+            location="Room 101",
+            description="Tomorrow's first class",
+        ),
     ]
 
-    mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"] = events
+    _set_lessons(mock_coordinator, *events)
 
     with patch("custom_components.firefly_cloud.dates.get_offset_time", return_value=now):
         current_sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_CURRENT_CLASS, "test-child-123")
@@ -1055,23 +960,21 @@ async def test_next_class_during_middle_class_shows_next_today(mock_coordinator,
 
     # Set up events: Math 9-10am (current), Science 11am-12pm (next today)
     events = [
-        {
-            "start": now.replace(hour=9, minute=0),
-            "end": now.replace(hour=10, minute=0),
-            "subject": "Mathematics",
-            "location": "Room 101",
-            "description": "Current class",
-        },
-        {
-            "start": now.replace(hour=11, minute=0),
-            "end": now.replace(hour=12, minute=0),
-            "subject": "Science",
-            "location": "Lab 1",
-            "description": "Next class today",
-        },
+        make_lesson(
+            now.replace(hour=9, minute=0),
+            subject="Mathematics",
+            location="Room 101",
+            description="Current class",
+        ),
+        make_lesson(
+            now.replace(hour=11, minute=0),
+            subject="Science",
+            location="Lab 1",
+            description="Next class today",
+        ),
     ]
 
-    mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"] = events
+    _set_lessons(mock_coordinator, *events)
 
     with patch("custom_components.firefly_cloud.dates.get_offset_time", return_value=now):
         current_sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_CURRENT_CLASS, "test-child-123")
@@ -1133,9 +1036,7 @@ async def test_current_class_with_time_prefix_enabled(mock_coordinator):
     now = get_offset_time().replace(hour=9, minute=30, second=0, microsecond=0)
 
     # Update event times to match current time
-    math_event = mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"][0]
-    math_event["start"] = now.replace(minute=0)
-    math_event["end"] = now.replace(hour=10, minute=0)
+    _move_lesson(mock_coordinator, 0, now.replace(minute=0), now.replace(hour=10, minute=0))
 
     with patch("custom_components.firefly_cloud.dates.get_offset_time", return_value=now):
         sensor = FireflySensor(mock_coordinator, config_entry, SENSOR_CURRENT_CLASS, "test-child-123")
@@ -1187,9 +1088,7 @@ async def test_current_class_with_time_prefix_disabled(mock_coordinator):
     now = get_offset_time().replace(hour=9, minute=30, second=0, microsecond=0)
 
     # Update event times to match current time
-    math_event = mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"][0]
-    math_event["start"] = now.replace(minute=0)
-    math_event["end"] = now.replace(hour=10, minute=0)
+    _move_lesson(mock_coordinator, 0, now.replace(minute=0), now.replace(hour=10, minute=0))
 
     with patch("custom_components.firefly_cloud.dates.get_offset_time", return_value=now):
         sensor = FireflySensor(mock_coordinator, config_entry, SENSOR_CURRENT_CLASS, "test-child-123")
@@ -1290,13 +1189,9 @@ async def test_next_class_with_time_prefix_enabled(mock_coordinator):
     now = get_offset_time().replace(hour=9, minute=30, second=0, microsecond=0)
 
     # Update event times to match current time
-    math_event = mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"][0]
-    math_event["start"] = now.replace(minute=0)
-    math_event["end"] = now.replace(hour=10, minute=0)
+    _move_lesson(mock_coordinator, 0, now.replace(minute=0), now.replace(hour=10, minute=0))
 
-    science_event = mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"][1]
-    science_event["start"] = now.replace(hour=11, minute=0)
-    science_event["end"] = now.replace(hour=12, minute=0)
+    _move_lesson(mock_coordinator, 1, now.replace(hour=11, minute=0), now.replace(hour=12, minute=0))
 
     with patch("custom_components.firefly_cloud.dates.get_offset_time", return_value=now):
         sensor = FireflySensor(mock_coordinator, config_entry, SENSOR_NEXT_CLASS, "test-child-123")
@@ -1348,13 +1243,9 @@ async def test_next_class_with_time_prefix_disabled(mock_coordinator):
     now = get_offset_time().replace(hour=9, minute=30, second=0, microsecond=0)
 
     # Update event times to match current time
-    math_event = mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"][0]
-    math_event["start"] = now.replace(minute=0)
-    math_event["end"] = now.replace(hour=10, minute=0)
+    _move_lesson(mock_coordinator, 0, now.replace(minute=0), now.replace(hour=10, minute=0))
 
-    science_event = mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"][1]
-    science_event["start"] = now.replace(hour=11, minute=0)
-    science_event["end"] = now.replace(hour=12, minute=0)
+    _move_lesson(mock_coordinator, 1, now.replace(hour=11, minute=0), now.replace(hour=12, minute=0))
 
     with patch("custom_components.firefly_cloud.dates.get_offset_time", return_value=now):
         sensor = FireflySensor(mock_coordinator, config_entry, SENSOR_NEXT_CLASS, "test-child-123")
@@ -1406,12 +1297,12 @@ async def test_next_class_in_class_no_upcoming_with_time_prefix(mock_coordinator
     now = get_offset_time().replace(hour=11, minute=30, second=0, microsecond=0)
 
     # Update event times - only Science class exists
-    science_event = mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"][1]
-    science_event["start"] = now.replace(minute=0)
-    science_event["end"] = now.replace(hour=12, minute=0)
+    science_event = replace(
+        mock_coordinator.data.child(CHILD).lessons[1], start=now.replace(minute=0), end=now.replace(hour=12, minute=0)
+    )
 
     # Remove math event so Science is the only/last class
-    mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"] = [science_event]
+    _set_lessons(mock_coordinator, science_event)
 
     with patch("custom_components.firefly_cloud.dates.get_offset_time", return_value=now):
         sensor = FireflySensor(mock_coordinator, config_entry, SENSOR_NEXT_CLASS, "test-child-123")
@@ -1463,13 +1354,9 @@ async def test_next_class_not_in_class_with_time_prefix(mock_coordinator):
     now = get_offset_time().replace(hour=10, minute=30, second=0, microsecond=0)
 
     # Update event times
-    math_event = mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"][0]
-    math_event["start"] = now.replace(hour=9, minute=0)
-    math_event["end"] = now.replace(hour=10, minute=0)
+    _move_lesson(mock_coordinator, 0, now.replace(hour=9, minute=0), now.replace(hour=10, minute=0))
 
-    science_event = mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"][1]
-    science_event["start"] = now.replace(hour=11, minute=0)
-    science_event["end"] = now.replace(hour=12, minute=0)
+    _move_lesson(mock_coordinator, 1, now.replace(hour=11, minute=0), now.replace(hour=12, minute=0))
 
     with patch("custom_components.firefly_cloud.dates.get_offset_time", return_value=now):
         sensor = FireflySensor(mock_coordinator, config_entry, SENSOR_NEXT_CLASS, "test-child-123")
@@ -1525,18 +1412,17 @@ async def test_class_times_show_local_timezone(mock_coordinator):
 
     # Create events with UTC times (9-10am UTC)
     class_start_utc = now_utc.replace(minute=0)
-    class_end_utc = now_utc.replace(hour=10, minute=0)
 
-    # Set up coordinator data with UTC times
-    mock_coordinator.data["children_data"]["test-child-123"]["events"]["week"] = [
-        {
-            "start": class_start_utc,
-            "end": class_end_utc,
-            "subject": "Mathematics",
-            "location": "Room 101",
-            "description": "Test class",
-        }
-    ]
+    # Set up coordinator data with UTC times (a one-hour lesson)
+    _set_lessons(
+        mock_coordinator,
+        make_lesson(
+            class_start_utc,
+            subject="Mathematics",
+            location="Room 101",
+            description="Test class",
+        ),
+    )
 
     with patch("custom_components.firefly_cloud.dates.get_offset_time", return_value=now_local):
         sensor = FireflySensor(mock_coordinator, config_entry, SENSOR_CURRENT_CLASS, "test-child-123")
@@ -1573,25 +1459,30 @@ async def test_task_attributes_include_change_fields(
     mock_coordinator, mock_config_entry, sensor_type, bucket, list_key
 ):
     """Every task list shows Firefly's date and any dashboard change, but not the history."""
-    from datetime import date
-
     from custom_components.firefly_cloud.dates import get_offset_time
 
-    now = get_offset_time()
-    mock_coordinator.data["children_data"]["test-child-123"]["tasks"][bucket] = [
-        {
-            "id": "1",
-            "title": "Moved",
-            "description": "",
-            "due_date": now + timedelta(days=3),
-            "subject": "Design",
-            "setter": "Ms Rivera",
-            "firefly_due_date": date(2026, 11, 11),
-            "due_date_changed": True,
-            "due_date_change_reason": "Extended in class",
-            "change": {"active": {}, "ended": [], "school_changes": []},
-        }
-    ]
+    today = get_offset_time().date()
+    due = today + timedelta(days={"upcoming": 3, "due_today": 0, "overdue": -3}[bucket])
+    change = {
+        "last_firefly_due": "2026-11-11",
+        "active": {"new_due_date": due.isoformat(), "reason": "Extended in class"},
+        "ended": [],
+        "school_changes": [],
+    }
+    _set_child(
+        mock_coordinator,
+        tasks=(
+            make_task(
+                "1",
+                title="Moved",
+                due=due,
+                firefly_due=date(2026, 11, 11),
+                subject="Design",
+                setter="Ms Rivera",
+                change=change,
+            ),
+        ),
+    )
 
     sensor = FireflySensor(mock_coordinator, mock_config_entry, sensor_type, "test-child-123")
     [task] = sensor.extra_state_attributes[list_key]
@@ -1604,14 +1495,68 @@ async def test_task_attributes_include_change_fields(
 
 @pytest.mark.asyncio
 async def test_task_attributes_without_change_fields(mock_coordinator, mock_config_entry):
-    """Tasks processed without a change store report no change."""
+    """A task without Firefly's own date or a dashboard change reports no change."""
     from custom_components.firefly_cloud.dates import get_offset_time
 
-    mock_coordinator.data["children_data"]["test-child-123"]["tasks"]["overdue"] = [
-        {"id": "1", "title": "Plain", "description": "", "due_date": get_offset_time(), "subject": "X", "setter": "Y"}
-    ]
+    _add_tasks(
+        mock_coordinator,
+        make_task(
+            "1",
+            title="Plain",
+            due=get_offset_time().date() - timedelta(days=1),
+            firefly_due=None,
+            subject="X",
+            setter="Y",
+        ),
+    )
     sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_OVERDUE_TASKS, "test-child-123")
     [task] = sensor.extra_state_attributes["tasks"]
     assert task["firefly_due_date"] is None
     assert task["due_date_changed"] is False
     assert task["due_date_change_reason"] is None
+
+
+@pytest.mark.asyncio
+async def test_sensor_shows_unknown_subject_when_none(mock_coordinator, mock_config_entry):
+    """A task with no subject shows "Unknown Subject"."""
+    from custom_components.firefly_cloud.dates import get_offset_time
+
+    _set_child(
+        mock_coordinator,
+        tasks=(make_task("1", title="No subject", due=get_offset_time().date() + timedelta(days=1), subject=None),),
+    )
+    sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_UPCOMING_TASKS, "test-child-123")
+    [task] = sensor.extra_state_attributes["tasks"]
+    assert task["subject"] == "Unknown Subject"
+
+
+@pytest.mark.asyncio
+async def test_sensor_keeps_empty_subject(mock_coordinator, mock_config_entry):
+    """A task whose subject is an empty string shows it as-is."""
+    from custom_components.firefly_cloud.dates import get_offset_time
+
+    _set_child(
+        mock_coordinator,
+        tasks=(make_task("1", title="Blank subject", due=get_offset_time().date() + timedelta(days=1), subject=""),),
+    )
+    sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_UPCOMING_TASKS, "test-child-123")
+    [task] = sensor.extra_state_attributes["tasks"]
+    assert task["subject"] == ""
+
+
+@pytest.mark.asyncio
+async def test_sensor_truncates_long_descriptions(mock_coordinator, mock_config_entry):
+    """Descriptions over 100 characters are cut to 100 and end with "..."; 100 or fewer are kept."""
+    from custom_components.firefly_cloud.dates import get_offset_time
+
+    due = get_offset_time().date()
+    _set_child(
+        mock_coordinator,
+        tasks=(
+            make_task("1", title="Long", due=due, description="x" * 101),
+            make_task("2", title="Exact", due=due, description="y" * 100),
+        ),
+    )
+    sensor = FireflySensor(mock_coordinator, mock_config_entry, SENSOR_TASKS_DUE_TODAY, "test-child-123")
+    descriptions = {task["title"]: task["description"] for task in sensor.extra_state_attributes["tasks"]}
+    assert descriptions == {"Long": "x" * 100 + "...", "Exact": "y" * 100}

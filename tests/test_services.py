@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import pytest_asyncio
+from conftest import make_child, make_data, make_task
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
 
@@ -30,19 +31,16 @@ def coordinator():
     coord = MagicMock()
     coord.change_store = store
     coord.async_rebuild_from_last_fetch = AsyncMock()
-    coord.data = {
-        "children_data": {
-            CHILD: {
-                "tasks": {
-                    "all": [
-                        {"id": 69040, "title": "Model Car", "firefly_due_date": date(2026, 11, 11)},
-                        {"id": "70000", "title": "Far away", "firefly_due_date": date(2026, 12, 20)},
-                    ],
-                    "upcoming": [],
-                }
-            }
-        }
-    }
+    coord.data = make_data(
+        make_child(
+            CHILD,
+            tasks=[
+                make_task("69040", title="Model Car", due=date(2026, 11, 11)),
+                make_task("70000", title="Far away", due=date(2026, 12, 20)),
+            ],
+            today=date(2026, 11, 10),
+        )
+    )
     return coord
 
 
@@ -148,6 +146,15 @@ async def test_unknown_task(hass, services):
     """A task id that isn't one of the child's open tasks is rejected."""
     with pytest.raises(ServiceValidationError) as err:
         await _call(hass, SERVICE_SET_TASK_DUE_DATE, task_id="1", reason="x")
+    assert err.value.translation_key == "task_not_found"
+
+
+@pytest.mark.asyncio
+async def test_task_not_found_before_first_refresh(hass, services, coordinator):
+    """Before the coordinator has data, any task id is reported as not found."""
+    coordinator.data = None
+    with pytest.raises(ServiceValidationError) as err:
+        await _call(hass, SERVICE_SET_TASK_DUE_DATE, task_id="69040", reason="x")
     assert err.value.translation_key == "task_not_found"
 
 

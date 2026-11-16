@@ -19,6 +19,7 @@ date, which confirms it.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import date, datetime
 from typing import Any
 
@@ -26,7 +27,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 
 from .const import DOMAIN
-from .dates import parse_due_date
+from .models import Task
 
 STORAGE_VERSION = 1
 STORAGE_KEY = f"{DOMAIN}.task_changes.{{entry_id}}"
@@ -153,50 +154,28 @@ def effective_due(state: dict[str, Any], child_guid: str, task_id: Any, firefly_
     return firefly_due
 
 
-def firefly_task_id(task: dict[str, Any]) -> Any:
-    """Return a task's Firefly id (as used for todo items and dashboard changes)."""
-    return task.get("guid", task.get("id", "unknown"))
-
-
 def apply_changes(
-    change_store: TaskChangeStore | None, child_guid: str, tasks: list[dict[str, Any]], now: datetime
-) -> list[dict[str, Any]]:
-    """Record Firefly's dates for a child's tasks and return copies whose dueDate is the date in force.
+    change_store: TaskChangeStore | None, child_guid: str, tasks: list[Task], now: datetime
+) -> list[Task]:
+    """Record Firefly's dates for a child's tasks and return them with the date in force applied.
 
-    Each copy keeps Firefly's own date in ``fireflyDueDate`` and the task's change
-    record in ``_change``, so date filters written for Firefly's data work on the
-    effective date. The store is saved only if Firefly's dates changed.
+    Each returned task keeps Firefly's own date in ``firefly_due``, has the date in force
+    in ``due`` and carries its change record in ``change``. The store is saved only if
+    Firefly's dates changed. With no store the tasks are returned as they are.
     """
     if change_store is None:
         return tasks
     state = change_store.state
-    firefly_dues = {str(firefly_task_id(task)): parse_due_date(task.get("dueDate")) for task in tasks}
-    if observe_firefly_dates(state, child_guid, firefly_dues, now):
+    if observe_firefly_dates(state, child_guid, {task.id: task.firefly_due for task in tasks}, now):
         change_store.async_save_delayed()
-
-    applied = []
-    for task in tasks:
-        task_id = str(firefly_task_id(task))
-        due = effective_due(state, child_guid, task_id, firefly_dues[task_id])
-        copy = {**task, "fireflyDueDate": task.get("dueDate"), "_change": task_record(state, child_guid, task_id)}
-        if due is not None:
-            copy["dueDate"] = f"{due.isoformat()}T00:00:00"
-        applied.append(copy)
-    return applied
-
-
-def change_fields(task: dict[str, Any]) -> dict[str, Any]:
-    """Return the dashboard change fields for a processed task (empty if changes weren't applied)."""
-    if "fireflyDueDate" not in task:
-        return {}
-    record = task.get("_change")
-    active = (record or {}).get("active") or {}
-    return {
-        "firefly_due_date": parse_due_date(task["fireflyDueDate"]),
-        "due_date_changed": bool(active.get("new_due_date")),
-        "due_date_change_reason": active.get("reason"),
-        "change": record,
-    }
+    return [
+        replace(
+            task,
+            due=effective_due(state, child_guid, task.id, task.firefly_due),
+            change=task_record(state, child_guid, task.id),
+        )
+        for task in tasks
+    ]
 
 
 class TaskChangeStore:

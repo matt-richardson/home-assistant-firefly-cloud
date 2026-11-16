@@ -6,6 +6,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import CONF_SCHOOL_NAME, DOMAIN
 from .coordinator import FireflyUpdateCoordinator
+from .models import ChildData
 
 
 class FireflyBaseEntity(CoordinatorEntity[FireflyUpdateCoordinator]):
@@ -34,35 +35,21 @@ class FireflyBaseEntity(CoordinatorEntity[FireflyUpdateCoordinator]):
         )
 
     @property
+    def _child(self) -> ChildData | None:
+        """Return this child's data, or None if the coordinator has no data for it."""
+        if self.coordinator.data is None:
+            return None
+        return self.coordinator.data.child(self._child_guid)
+
+    @property
     def name(self) -> str:
         """Return the display name of the entity."""
-        if self.coordinator.data and self._child_guid in self.coordinator.data.get("children_data", {}):
-            child_data = self.coordinator.data["children_data"][self._child_guid]
-            child_name = child_data.get("name")
-            if child_name:
-                return f"{self._base_name} ({child_name})"
+        child = self._child
+        if child is not None and child.name:
+            return f"{self._base_name} ({child.name})"
         return self._attr_name or f"{self._base_name} ({self._child_guid[:8]})"
 
     @property
     def available(self) -> bool:
         """Return True if entity is available."""
-        return (
-            self.coordinator.last_update_success
-            and self.coordinator.data is not None
-            and self._child_guid in self.coordinator.data.get("children_data", {})
-        )
-
-    def _get_child_data(self) -> dict | None:
-        """Get data for this child from coordinator.
-
-        Returns None if coordinator data is not available or child doesn't exist.
-        This is a helper method to reduce code duplication across entity types.
-        """
-        if not self.coordinator.data:
-            return None
-
-        children_data = self.coordinator.data.get("children_data", {})
-        if self._child_guid not in children_data:
-            return None
-
-        return children_data[self._child_guid]
+        return self.coordinator.last_update_success and self._child is not None
