@@ -24,6 +24,13 @@ def test_bucket_accepts_float_lookahead():
     assert bucket(date(2026, 11, 21), TODAY, 7.0) is Bucket.LATER
 
 
+def test_task_with_unparseable_due_date_has_no_due_date():
+    """A due date Firefly sends in a form we can't read becomes no due date, not an error."""
+    task = Task.from_firefly({"guid": "1", "dueDate": "not-a-date"})
+    assert task.due is None
+    assert task.firefly_due is None
+
+
 def test_task_from_firefly_matches_processed_rules():
     assert Task.from_firefly({"guid": 42}).id == "42"
     assert Task.from_firefly({"id": 7}).id == "7"

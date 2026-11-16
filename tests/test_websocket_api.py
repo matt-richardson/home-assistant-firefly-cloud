@@ -54,10 +54,10 @@ def test_overview_unknown_entity():
     connection.send_result.assert_not_called()
 
 
-@pytest.mark.parametrize("data", [None, make_data()])
-def test_overview_no_data_for_child(coordinator, data):
+@pytest.mark.parametrize("has_data", [False, True], ids=["before_first_update", "child_not_returned"])
+def test_overview_no_data_for_child(coordinator, has_data):
     """Before the first update, or for a child not yet returned, the reply is not_ready."""
-    coordinator.data = data
+    coordinator.data = make_data() if has_data else None
     connection = MagicMock()
     with patch("custom_components.firefly_cloud.websocket_api.resolve_child", return_value=(coordinator, CHILD)):
         ws_child_overview(MagicMock(), connection, _msg())
