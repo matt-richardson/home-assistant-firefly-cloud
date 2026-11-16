@@ -6,12 +6,15 @@ child's todo entity.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 
 from .const import DOMAIN
+
+if TYPE_CHECKING:
+    from .coordinator import FireflyUpdateCoordinator
 
 # Firefly todo entities have unique ids "<config entry id>_todo_<child guid>"
 TODO_UNIQUE_ID_MARKER = "_todo_"
@@ -28,7 +31,7 @@ def firefly_todo_child(hass: HomeAssistant, entity_id: str) -> tuple[str, str] |
     return entry.config_entry_id, unique_id.split(TODO_UNIQUE_ID_MARKER, 1)[1]
 
 
-def resolve_child(hass: HomeAssistant, entity_id: str) -> tuple[Any, str] | None:
+def resolve_child(hass: HomeAssistant, entity_id: str) -> tuple[FireflyUpdateCoordinator, str] | None:
     """Return (coordinator, child_guid) for a loaded Firefly tasks list, or None."""
     found = firefly_todo_child(hass, entity_id)
     if found is None:

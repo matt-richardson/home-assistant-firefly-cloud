@@ -16,8 +16,9 @@ from homeassistant.util import dt as dt_util
 
 from .child_lookup import resolve_child
 from .const import DOMAIN
+from .coordinator import FireflyUpdateCoordinator
 from .models import Task
-from .task_changes import clear_change, set_change
+from .task_changes import TaskChangeStore, clear_change, set_change
 
 SERVICE_SET_TASK_DUE_DATE = "set_task_due_date"
 SERVICE_CLEAR_TASK_DUE_DATE = "clear_task_due_date"
@@ -54,26 +55,30 @@ def _error(key: str, **placeholders: str) -> ServiceValidationError:
     return ServiceValidationError(translation_domain=DOMAIN, translation_key=key, translation_placeholders=placeholders)
 
 
-def _resolve_task(hass: HomeAssistant, call: ServiceCall) -> tuple[Any, str, Task]:
-    """Find the coordinator, child and open task a service call targets."""
+def _resolve_task(
+    hass: HomeAssistant, call: ServiceCall
+) -> tuple[FireflyUpdateCoordinator, TaskChangeStore, str, Task]:
+    """Find the coordinator, its change store, and the child and open task a service call targets."""
     entity_id = call.data["entity_id"]
     resolved = resolve_child(hass, entity_id)
     if resolved is None:
         raise _error("entity_not_found", entity_id=entity_id)
     coordinator, child_guid = resolved
+    store = coordinator.change_store
+    assert store is not None  # resolve_child only returns coordinators with a change store
     task_id = call.data[ATTR_TASK_ID]
-    child = coordinator.data.child(child_guid) if coordinator.data else None
-    task = next((t for t in child.tasks if t.id == task_id), None) if child else None
+    child = coordinator.data.child(child_guid) if coordinator.data is not None else None
+    task = next((t for t in child.tasks if t.id == task_id), None) if child is not None else None
     if task is None:
         raise _error("task_not_found", task_id=task_id)
-    return coordinator, child_guid, task
+    return coordinator, store, child_guid, task
 
 
 async def _async_set_task_due_date(hass: HomeAssistant, call: ServiceCall) -> None:
-    coordinator, child_guid, task = _resolve_task(hass, call)
+    coordinator, store, child_guid, task = _resolve_task(hass, call)
     try:
         set_change(
-            coordinator.change_store.state,
+            store.state,
             child_guid,
             task.id,
             firefly_due=task.firefly_due,
@@ -83,17 +88,17 @@ async def _async_set_task_due_date(hass: HomeAssistant, call: ServiceCall) -> No
         )
     except ValueError as err:
         raise _error(str(err)) from err
-    coordinator.change_store.async_save_delayed()
+    store.async_save_delayed()
     await coordinator.async_rebuild_from_last_fetch()
 
 
 async def _async_clear_task_due_date(hass: HomeAssistant, call: ServiceCall) -> None:
-    coordinator, child_guid, task = _resolve_task(hass, call)
+    coordinator, store, child_guid, task = _resolve_task(hass, call)
     try:
-        clear_change(coordinator.change_store.state, child_guid, task.id, dt_util.now())
+        clear_change(store.state, child_guid, task.id, dt_util.now())
     except ValueError as err:
         raise _error(str(err)) from err
-    coordinator.change_store.async_save_delayed()
+    store.async_save_delayed()
     await coordinator.async_rebuild_from_last_fetch()
 
 

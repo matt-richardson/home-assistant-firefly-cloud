@@ -150,6 +150,15 @@ async def test_unknown_task(hass, services):
 
 
 @pytest.mark.asyncio
+async def test_task_not_found_before_first_refresh(hass, services, coordinator):
+    """Before the coordinator has data, any task id is reported as not found."""
+    coordinator.data = None
+    with pytest.raises(ServiceValidationError) as err:
+        await _call(hass, SERVICE_SET_TASK_DUE_DATE, task_id="69040", reason="x")
+    assert err.value.translation_key == "task_not_found"
+
+
+@pytest.mark.asyncio
 async def test_task_beyond_lookahead_can_be_changed(hass, services, coordinator):
     """Tasks outside the upcoming window (only in 'all') can still be changed."""
     await _call(hass, SERVICE_SET_TASK_DUE_DATE, task_id="70000", due_date="2026-12-24")

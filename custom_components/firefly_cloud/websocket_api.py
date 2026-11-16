@@ -43,7 +43,7 @@ def ws_child_overview(hass: HomeAssistant, connection: websocket_api.ActiveConne
             connection.send_error(msg["id"], ERROR_NOT_READY, "Firefly data isn't loaded yet")
         return
     coordinator, child_guid = resolved
-    child = coordinator.data.child(child_guid) if coordinator.data else None
+    child = coordinator.data.child(child_guid) if coordinator.data is not None else None
     if child is None:
         connection.send_error(msg["id"], ERROR_NOT_READY, "Firefly data isn't loaded yet")
         return
