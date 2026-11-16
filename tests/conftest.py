@@ -483,7 +483,9 @@ def make_task(
     )
 
 
-def make_lesson(start: datetime, minutes=60, subject="Maths", location="M8", description=None) -> Lesson:
+def make_lesson(  # pylint: disable=too-many-arguments
+    start: datetime, minutes=60, subject="Maths", location="M8", description=None, *, guild=None, attendees=()
+) -> Lesson:
     """Build a Lesson starting at ``start`` and lasting ``minutes``."""
     return Lesson(
         start=start,
@@ -491,8 +493,8 @@ def make_lesson(start: datetime, minutes=60, subject="Maths", location="M8", des
         subject=subject,
         location=location,
         description=description,
-        guild=None,
-        attendees=(),
+        guild=guild,
+        attendees=tuple(attendees),
     )
 
 

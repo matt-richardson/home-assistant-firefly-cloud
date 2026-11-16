@@ -332,15 +332,7 @@ async def test_calendar_event_build_description_empty_fields(mock_coordinator, m
     calendar = FireflyCalendar(mock_coordinator, mock_config_entry, "test-child-123")
 
     # Event with minimal data
-    event_data = Lesson(
-        start=dt_util.now(),
-        end=dt_util.now() + timedelta(hours=1),
-        subject="Test Subject",
-        location="Test Location",
-        description=None,
-        guild=None,
-        attendees=(),
-    )
+    event_data = make_lesson(dt_util.now(), subject="Test Subject", location="Test Location", description=None)
 
     calendar_event = calendar._convert_to_calendar_event(event_data)
 
@@ -356,14 +348,13 @@ async def test_calendar_event_build_description_with_many_attendees(mock_coordin
     calendar = FireflyCalendar(mock_coordinator, mock_config_entry, "test-child-123")
 
     # Event with many attendees
-    event_data = Lesson(
-        start=dt_util.now(),
-        end=dt_util.now() + timedelta(hours=1),
+    event_data = make_lesson(
+        dt_util.now(),
         subject="Test Subject",
         location="Test Location",
         description="Test description",
         guild="Year 10",
-        attendees=tuple(f"Teacher {i}" for i in range(10)),  # 10 attendees
+        attendees=[f"Teacher {i}" for i in range(10)],
     )
 
     calendar_event = calendar._convert_to_calendar_event(event_data)
@@ -379,9 +370,8 @@ async def test_calendar_event_build_description_with_dict_attendees(mock_coordin
     calendar = FireflyCalendar(mock_coordinator, mock_config_entry, "test-child-123")
 
     # Event with dictionary attendees (how they come from the real API)
-    event_data = Lesson(
-        start=dt_util.now(),
-        end=dt_util.now() + timedelta(hours=1),
+    event_data = make_lesson(
+        dt_util.now(),
         subject="Chemistry Lab",
         location="Science Lab 1",
         description="Bring safety goggles",
@@ -480,8 +470,8 @@ async def test_calendar_handles_lessons_without_timezone(hass, mock_config_entry
 
 
 @pytest.mark.asyncio
-async def test_calendar_get_events_no_week_events_data(hass, mock_config_entry):
-    """Test calendar get_events when week events data is missing."""
+async def test_calendar_get_events_child_without_lessons(hass, mock_config_entry):
+    """A child with no lessons has no calendar events."""
     coordinator = MagicMock()
     coordinator.data = make_data(make_child("test-child-123", today=dt_util.now().date()))
 
@@ -490,7 +480,6 @@ async def test_calendar_get_events_no_week_events_data(hass, mock_config_entry):
     now = dt_util.now()
     events = await calendar.async_get_events(hass, now, now + timedelta(days=7))
 
-    # Should handle missing week data gracefully
     assert events == []
 
 

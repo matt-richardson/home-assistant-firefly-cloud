@@ -220,25 +220,6 @@ async def test_create_todo_item_with_missing_due_date():
 
 
 @pytest.mark.asyncio
-async def test_create_todo_item_with_invalid_due_date():
-    """Test create_todo_item with invalid due date format."""
-    coordinator = Mock(spec=FireflyUpdateCoordinator)
-    config_entry = Mock(spec=ConfigEntry)
-    config_entry.data = {"school_name": "Test School"}
-    config_entry.entry_id = "test-entry"
-
-    entity = FireflyTodoListEntity(coordinator, config_entry, "test-child-123")
-
-    # An unparseable due date reaches the entity as no due date
-    task_data = make_task("t1", title="Task With Bad Date", description="Invalid date format", due=None)
-
-    todo_item = entity._create_todo_item(task_data, TodoItemStatus.NEEDS_ACTION)
-
-    assert todo_item.summary == "Task With Bad Date"
-    assert todo_item.due is None  # Should handle invalid date gracefully
-
-
-@pytest.mark.asyncio
 async def test_create_todo_item_with_missing_subject():
     """Test create_todo_item with missing subject."""
     coordinator = Mock(spec=FireflyUpdateCoordinator)

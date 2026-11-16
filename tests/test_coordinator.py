@@ -837,8 +837,13 @@ async def test_coordinator_data_structure(hass: HomeAssistant, mock_api):
         assert isinstance(child_data, ChildData)
         assert child_data.guid == guid
         assert child_data.name
-        assert all(isinstance(lesson, Lesson) for lesson in child_data.lessons)
-        assert all(isinstance(task, Task) for task in child_data.tasks)
+        [lesson] = child_data.lessons
+        assert isinstance(lesson, Lesson)
+        assert (lesson.subject, lesson.location, lesson.description) == ("Mathematics", "Room 101", "Algebra lesson")
+        [task] = child_data.tasks
+        assert isinstance(task, Task)
+        assert (task.id, task.title, task.subject) == ("task-1", "Math Homework", "Mathematics")
+        assert child_data.upcoming == [task]
 
 
 @pytest.mark.asyncio
