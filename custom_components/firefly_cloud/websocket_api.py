@@ -48,7 +48,7 @@ def ws_child_overview(hass: HomeAssistant, connection: websocket_api.ActiveConne
         connection.send_error(msg["id"], ERROR_NOT_READY, "Firefly data isn't loaded yet")
         return
     today = dates.get_offset_time().date()
-    connection.send_result(msg["id"], build_overview(child, today, coordinator.task_lookahead_days))
+    connection.send_result(msg["id"], build_overview(child, today))
 
 
 def _needs_attention(hass: HomeAssistant, entry_id: str) -> bool:

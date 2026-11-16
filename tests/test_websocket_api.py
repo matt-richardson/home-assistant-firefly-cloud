@@ -38,7 +38,7 @@ def test_overview_result(coordinator):
         now.return_value.date.return_value = date(2026, 11, 14)
         ws_child_overview(MagicMock(), connection, _msg())
 
-    build.assert_called_once_with(coordinator.data.child(CHILD), date(2026, 11, 14), 7)
+    build.assert_called_once_with(coordinator.data.child(CHILD), date(2026, 11, 14))
     connection.send_result.assert_called_once_with(5, {"ok": 1})
 
 

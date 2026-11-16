@@ -127,13 +127,17 @@ def _lesson_days(lessons: tuple[Lesson, ...], today: date) -> list[dict[str, Any
     return [{"date": day, "lessons": items} for day, items in sorted(days.items())]
 
 
-def build_overview(child: ChildData, today: date, lookahead_days: float) -> dict[str, Any]:
-    """Build the tasks and lessons overview for one child, for the dashboard cards."""
-    tasks = [_task_overview(task, today, lookahead_days) for task in child.tasks]
+def build_overview(child: ChildData, today: date) -> dict[str, Any]:
+    """Build the tasks and lessons overview for one child, for the dashboard cards.
+
+    ``today`` is passed in rather than read from the child, so a request just after
+    midnight buckets against the new day even before the next refresh.
+    """
+    tasks = [_task_overview(task, today, child.lookahead_days) for task in child.tasks]
     tasks.sort(key=lambda t: (t["due"] is None, t["due"] or "", t["title"] or ""))
     return {
         "today": today.isoformat(),
-        "lookahead_days": lookahead_days,
+        "lookahead_days": child.lookahead_days,
         "tasks": tasks,
         "lesson_days": _lesson_days(child.lessons, today),
     }
